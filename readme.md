@@ -2,11 +2,11 @@
 Cosmos
 ====
 
-1. (noun) the world or universe regarded as an orderly, harmonious system.
+> 1. (noun) the world or universe regarded as an orderly, harmonious system.
 
 Cosmos is a modern logic programming language.
 
-**Note:** the language is in alpha.
+> **Note:** the language is in alpha.
 
 Download
 ---
@@ -85,7 +85,6 @@ Note how conventional the code looks now. Despite being a declarative language, 
 Whereas functions have one output, relations may have zero, one or more outputs. You can check this by making queries at the interpreter.
 
 ```javascript
-Cosmos v0.10
 > x=1 or x=2 //this query has two answers (outputs)
 | x = 1
 | x = 2
@@ -186,7 +185,7 @@ The type system supports *composite types*.
 ```
     Relation Any Any p = double
 ```
-Relations can also receive composite types. *Relation Any Any* is a type that accepts any relation with exactly two arguments.
+Relations get composite types. *Relation Any Any* is a type that accepts any relation with exactly two arguments.
 
 Booleans
 ----
