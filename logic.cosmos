@@ -1,0 +1,80 @@
+require('list', list)
+require('string', string)
+require('math', math)
+
+rel listOf(x, Relation p, args, Functor l)
+	pl::list_of(x, p, args, l)
+
+rel between(i, j, x)
+	pl::between(i, j, x)
+	
+rel apply(Relation p, Functor l)
+	pl::apply(p,l)
+	
+rel applyOnce(Relation p, Functor l)
+	pl::apply_once(p,l)
+	
+rel applyCatch(Relation p, Functor l, Relation q)
+	pl::apply_catch(p,l,q)
+	
+rel iterate(Relation p, Integer n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+
+rel throw(x)
+	pl::throw(x)
+	
+rel type(x,y)
+	pl::nonvar(x)
+	if(pl::number(x))
+		y='Number'
+	elseif(pl::string(x))
+		y='String'
+	elseif(pl::is_list(x))
+		y='List'
+	elseif(pl::is_assoc(x))
+		y='Record'
+	elseif(pl::compound(x) or pl::atom(x) or x=[])
+		y='Functor'
+	else
+		y='Any'
+	
+rel instantied(Any x)
+	pl::var(x)
+	
+rel toString(Any x, String s)
+	once if(pl::is_list(x))
+		list.map(x, toString, l2)
+		list.join(l2, ', ', s0)
+		s = '['+s0+']'
+	elseif(pl::compound(x) and pl::atom_string(atom,'closure') and pl::functor(x, atom, _))
+		s='#relation'
+	elseif(pl::var(x))
+		s = '#var'
+	elseif(pl::is_assoc(x))
+		rel bindingToString(b, s)
+			pl::get_binding(b, key, value)
+			toString(key,s1)
+			toString(value,s2)
+			s=s1+' = '+s2
+			//s=toString(key)+' = '+toString(value) //todo error?
+		pl::assoc_to_list(x,l)
+		list.map(l, bindingToString, l2)
+		list.join(l2, ' and ', s0)
+		s = '{ '+s0+' }'
+	elseif(pl::atom(x)) 
+		pl::atom_string(x, s0)
+		if(string.slice(s0, 0, 2, 'fc')) //functor
+			string.slice(s0, 2, string.size(s0), s)
+		else //relation
+			s='#relation'
+	elseif(pl::compound(x)) //functor
+		pl::functor(x, s0, _)
+		string.slice(s0, 2, string.size(s0), name)
+		s=name+'(~)'
+	else
+		s=x
+	

@@ -1,0 +1,135 @@
+functor(Cons,Functor)
+functor(Token,Functor)
+
+require('lexer', lexer)
+require('parser', parser)
+require('whitespacer', whitespacer)
+require('gen', gen)
+
+//main :- current_prolog_flag(argv, A), list_atom_string(A, B), cosmos_env(T), cosmos_main(T,B).
+rel run_all(s, x, module, opts)
+	//io.writeln('Running lexer...')
+	lexer.run(s,0,l)
+	//io.writeln('Removing whitespace...')
+	whitespacer.run(l,l2)
+	//io.writeln('Parsing...')
+	parser.parse_world(l2, _, fc)
+	/*pl::writeln(fc)
+	io.writeln('Generating code...')*/
+	gen.generate_chunk(fc,x, module, opts)
+
+rel run_query(s, x, prefix, module, query_vars)
+	//io.writeln('Running lexer...')
+	lexer.run(s,0,l)
+	//io.writeln('Removing whitespace...')
+	whitespacer.run(l,l2)
+	//io.writeln('Parsing...')
+	if(parser.parse_body(l2, lfinal, fc))
+		lfinal=[Token(_,'EOF',_)]
+	else
+		logic.throw("cannot parse query")
+	//io.writeln('Generating code...')
+	//io.rawWriteln(fc)
+	gen.generate_query(fc, x, prefix, query_vars, module)
+	//io.writeln("translated query")
+
+rel compile_to_file(module, fname2, code, opts)
+	String name1=''+module+'.'+'cosmos'
+	io.readFile(name1, s)
+	this.run_all(s, code0, module, opts)
+	if(list.has(opts,'--main'))
+		code = code0 + '\nmain :- current_prolog_flag(argv, A), list_atom_string(A, B), '+module+'_env(T), '+module+'_main(T,B).'
+	else
+		code = code0
+	io.writeToFile(fname2, code)
+
+rel run_file(fname, code)
+	io.readFile(fname,s)
+	once this.run_all(s,code,'temp', [])
+
+rel compile(code_cosmos, code_prolog, module)
+	once this.run_all(code_cosmos, code_prolog, module, [])
+
+rel compile_module(module, x, opts)
+	//s1=module+'.'+'cosmos'
+	s2=module+'.'+'pl'
+	logic.applyCatch(compile_to_file, [module, s2, x, opts], rel(e) io.writeln('CosmosError: '+e);)
+	
+rel eval_vars(code, prefix, vars, module)
+	//store code on temporary file, then consult file
+	name='.temp.pl'
+	list.map(vars, rel(x,s) s='_'+x;, v2)
+	list.join(v2, ', ', v3)
+	file_code=':- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").\n'+prefix+'temp('+v3+') :- '+code+'.'
+	//io.writeln('eval: '+code)
+	//io.writeln('code: '+file_code)
+	io.writeToFile(name, file_code)
+	list.map(vars, rel(_,y) y=z;, v4)
+	pl::consult(name)
+	pl::atom_string(atom_temp, 'temp')
+	pl::atom_string(atom_writeln, 'writeln')
+	pl::apply_forall_custom_vars(atom_temp, vars, v4)
+
+rel interpreter()
+	module = 'temp'
+	io.write('> ')
+	io.read(input)
+	if(logic.applyCatch(run_query, [input, code, prefix, module, vars], rel(e) io.writeln('CosmosError: '+e) and false;))
+		logic.applyCatch(eval_vars, [code, prefix, vars, module], rel(e) io.write('RuntimeError: ') and pl::writeln(e);)
+	interpreter()
+
+rel do_query(q, name)
+	io.writeln('> '+q)
+	run_query(q, code_query, prefix, name, vars)
+	eval_vars(code_query, '', vars, 'temp')
+
+//finds boolean flag e.g. 'cosmos --verbose'
+rel find_flag0(args, flag)
+	if(args = Cons(a,b))
+		if(a = flag)
+			true
+		else
+			find_flag0(b, flag)
+	else
+		false
+
+//finds 1-argument flag e.g. 'cosmos --module name'
+rel find_flag1(args, flag, name)
+	if(args = Cons(a,b))
+		b = Cons(c, d)
+		if(a = flag)
+			c = name
+		else
+			find_flag1(b, flag, name)
+	else
+		false
+		
+rel main(args)
+	version = 'Cosmos 0.04 (Abyss) very alpha'
+	if(find_flag0(args, '-h'))
+		io.writeln(version)
+		io.writeln('-h\tGet help.\n'+'-i\tOpen interpreter.\n'+'-q [str]\tMake query.\n'+'--module [name]\t\tCompile name.cosmos to name.pl\n'+"--no-std-libs\t\tDon't load stdlibs.\n"+'\n\t e.g. cosmos --module test -q main(x) #compile test.cosmos and run main(x)')
+	elseif(find_flag1(args, '--module', name))
+		if(find_flag0(args, '--no-std-libs'))
+			opts=['--no-std-libs']
+		else
+			opts=[]
+		if(find_flag0(args, '--main'))
+			list.push(opts,'--main',opts2)
+			compile_module(name, code0, opts2)
+			code = code0 + '\nmain :- current_prolog_flag(argv, A), list_atom_string(A, B), '+name+'_env(T), '+name+'_main(T,B).'
+		else
+			compile_module(name, code, opts)
+		//io.writeln('\ncompiled code: '+code)
+		if(find_flag1(args, '-q', q))
+			pl::consult(name+'.pl')
+			do_query(q, name)
+		if(find_flag0(args, '-i'))
+			interpreter()
+	elseif(find_flag1(args, '-q', q))
+		do_query(q, 'temp')
+		if(find_flag0(args, '-i'))
+			interpreter()
+	elseif(find_flag0(args, '-i'))
+		io.writeln(version)
+		interpreter()

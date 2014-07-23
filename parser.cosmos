@@ -1,0 +1,381 @@
+functor(Cons, Functor)
+functor(Token, Functor)
+functor(Info, Functor)
+
+/*
+	world = rel|world 'and' world
+	rel = 'rel' (args) body;
+	body = inequality | rel | pred | obj_pred | body conn body | cond | type id
+	cond = 'if' (body) body;
+		| 'if' (body) body else body;
+	inequality = exp '=' exp|exp '!=' exp|exp '<' exp|exp '>' exp|exp '<=' exp|exp '>=' exp
+	exp = ... | math
+	math = exp+exp|exp-exp|exp*exp|exp/exp
+		
+	conn = 'and'|'or'
+*/
+
+//'body'
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(RelOp, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+
+require('lexer', lexer)
+require('whitespacer', whitespacer)
+
+/* misc */
+
+rel parse_type(l,tail,type)
+	l = Cons(Token(_,type,_),tail)
+	
+rel parse_string(l,tail,str)
+	l=Cons(Token(str,_,_),tail)
+
+rel get_info(l,info)
+	l=Cons(Token(_,_,info), _)
+	
+rel custom_throw(String msg, Functor info)
+	info=Info(line, col)
+	logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+
+/* ... */
+
+Relation parse_exp
+rel parse_args(l,tail,f)
+	this.parse_exp(l,l1,f1)
+	this.parse_type(l1,l2,',')
+	this.parse_args(l2,tail,f2)
+	f=Cons(f1,f2) or
+	
+	this.parse_exp(l,tail,f1)
+	f=Cons(f1,Cons) or
+	
+	f=Cons
+	tail=l
+	
+/* ... */
+
+rel parse_name2(l,tail,type,name)
+	l=Cons(Token(a,'id',_),l2)
+	this.parse_name2(l2,tail,type2,name)
+	type=Cons(a,type2) or
+	
+	l=Cons(Token(a,'id',_),tail)
+	type=Cons
+	name=a
+	
+rel name_list_to_type2(l,l2)
+	if(l=[head])
+		l2=[[head]]
+	else
+		l=Cons(head, tail)
+		this.name_list_to_type2(tail, tail2)
+		l2=Cons([head], tail2)
+		
+//e.g. [Rel, Num] ==> [Rel, [Num]]
+rel name_list_to_type(l,l2)
+	if(l=[])
+		l2=l
+	elseif(l=[a]) //atomic type
+		l2=l
+	else //composite type
+		l=Cons(a,tail)
+		this.name_list_to_type2(tail,tail2)
+		l2=Cons(a,tail2)
+	
+rel parse_name(l,tail,type,name)
+	once this.parse_name2(l,tail,name_list,name)
+	this.name_list_to_type(name_list,type)
+
+Relation parse_body
+	
+rel parse_lambda(l,tail,f)
+	l=Cons(Token(_,'rel',_),Cons(Token(_,'(',_), l2))
+	this.parse_args(l2, l3, args)
+	l3=Cons(Token(_,')',_),l4)
+	this.parse_body(l4, l5, body)
+	l5=Cons(Token(_,';',_), tail)
+	f=Rel(args,body)
+
+/* expression parsing */
+
+rel parse_exp_obj_call(l,tail,f)
+	l = Cons(Token(obj,'id',_),Cons(Token(_,'.',_),Cons(Token(name,'id',_),Cons(Token(_,'(',_), l2))))
+	this.parse_args(l2,l3,args)
+	l3=Cons(Token(_,')',_),tail)
+	f=Func(obj, name, args, get_info(l))
+
+rel parse_obj_get(l,tail,f)
+	l = Cons(Token(a,'id',_),Cons(Token(_,'.',_),Cons(Token(b,'id',_), tail)))
+	f=ObjGet(a,b)
+
+rel parse_exp_call(l,tail,f)
+	l = Cons(Token(name,'id',_),Cons(Token(_,'(',_), l2))
+	this.parse_args(l2,l3,args)
+	l3=Cons(Token(_,')',_),tail)
+	f=Func(name,args,get_info(l))
+
+rel parse_list(l,tail,f)
+	l = Cons(Token(_,'[',_),l2)
+	this.parse_args(l2,l3,args)
+	l3=Cons(Token(_,']',_),tail)
+	f=TList(args)
+
+rel exp_to_functor(l,tail,f)
+	l=Cons(Token(a,'string',_), tail) and f=Str(a) or
+	l=Cons(Token(_,'-',_), Cons(Token(a,'number',_), tail)) and f=Num('-'+a) or
+	l=Cons(Token(a,'number',_), tail) and f=Num(a)
+
+//parses atomic expression
+rel parse_exp2(l,tail,f)
+	parse_exp_obj_call(l,tail,f) or
+	parse_obj_get(l,tail,f) or
+	parse_exp_call(l,tail,f) or
+	parse_list(l,tail,f) or
+	parse_name(l,tail,type,name) and f=Id(name,type) or
+	parse_lambda(l,tail,f) or
+	exp_to_functor(l, tail,f)
+	
+Relation parse_math0
+
+//parses expressions joined by math operators
+rel parse_math2(l,tail,prev,f)
+	parse_string(l,l2,op)
+	if(op='+' or op='-' or op='*' or op='/')
+		if(parse_string(l2,l3,'(')) //rightmost bracket expression
+			parse_math0(l3,l4,b)
+			parse_string(l4,tail,')')
+			f = Op(prev,b,op,get_info(l))
+			//logic.throw('brackets')
+		else
+			parse_exp2(l2,l4,b)
+			fcur = Op(prev,b,op,get_info(l))
+			parse_math2(l4,tail,fcur,fnext)
+			if(fnext=None)
+				f=fcur
+			else
+				f=fnext
+	else
+		f=None
+		tail=l
+	
+rel parse_math1(l,tail,f)
+	parse_exp2(l,l2,a)
+	parse_math2(l2,tail,a,f2)
+	if(f2=None)
+		f=a
+	else
+		f=f2
+	
+rel parse_math0(l,tail,f)
+	parse_string(l,l2,s)
+	if(s='(') //get entire expression within bracket
+		parse_math0(l2,l3,f1)
+		parse_string(l3,l4,')')
+		parse_math2(l4,tail,f1,f2)
+		if(f2=None)
+			f=f1
+		else
+			f=f2
+	else
+		parse_math1(l,tail,f)
+
+rel parse_exp(l,tail,f)
+	once parse_math0(l,tail,f)
+	
+
+/* parses body */
+
+rel parse_eq(l,tail,f)
+	this.parse_exp(l,l2,a)
+	this.parse_type(l2,l3,'=')
+	this.parse_exp(l3,tail,b)
+	f=Eq(a,b,get_info(l))
+
+rel parse_neq(l,tail,f)
+	this.parse_exp(l,l2,a)
+	this.parse_type(l2,l3,'!=')
+	this.parse_exp(l3,tail,b)
+	f=Neq(a,b)
+
+rel parse_inequality(l,tail,f)
+	this.parse_exp(l,l2,a)
+	this.parse_type(l2,l3,op)
+	if(op='<=' or op='>=' or op='>' or op='<' or op='!=')
+		this.parse_exp(l3,tail,b)
+		f=Inequality(a,b,op,get_info(l))
+	else
+		false
+	
+rel parse_pred(l,tail,code)
+	l = Cons(Token(a,'id',_), Cons(Token(_,'(',_), l2))
+	this.parse_args(l2,l3,code_args)
+	l3=Cons(Token(_,')',_), tail)
+	code=Pred(a,code_args,get_info(l))
+
+rel parse_obj_pred(l,tail,code)
+	l = Cons(Token(obj,'id',_),Cons(Token(_,'.',_),Cons(Token(a,'id',_),Cons(Token(_,'(',_), l2))))
+	this.parse_args(l2,l3,code_args)
+	l3=Cons(Token(_,')',_),tail)
+	code=ObjPred(obj,a,code_args,get_info(l))
+
+rel parse_host(l,tail,code)
+	l = Cons(Token(obj,'id',_),Cons(Token(_,'::',_),Cons(Token(a,'id',_),Cons(Token(_,'(',_), l2))))
+	this.parse_args(l2,l3,code_args)
+	l3=Cons(Token(_,')',_),tail)
+	code=Host(obj,a,code_args) or
+	
+	l = Cons(Token(obj,'id',_),Cons(Token(_,'::',_), l2))
+	l2=Cons(Token(str,'string',_),tail)
+	code=Host(obj, str)
+	
+rel parse_declaration(l,tail,code)
+	this.parse_name(l,tail,type,name) //todo: throw error when type is empty (doesn't work now due to backtracking)
+	code=Declaration(name,type)
+
+rel parse_true(l,tail,f)
+	l = Cons(Token(a,'true',_),tail)
+	f=True
+
+rel parse_false(l,tail,f)
+	l = Cons(Token(a,'false',_),tail)
+	f=False
+
+rel parse_elseifs(l,tail,cond)
+	l = Cons(Token(_,'elseif',_), Cons(Token(_,'(',_), l1))
+	this.parse_body(l1, l2, f1)
+	l2=Cons(Token(_,')',_), l3)
+	this.parse_body(l3, l4, f2)
+	this.parse_elseifs(l4, tail, cond2)
+	cond=Cons(f1,Cons(f2,cond2)) or
+	
+	l = Cons(Token(_,'else',_), l10)
+	this.parse_body(l10,tail,f1) 
+	cond=[f1] or
+	
+	cond=Cons
+	tail=l
+
+rel parse_if(l,tail,f)
+	if(l = Cons(Token(_,'if',_), l0))
+		f=Cond(fbody1,fbody2,cond)
+	else
+		l = Cons(Token(_,'choose',_), l0)
+		f=SoftCut(fbody1,fbody2,cond)
+	l0 = Cons(Token(_,'(',_), l2)
+	this.parse_body(l2,l3,fbody1)
+	l3=Cons(Token(_,')',_), l4)
+	this.parse_body(l4,l5,fbody2)
+	this.parse_elseifs(l5,l11,cond)
+	l11=Cons(Token(_,';',_), tail)
+	
+Relation parse_definition
+	
+rel parse_call(l,tail,code)
+	parse_true(l,tail,code) or
+	parse_false(l,tail,code) or
+	parse_if(l,tail,code) or
+	parse_pred(l,tail,code) or
+	parse_eq(l,tail,code) or
+	parse_inequality(l,tail,code) or
+	parse_obj_pred(l,tail,code) or
+	this.parse_definition(l,tail,code) or
+	parse_host(l,tail,code) or
+	this.parse_declaration(l,tail,code) or
+	
+	l=Cons(Token(_,'once',_),l2)
+	this.parse_call(l2,tail,s1)
+	code=Once(s1)
+
+rel parse_body(l,tail,code)	
+	this.parse_call(l,l2,s1)
+	if(l2=Cons(Token(conn,'connective',_), l3))
+		if(conn='and')
+			code=And(s1,s2)
+		elseif(conn='or')
+			code=Or(s1,s2)
+		this.parse_body(l3,tail,s2)
+	else
+		l2=tail
+		s1=code
+	true or
+	
+	l = Cons(Token(_, '(',_), l2)
+	this.parse_body(l2, l3, f1)
+	l3 = Cons(Token(_, ')',_), l4) 
+	l4=Cons(Token(conn,'connective',_), l5)
+	this.parse_body(l5,tail,f2)
+	if(conn='and')
+		code=And(Bracket(f1),f2)
+	else
+		conn='or'
+		code=Or(Bracket(f1),f2)
+	true or
+	
+	l = Cons(Token(_, '(',_), l2)
+	this.parse_body(l2, l3, f)
+	l3 = Cons(Token(_, ')',_), tail)
+	code=Bracket(f)
+
+/* parses world */
+	
+rel parse_fact(l,tail,f)
+	l=Cons(Token(name, 'id',_), Cons(Token(_, '(',_), l2))
+	this.parse_args(l2, l3, args)
+	l3=Cons(Token(_,')',_), tail)
+	f=Fact(name, args, get_info(l))
+
+rel parse_definition(l,tail,f)
+	l=Cons(Token(_,'rel',_),Cons(Token(name,'id',_),Cons(Token(_,'(',_), l2)))
+	this.parse_args(l2, l3, args)
+	l3=Cons(Token(_,')',_),l4)
+	this.parse_body(l4, l5, body)
+	l5=Cons(Token(_,';',_), tail)
+	f=Rel(name,args,body)
+
+rel parse_def(l,tail,f)
+	parse_eq(l,tail,f) or
+	parse_definition(l,tail,f) or
+	parse_fact(l,tail,f) or
+	this.parse_declaration(l,tail,f)
+
+rel parse_world(l,tail,f)
+	if(parse_def(l,l2,a))
+		if(l2=Cons(Token(conn,'connective',_), l3))
+			parse_world(l3,tail,b)
+			f=And(a,b)
+		else
+			l2=tail
+			f=a
+	else
+		custom_throw('cannot parse definition from this point', get_info(l))

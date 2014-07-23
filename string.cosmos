@@ -1,0 +1,139 @@
+require('math', math)
+
+rel slice(String S1,Integer I,Integer J,String S2)
+	pl::s_slice(S1,I,J,S2)
+	
+rel first(String S1,String S2)
+	pl::s_at(S1, 0, S2)
+	
+rel rest(String S1,String S2)
+	pl::s_size(S1,L)
+	pl::s_slice(S1, 1, L, S2)
+
+rel get(String s,Integer x,String c)
+	pl::sub_string(s,x,1,_,c)
+
+rel at(s,x,c)
+	get(s,x,c)
+
+rel size(String s, Integer n)
+	pl::string_length(s,n)
+
+rel last(String s, String c)
+	get(s, size(s)-1, c)
+	
+rel findIndex(String s1, String s2, Integer i, Integer pos)
+	if(get(s1, i, s2))
+		i=pos
+	else
+		i<size(s1)
+		findIndex(s1, s2, i+1, pos)
+	
+rel find(String s1, String s2, Integer pos)
+	findIndex(s1,s2,0,pos)
+	
+rel has(String s1, String s2)
+	findIndex(s1, s2, 0, _)
+
+rel upper(String s1, String s2)
+	pl::string_upper(s1, s2)
+	
+rel lower(String s1, String s2)
+	pl::string_lower(String s1, String s2)
+	
+/* ... */
+	
+rel eachIndex(String s, Relation Integer Any Any p, Integer i, String s2)
+	if(get(s, i, c))
+		p(i, c, c2)
+		eachIndex(s, p, i+1, String tail2)
+		concat(c2, tail2, s2)
+	else
+		i=size(s)
+		s2=''
+
+rel each(String s, Relation Integer Any Any p, String s2)
+	eachIndex(s, p, 0, s2)
+
+rel mapIndex(String s, Relation Any Any p, Integer i, String s2)
+	if(get(s, i, c))
+		p(c, c2)
+		mapIndex(s, p, i+1, String tail2)
+		concat(c2, tail2, s2)
+	else
+		i=size(s)
+		s2=''
+	
+rel map(String s, Relation Any Any p, String s2)
+	mapIndex(s, p, 0, s2)
+	
+rel everyIndex(String s, Relation Any p, Integer i)
+	if(i=size(s))
+		true
+	else
+		get(s, i, c)
+		p(c)
+		everyIndex(s, p, i+1)
+	
+rel every(String s, Relation Any p)
+	everyIndex(s, p, 0)
+	
+rel splitIndex(String s, String sep, Integer i, Functor l)
+	findIndex(s,sep,i,pos)
+	math.inc(pos,pos2)
+	size(s,len)
+	slice(s,i,pos,part1) 
+	l=Cons(part1, l2) 
+	splitIndex(s, sep, pos2, l2) or
+	
+	size(s,len)
+	slice(s,i,len,part1) 
+	l=Cons(part1,Cons)
+	
+rel split(String s, String sep, Functor l)
+	splitIndex(s, sep, 0, l)
+	
+rel concat(String S1, String S2, String S3)
+	pl::string_concat(S1,S2,S3)
+	
+rel replace(String s, String word1, String word2, String s2)
+	pl::replace_word(word1,word2,s,s2)
+
+/* ... */
+
+rel toNumber(String S, N)
+	pl::number_string(N,S)
+	
+rel toInteger(String S, Integer N)
+	pl::number_string(N,S)
+	
+rel toReal(String S, Real N)
+	pl::number_string(N,S)
+
+rel _toList(String s, Integer i, Functor l2)
+	if(get(s, i, c))
+		_toList(s, i+1, tail)
+		pl::append([c],tail,l2)
+	else
+		i=size(s)
+		l2=[]
+	
+//e.g. 'abc' ==> ['a','b','c']
+rel toList(String s, Functor l)
+	_toList(s, 0, l)
+	
+//e.g. 'abc' ==> [97,98,99]
+rel toCodes(String s, Functor l)
+	pl::string_codes(s,l)
+	//pl::s_codes(s,l)
+
+//gets code of char (string must have size 1)
+rel code(String s, Integer n)
+	toCodes(s,[n])
+	
+rel lessOrEqual(String S1, String S2)
+	pl::s_le(S1,S2)
+
+rel _add(s1,s2,s3)
+	concat(s1,s2,s3)
+	

@@ -1,0 +1,8 @@
+rel p(Integer i)
+	i=1
+	
+rel q(String i)
+	i='1'
+	
+rel z(Relation fn, Any x)
+	true

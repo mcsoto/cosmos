@@ -1,0 +1,176 @@
+functor(Cons, Functor)
+require('string', string)
+require('math', math)
+require('io', io)
+
+Relation type_to_string2
+
+rel type_to_string3(t,String s)
+	t=Cons(a,b)
+	s1=a
+	this.type_to_string2(b,s2)
+	if(s2='')
+		s=s1
+	else
+		s='('+s1+' '+s2+')'
+
+rel type_to_string2(t,String s)
+	if(t=Cons)
+		s=''
+	else
+		t=Cons(a,b)
+		this.type_to_string3(a,s1)
+		this.type_to_string2(b,s2)
+		if(s2='')
+			s=s1
+		else
+			s=s1+' '+s2
+
+rel type_to_string(t,String s)
+	t=Cons(a,b)
+	s1=a
+	this.type_to_string2(b,s2)
+	if(s2='')
+		s=s1 //todo 'Relation Null'?
+	else
+		s=s1+' '+s2
+	
+rel compare_types_atomic(s1, String s2)
+	s1='Any' or s2='Any' or
+	s1=s2
+	
+Relation compare_types
+rel compare_types2(t1, t2)
+	t1=Cons
+	t2=Cons or
+	
+	t1=Cons(a1,b1)
+	t2=Cons(a2,b2)
+	this.compare_types(a1,a2)
+	this.compare_types2(b1,b2)
+	
+rel compare_types(t1, t2)
+	t1=Cons(a1,b1)
+	t2=Cons(a2,b2)
+	this.compare_types_atomic(a1,a2)
+	if(b1=Cons or b2=Cons)
+		true //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+	else
+		this.compare_types2(b1,b2)
+	
+rel strict_type_atomic(String ta, String tb, String tc)
+	once if(ta='Any')
+		tc=tb
+	else
+		tc=ta
+	//inheritance not implemented yet
+	
+Relation strict_type
+rel strict_type2(t1, t2, t3)
+	if(t1=Cons and t2=Cons)
+		t3=Cons
+	else
+		t1=Cons(a1,b1)
+		t2=Cons(a2,b2)
+		//io.writeln(a1)
+		//io.writeln(a2)
+		this.strict_type(a1,a2,a3)
+		//io.writeln('-')
+		//io.writeln(a3)
+		this.strict_type2(b1,b2,b3)
+		t3=Cons(a3,b3)
+
+//this is a hack, eventually will be replaced by strictest_type
+rel strict_type(t1, t2, t3)
+	t1=Cons(a1,b1)
+	t2=Cons(a2,b2)
+	this.strict_type_atomic(a1,a2,a3)
+	if(b1=Cons)
+		t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+	elseif(b2=Cons)
+		t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+	else
+		this.strict_type2(b1,b2,b3)
+		t3=Cons(a3,b3)
+
+
+//t3 is the most strict combination of t1 and t2
+//e.g. strict_type(Rel Num Any, Rel Any Str) ==> Rel Num Str
+rel strictest_type(t1, t2, t3)
+	once if(t1=['Any'])
+		t3=t2
+	elseif(t2=['Any'])
+		t3=t1
+	else
+		t1=Cons(a1,b1)
+		t2=Cons(a2,b2)
+		this.strict_type_atomic(a1,a2,a3)
+		io.writeln(a3)
+		if(b1=Cons)
+			t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+			io.writeln(t3)
+		elseif(b2=Cons)
+			t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+			io.writeln(t3)
+		else
+			this.strict_type2(b1,b2,b3)
+			t3=Cons(a3,b3)
+			io.writeln(t3)
+
+rel match_until(s,i,i2)
+	once if(string.size(s)=i or string.at(s,i,' '))
+		i=i2
+	else
+		match_until(s,i+1,i2)
+
+rel _string_to_type(s, i, final, type)
+	match_until(s,i,j)
+	choose(string.at(s,j-1)=')') //END BRACKET
+		s1=string.slice(s,i,j-1)
+		type=[s1]
+		final=j
+	else
+		s1=string.slice(s,i,j)
+		//io.writeln('s1:'+s1)
+		choose(j=string.size(s)) //EOF
+			type=[s1]
+			final=j
+		else //found first type, find rest
+			string.at(s,j+1,c)
+			//io.writeln('$'+c)
+			choose(c='(') //???
+				_string_to_type(s,j+2,final0,t0)
+				//io.write('-t0:')
+				//io.writeln(t0)
+				choose(string.size(s)=final0)
+					type=Cons(s1, [t0])
+				else
+					_string_to_type(s,final0+1,final,t1)
+					t1=Cons(a,b)
+					type=Cons(s1,Cons(t0,Cons([a],b)))
+			else
+				_string_to_type(s,j+1,final,t0)
+				t0=Cons(a,b)
+				type=Cons(s1,Cons([a],b))
+				
+rel string_to_type(s, type)
+	_string_to_type(s, 0, _, type)
+
+rel get_type(env, x, String s)
+	s='Relation'
+
+rel parse_type(String s, t)
+	string.split(s, ' ', t)
+	
+rel has_type(env, x, String s)
+	this.get_type(env, x, type1)
+	this.parse_type(s, type2)
+	this.compare_types(type1, type2)
+	
+rel main(x)
+	//io.writeln(string_to_type('Relation Any'))
+	io.writeln(string_to_type('Relation (Functor Any)'))
+	io.writeln(string_to_type('Rel (Rel Num Str) Str Num'))
+	io.writeln(string_to_type('Rel Rel Num Str Num'))
+	io.writeln(string_to_type('Rel (Rel Num (Rel Str) Num) Str Num'))
+	//io.writeln(string_to_type('Rel (Rel Num (Rel Str)) Str Num')) //todo

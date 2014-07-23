@@ -1,0 +1,111 @@
+require('string', string)
+
+rel get(Functor L, Integer N, Any Element)
+	pl::nth0(N,L,Element)
+	
+rel first(Functor l, Any a)
+	l=Cons(a,_)
+
+rel rest(Functor l, Any b)
+	l=Cons(_,b)
+
+rel size(Functor l, Integer n)
+	pl::length(l, n)
+	
+rel last(Functor l,a)
+	get(l, size(l)-1, a)
+
+rel push(Functor l, x, Functor l2)
+	l2=Cons(x, l)
+	
+rel pop(Functor l, Functor l2)
+	l=Cons(x, tail)
+	l2=tail
+	
+rel slice(Functor l, Integer i, Integer j, Functor l2)
+	once pl::slice(l, i, j, l2)
+
+rel find(Functor l, Any element, Integer i)
+	if(first(l,element))
+		i=0
+	else
+		rest(l,tail)
+		find(tail,element,j)
+		i=j+1
+
+rel has(Functor l, Any x)
+	find(l, x, _)
+
+rel reverse(Functor l, Functor l2)
+	if(l=Cons(a,tail))
+		reverse(tail, ltemp)
+		concat(ltemp, Cons(a,Cons), l2)
+	else
+		l=Cons
+		l2=Cons
+
+/* ... */
+	
+rel concat(Functor l, Functor l2, Functor l3)
+	pl::append(l,l2,l3)
+		
+//like map but relation has an argument for the index
+//each([1,2,3], rel(i, x, y) y=x*i;, x) //x = [0, 2, 6]
+rel eachIndex(l,p,i,l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		l2=Cons(head2, tail2)
+		p(i, head, head2)
+		eachIndex(tail, p, i+1, tail2)
+		
+rel each(Functor l, Relation Integer Any Any p, Functor l2)
+	eachIndex(l, p, 0, l2)
+	
+rel map(Functor l, Relation Any Any p, Functor l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		l2=Cons(head2, tail2)
+		p(head, head2)
+		map(tail, p, tail2)
+
+rel every(Functor l, Relation Any p)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		p(head)
+		every(tail, p)
+
+rel filter(Functor l, Relation Any p, Functor l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		if(p(head))
+			l2=Cons(head, tail2)
+			filter(tail, p, tail2)
+		else
+			filter(tail, p, l2)
+
+rel join(Functor l, String sep, String s)
+	if(l=Cons(a,Cons))
+		s=a
+	elseif(l=Cons(s1,tail))
+		join(tail,sep,s2)
+		string.concat(s1,sep,temp)
+		string.concat(temp,s2,s)
+	else
+		l=Cons
+		s=''
+
+rel fold(Functor l, Relation Any Any Any pred, Any a, Any result)
+	if(l=Cons(b,tail))
+		pred(a,b,c)
+		fold(tail, pred, c, result)
+	else
+		l=Cons
+		result=a

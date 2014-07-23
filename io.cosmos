@@ -1,0 +1,62 @@
+require('logic', logic)
+
+rel write(Any x)
+	pl::write(logic.toString(x))
+	
+rel writeln(Any x)
+	write(x)
+	write('\n')
+	
+rel read(String x)
+	pl::ioread(x)
+
+rel rawWrite(Any x)
+	pl::write(x)
+	
+rel rawWriteln(Any x)
+	rawWrite(x)
+	rawWrite('\n')
+	
+/* files */
+	
+rel open(String name, String mode, f)
+	pl::fopen(name,mode,f)
+	
+rel close(File f)
+	pl::close(f)
+	
+rel openWrite(String name, File f)
+	pl::fopen(name,'write',f)
+	
+rel fileWrite(File f, String x)
+	pl::write(f,x)
+	
+rel fileRead(File f, String s)
+	pl::fread(f,s)
+	
+rel fileReadLine(File f, String s)
+	pl::fread(f,s)
+	
+rel fileReadChar(File f, String s)
+	pl::read_string(f,1,s)
+	
+rel fileReadAll(File f, String s)
+	pl::fread_all(f,s)
+	
+/* file utilities */
+
+rel readFile(String name, String s)
+	open(name,'read',f)
+	fileReadAll(f,s)
+	close(f)
+
+rel writeToFile(String name, String s)
+	open(name,'write',f)
+	fileWrite(f,s)
+	close(f)
+
+rel appendToFile(String name, String s)
+	open(name,'append',f)
+	fileWrite(f,s)
+	close(f)
+	
