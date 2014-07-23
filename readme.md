@@ -213,12 +213,7 @@ is simply sugar for
 Whitespace
 ----
 
-The language is whitespace sensitive. This has two purposes:
-
-* Remove the need to write and read unnecessary characters.
-* Hide some of the logic semantics of the languages.
-
-Take the following definition.
+The language is whitespace sensitive.
 ```
 rel p(x)
     x!=1
@@ -241,5 +236,3 @@ Cosmos is currently compiled into Prolog. As such, it's possible to call predica
 rel write(x)
     pl::write(x) //calls Prolog predicate 'write'
 ```
-
-> Written with [StackEdit](https://stackedit.io/).
