@@ -1,0 +1,4 @@
+:- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").
+temp_env(X) :- new(X0),set(X0,"y2",temp_y2,X1),set(X1,"y",temp_y,X2),set(X2,"p",temp_p,X3),set(X3,"main",temp_main,X4),list_env(Y4),set(X4,"list",Y4,X5),string_env(Y5),set(X5,"string",Y5,X6),math_env(Y6),set(X6,"math",Y6,X7),io_env(Y7),set(X7,"io",Y7,X8),logic_env(Y8),set(X8,"logic",Y8,X9),set(X9,"Some",temp_Some,X10),set(X10,"None",temp_None,X11),set(X11,"Left",temp_Left,X12),set(X12,"Right",temp_Right,X13),X=X13.
+temp0(Env0,_x) :- eq(_x,1);eq(_x,2).
+temp(_y2, _y, _p) :- temp_env(Env0),(eq(_p,closure(temp0,Env0)),(closure_call(Env0,_p,[_y]),closure_call(Env0,_p,[_y2]))).

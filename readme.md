@@ -6,7 +6,7 @@ Cosmos
 
 Cosmos is a modern logic programming language.
 
-> **Note:** the language is in alpha.
+> **Note:** the language is in very early alpha.
 
 Download
 ---
@@ -80,7 +80,7 @@ rel main()
     x = double(4) //x is 8
 ```
 
-Note how conventional the code looks now. Despite being a declarative language, Cosmos can look and behave very similarly to a typical language at times. How similar is up to the programmer.
+Although it is a logic programming language, code in this language can look and behave very conventionally: the above code might seem imperative or functional.
 
 Whereas functions have one output, relations may have zero, one or more outputs. You can check this by making queries at the interpreter.
 
@@ -206,7 +206,7 @@ Code such as
 is simply sugar for
 
 ```
-    s = 'a' or (s = 'b' and x = 1) or x = 2
+    (s = 'a' and x = 0) or (s = 'b' and x = 1) or x = 2
 ```
 
 Whitespace
