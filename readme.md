@@ -43,7 +43,7 @@ Overview
 Philosophy
 ----
 
-The design of the language aims for simplicity and minimalism. This is done by adopting few but powerful core features: relations, functors and types. As a result, the language is concise and easy-to-learn without sacrificing expresiveness.
+The design of the language aims for simplicity and minimalism. This is done by adopting few but powerful core features: relations, functors and types. As a result, the language is concise and easy-to-learn without sacrificing expressiveness.
 
 ```javascript
 rel main()
