@@ -422,7 +422,7 @@ rel extract_name(Functor f, String s2, env, env2, String prefix, String module)
 			sargs2=sargs+','+s2
 		prefix2='obj_call2(Env0,"'+obj+'",'+'"'+name+'",'+"["+sargs2+"]),"
 		prefix=prefix1+prefix2
-			
+	
 	elseif(f=TList(args))
 		env=env2
 		extract_list(args,sargs,env,prefix)
@@ -905,9 +905,13 @@ rel generate_chunk(Functor f, String code, String module, opts)
 	code=info + ':- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").\n' + list.join(l_lambdas,'') + code_world + code_env + '.'
 
 rel generate_query(Functor f, String code, String prefix, Functor query_vars, module)
-	env_init(env0, [Var('main','object',['Relation']),Lib('list','list'),Lib('string','string'),Lib('math','math'),Lib('io','io'),Lib('logic','logic'),Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])], [Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']])], [])
-	extract_modules(env0, ['list','string','math','io','logic'], env)
-	s0=module+'_env(Env0),'
+	env_init(env_a, [Lib('list','list'),Lib('string','string'),Lib('math','math'),Lib('io','io'),Lib('logic','logic'),Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])], [Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']])], [])
+	extract_modules(env_a, ['list','string','math','io','logic'], env_b)
+	if(module='temp')
+		env=env_b
+	else
+		extract_module(module,ts)
+		list.fold(ts, env_push, env_b, env)
 	generate_body(f, s1, env, env2, module)
 	//get query variables
 	list.filter(env_vars(env2), rel(x) x=Var(_,'local',Cons(t0,_)) and t0!='FunctorObject';, xx1)
@@ -921,4 +925,4 @@ rel generate_query(Functor f, String code, String prefix, Functor query_vars, mo
 	make_lambdas(lambdas, l_temp_functions, list.size(lambdas)-1, env2, module)
 	list.join(l_temp_functions, '', prefix1)
 	prefix = prefix0+prefix1
-	code=s0+'('+s1+')'
+	code=module+'_env(Env0),'+'('+s1+')'

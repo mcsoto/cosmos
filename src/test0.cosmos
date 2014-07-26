@@ -2,7 +2,7 @@ require('test1',t1)
 rel p(Integer x)
 	x=1
 rel q(String x)
-	x='1'
+	x='abc'
 rel z(fn,x)
 	fn(x)
 rel main(x)

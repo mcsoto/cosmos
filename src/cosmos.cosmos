@@ -6,7 +6,6 @@ require('parser', parser)
 require('whitespacer', whitespacer)
 require('gen', gen)
 
-//main :- current_prolog_flag(argv, A), list_atom_string(A, B), cosmos_env(T), cosmos_main(T,B).
 rel run_all(s, x, module, opts)
 	//io.writeln('Running lexer...')
 	lexer.run(s,0,l)
@@ -60,9 +59,9 @@ rel eval_vars(code, prefix, vars, module)
 	name='.temp.pl'
 	list.map(vars, rel(x,s) s='_'+x;, v2)
 	list.join(v2, ', ', v3)
-	file_code=':- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").\n'+prefix+'temp('+v3+') :- '+code+'.'
-	//io.writeln('eval: '+code)
-	//io.writeln('code: '+file_code)
+	file_code=':- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").\n'+prefix+module+'('+v3+') :- '+code+'.'
+	io.writeln('eval: '+code)
+	io.writeln('code: '+file_code)
 	io.writeToFile(name, file_code)
 	list.map(vars, rel(_,y) y=z;, v4)
 	pl::consult(name)
@@ -78,9 +77,15 @@ rel interpreter()
 		logic.applyCatch(eval_vars, [code, prefix, vars, module], rel(e) io.write('RuntimeError: ') and pl::writeln(e);)
 	interpreter()
 
-rel do_query(q, name)
+rel do_query(q)
+	module = 'temp'
 	io.writeln('> '+q)
-	run_query(q, code_query, prefix, name, vars)
+	run_query(q, code_query, prefix, module, vars)
+	eval_vars(code_query, prefix, vars, module)
+
+rel do_query_module(q, module)
+	io.writeln('> '+q)
+	run_query(q, code_query, prefix, module, vars)
 	eval_vars(code_query, '', vars, 'temp')
 
 //finds boolean flag e.g. 'cosmos --verbose'
@@ -105,10 +110,10 @@ rel find_flag1(args, flag, name)
 		false
 		
 rel main(args)
-	version = 'Cosmos 0.04 (Abyss) very alpha'
+	version = 'Cosmos 0.05 (Abyss) very alpha'
 	if(find_flag0(args, '-h'))
 		io.writeln(version)
-		io.writeln('-h\tGet help.\n'+'-i\tOpen interpreter.\n'+'-q [str]\tMake query.\n'+'--module [name]\t\tCompile name.cosmos to name.pl\n'+"--no-std-libs\t\tDon't load stdlibs.\n"+'\n\t e.g. cosmos --module test -q main(x) #compile test.cosmos and run main(x)')
+		io.writeln('\n-h\t\t\tGet help.\n'+'-i\t\t\tOpen interpreter.\n'+'-q [str]\t\tMake query.\n'+'--module [name]\t\tCompile name.cosmos to name.pl\n'+"--no-std-libs\t\tDon't load stdlibs.\n"+'\n  e.g. cosmos --module test -q main(x)   //compile test.cosmos and run `main(x)`')
 	elseif(find_flag1(args, '--module', name))
 		if(find_flag0(args, '--no-std-libs'))
 			opts=['--no-std-libs']
@@ -123,13 +128,15 @@ rel main(args)
 		//io.writeln('\ncompiled code: '+code)
 		if(find_flag1(args, '-q', q))
 			pl::consult(name+'.pl')
-			do_query(q, name)
+			do_query_module(q, name)
 		if(find_flag0(args, '-i'))
 			interpreter()
 	elseif(find_flag1(args, '-q', q))
-		do_query(q, 'temp')
+		do_query(q)
 		if(find_flag0(args, '-i'))
 			interpreter()
 	elseif(find_flag0(args, '-i'))
 		io.writeln(version)
 		interpreter()
+	elseif(find_flag0(args, '-v'))
+		io.writeln(version)
