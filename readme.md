@@ -199,7 +199,7 @@ Tables are structures that map keys to values.
     table.get(t2, 'a', x)
     
     io.writeln(t) //{}
-    io.writeln(t2) //{a = 1 and b = 2}
+    io.writeln(t3) //{a = 1 and b = 2}
     io.writeln(x) //1
 ```
 
