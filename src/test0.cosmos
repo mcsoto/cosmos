@@ -6,4 +6,8 @@ rel q(String x)
 rel z(fn,x)
 	fn(x)
 rel main(x)
-	x = 1
+	Table t = {}
+	t2 = table.set(table.set(t,'a',1),'b',2)
+	io.writeln(t1)
+	io.writeln(t)
+	io.writeln(t2)

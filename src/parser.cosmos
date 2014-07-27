@@ -46,6 +46,7 @@ functor(Id, Functor)
 functor(ObjGet, Functor)
 functor(Func, Functor)
 functor(TList, Functor)
+functor(TTable, Functor)
 
 functor(Error, Functor)
 functor(None, Functor)
@@ -151,6 +152,13 @@ rel parse_list(l,tail,f)
 	l3=Cons(Token(_,']',_),tail)
 	f=TList(args)
 
+rel parse_table(l,tail,f)
+	l = Cons(Token(_,'{',_),l2)
+	//this.parse_args(l2,l3,args)
+	l2=l3
+	l3=Cons(Token(_,'}',_),tail)
+	f=TTable(args)
+
 rel exp_to_functor(l,tail,f)
 	l=Cons(Token(a,'string',_), tail) and f=Str(a) or
 	l=Cons(Token(_,'-',_), Cons(Token(a,'number',_), tail)) and f=Num('-'+a) or
@@ -162,6 +170,7 @@ rel parse_exp2(l,tail,f)
 	parse_obj_get(l,tail,f) or
 	parse_exp_call(l,tail,f) or
 	parse_list(l,tail,f) or
+	parse_table(l,tail,f) or
 	parse_name(l,tail,type,name) and f=Id(name,type) or
 	parse_lambda(l,tail,f) or
 	exp_to_functor(l, tail,f)

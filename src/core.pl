@@ -152,6 +152,7 @@ closure_call(Env,Closure,Arg) :- closure(Method,MethodEnv)=Closure, _t2=Method, 
 :- ensure_loaded("math.pl").
 :- ensure_loaded("io.pl").
 :- ensure_loaded("logic.pl").
+:- ensure_loaded("table.pl").
 
 custom_var(Name, X) :- (write(Name), write(" = "), (logic_env(T),logic_toString(T,X,S), write(S))).
 custom_vars(N,A) :- A = [] -> write("true") ;

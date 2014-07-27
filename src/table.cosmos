@@ -1,0 +1,12 @@
+rel get(Table t, Any i, Table t2)
+	pl::get(t,x,t2)
+	
+rel set(Table t, Any i, Any x, Table t2)
+	pl::set(t,i,x,t2)
+	
+rel toListKeys(Table t, Functor l)
+	pl::assoc_to_keys(t, l)
+	
+rel toListValues(Table t, Functor l)
+	pl::assoc_to_values(t, l)
+	
