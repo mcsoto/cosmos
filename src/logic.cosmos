@@ -64,7 +64,7 @@ rel toString(Any x, String s)
 		pl::assoc_to_list(x,l)
 		list.map(l, bindingToString, l2)
 		list.join(l2, ' and ', s0)
-		s = '{ '+s0+' }'
+		s = '{'+s0+'}'
 	elseif(pl::atom(x)) 
 		pl::atom_string(x, s0)
 		if(string.slice(s0, 0, 2, 'fc')) //functor

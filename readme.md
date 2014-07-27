@@ -43,7 +43,7 @@ Overview
 Philosophy
 ----
 
-The design of the language aims for simplicity and minimalism. This is done by adopting few but powerful core features: relations, functors and types. As a result, the language is concise and easy-to-learn without sacrificing expressiveness.
+The design of the language aims for simplicity and minimalism. This is done by adopting few but powerful core features: relations, functors, tables and types. As a result, the language is concise and easy-to-learn without sacrificing expressiveness.
 
 ```javascript
 rel main()
@@ -186,6 +186,22 @@ The type system supports *composite types*.
     Relation Any Any p = double
 ```
 Relations get composite types. *Relation Any Any* is a type that accepts any relation with exactly two arguments.
+
+Tables
+----
+
+Tables are structures that map keys to values.
+
+```
+    Table t = {}
+    table.set(t, 'a', 1, t2)
+    table.set(t2, 'b', 2, t3)
+    table.get(t2, 'a', x)
+    
+    io.writeln(t) //{}
+    io.writeln(t2) //{a = 1 and b = 2}
+    io.writeln(x) //1
+```
 
 Booleans
 ----

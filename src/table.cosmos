@@ -1,5 +1,5 @@
 rel get(Table t, Any i, Table t2)
-	pl::get(t,x,t2)
+	pl::get(t,i,t2)
 	
 rel set(Table t, Any i, Any x, Table t2)
 	pl::set(t,i,x,t2)

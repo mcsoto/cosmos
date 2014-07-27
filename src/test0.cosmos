@@ -8,6 +8,7 @@ rel z(fn,x)
 rel main(x)
 	Table t = {}
 	t2 = table.set(table.set(t,'a',1),'b',2)
-	io.writeln(t1)
 	io.writeln(t)
 	io.writeln(t2)
+	table.get(t2,'a',x)
+	io.writeln(x)

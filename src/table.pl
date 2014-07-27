@@ -1,6 +1,6 @@
 %toListValues Relation Table Functor;toListKeys Relation Table Functor;set Relation Table Any Any Table;get Relation Table Any Table
 :- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").
-table_get(Env0,_t,_i,_t2) :- get(_t,_x,_t2).
+table_get(Env0,_t,_i,_t2) :- get(_t,_i,_t2).
 table_set(Env0,_t,_i,_x,_t2) :- set(_t,_i,_x,_t2).
 table_toListKeys(Env0,_t,_l) :- assoc_to_keys(_t,_l).
 table_toListValues(Env0,_t,_l) :- assoc_to_values(_t,_l).
