@@ -40,6 +40,9 @@ rel upper(String s1, String s2)
 	
 rel lower(String s1, String s2)
 	pl::string_lower(String s1, String s2)
+
+rel concat(String S1, String S2, String S3)
+	pl::string_concat(S1,S2,S3)
 	
 /* ... */
 	
@@ -93,8 +96,6 @@ rel splitIndex(String s, String sep, Integer i, Functor l)
 rel split(String s, String sep, Functor l)
 	splitIndex(s, sep, 0, l)
 	
-rel concat(String S1, String S2, String S3)
-	pl::string_concat(S1,S2,S3)
 	
 rel replace(String s, String word1, String word2, String s2)
 	pl::replace_word(word1,word2,s,s2)
