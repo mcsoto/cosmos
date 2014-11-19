@@ -36,6 +36,9 @@ rel find(Functor l, Any element, Integer i)
 rel has(Functor l, Any x)
 	find(l, x, _)
 
+rel concat(Functor l, Functor l2, Functor l3)
+	pl::append(l,l2,l3)
+
 rel reverse(Functor l, Functor l2)
 	if(l=Cons(a,tail))
 		reverse(tail, ltemp)
@@ -45,9 +48,6 @@ rel reverse(Functor l, Functor l2)
 		l2=Cons
 
 /* ... */
-	
-rel concat(Functor l, Functor l2, Functor l3)
-	pl::append(l,l2,l3)
 		
 //like map but relation has an argument for the index
 //each([1,2,3], rel(i, x, y) y=x*i;, x) //x = [0, 2, 6]
