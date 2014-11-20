@@ -1,4 +1,4 @@
-%realToInteger Relation Real Real;integerToReal Relation Integer Real;realToString Relation Real String;integerToString Relation Integer String;stringToNumber Relation Any Any;dec Relation Integer Integer;inc Relation Integer Integer;div Relation Integer Integer Integer;mul Relation Integer Integer Integer;sub Relation Integer Integer Integer;add Relation Integer Integer Integer;ceil Relation Integer Integer;floor Relation Integer Integer;abs Relation Integer Integer;random Relation Real;sqrt Relation Real Real
+%realToInteger Relation Real Real;integerToReal Relation Integer Real;realToString Relation Real String;integerToString Relation Integer String;stringToNumber Relation Any Any;dec Relation Integer Integer;inc Relation Integer Integer;div Relation Integer Integer Integer;mul Relation Integer Integer Integer;sub Relation Integer Integer Integer;add Relation Integer Integer Integer;ceil Relation Real Integer;floor Relation Real Integer;abs Relation Integer Integer;random Relation Real;sqrt Relation Real Real
 :- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").
 math_sqrt(Env0,_x,_y) :- sqrt(_x,_y).
 math_random(Env0,_x) :- random(_x).
