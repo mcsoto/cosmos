@@ -1,38 +1,68 @@
+.PHONY: stdlib cosmos
+
+COSMOS?=./cosmos
+SWIPL?=swipl
+
+cosmos_OPTS=--main
+STDLIB_OPTS=--no-std-libs
+list_OPTS=$(STDLIB_OPTS)
+string_OPTS=$(STDLIB_OPTS)
+math_OPTS=$(STDLIB_OPTS)
+io_OPTS=$(STDLIB_OPTS)
+logic_OPTS=$(STDLIB_OPTS)
+table_OPTS=$(STDLIB_OPTS)
+
 %.pl: %.cosmos
-	cosmos --module $(patsubst %.cosmos,%,$<)
+	$(COSMOS) $($*_OPTS) --module $(patsubst %.cosmos,%,$<)
 
-all: cosmos
+# stdlib
+math.pl:
 
-core.pl:
+string.pl: math.pl
 
-math.pl: core.pl
+list.pl: string.pl
 
-string.pl: core.pl math.pl
+logic.pl: list.pl string.pl math.pl
 
-list.pl: core.pl string.pl
+io.pl: logic.pl
 
-logic.pl: core.pl list.pl string.pl math.pl
+stdlib-clean:
+	touch list.cosmos string.cosmos math.cosmos io.cosmos logic.cosmos table.cosmos
 
-io.pl: core.pl logic.pl
+stdlib: list.pl string.pl math.pl io.pl logic.pl table.pl
 
-types.pl: core.pl string.pl math.pl io.pl
+# compiler
+types.pl:
 
-lexer.pl: core.pl
+whitespacer.pl: lexer.pl
 
-whitespacer.pl: core.pl lexer.pl
+parser.pl: lexer.pl whitespacer.pl
 
-parser.pl: core.pl lexer.pl whitespacer.pl
+gen.pl: lexer.pl parser.pl whitespacer.pl types.pl
 
-gen.pl: core.pl lexer.pl parser.pl whitespacer.pl types.pl
+cosmos.pl: lexer.pl parser.pl whitespacer.pl gen.pl
 
-cosmos.pl: core.pl lexer.pl parser.pl whitespacer.pl gen.pl
+compiler-clean:
+	-rm cosmos.pl gen.pl lexer.pl parser.pl whitespacer.pl types.pl
 
-cosmos: cosmos.pl
-	swipl -t halt -o cosmos -g main -c $<
+compiler: cosmos.pl types.pl
 
-clean:
-	rm cosmos.pl gen.pl io.pl lexer.pl list.pl logic.pl math.pl parser.pl string.pl table.pl test0.pl test1.pl types.pl whitespacer.pl
+# frontend
+cosmos:
+	$(SWIPL) -t halt -o cosmos -g main -c $@.pl
+
+# tests
+test0.pl: test1.pl
 
 test: test0.pl test1.pl
-	./cosmos --module test0
-	./cosmos --module test1
+	$(COSMOS) --module test0
+	$(COSMOS) --module test1
+
+# rebuild
+rebuild:
+	# build frontend with current compiler and stdlib modules
+	$(MAKE) cosmos
+	$(MAKE) compiler-clean
+	$(MAKE) compiler cosmos
+	$(MAKE) stdlib-clean
+	$(MAKE) stdlib compiler-clean compiler cosmos test-clean test
