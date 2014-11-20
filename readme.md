@@ -23,6 +23,17 @@ Building
 
 Building from the source requires SWI-Prolog (7.1.16+). Look into the _make_ script and move the executable to swipl/bin.
 
+Files
+---
+
+* `list.cosmos`, `string.cosmos`, `math.cosmos`, `io.cosmos`, `logic.cosmos` and `table.cosmos`
+  contain the standard library for Cosmos programs.
+* `core.pl` contains the language core. It is the only part of the Cosmos implementation that is
+  not written in Cosmos itself, but in Prolog. It's used by the standard library as well as the
+  compiler.
+* `types.cosmos`, `lexer.cosmos`, `whitespacer.cosmos`, `parser.cosmos` and `gen.cosmos` contain
+  the Cosmos compiler, `cosmos.cosmos` contains the compiler frontend.
+
 Queries
 ----
 
