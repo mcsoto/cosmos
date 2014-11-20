@@ -21,7 +21,9 @@ _Coming soon._
 Building
 ---
 
-Building from the source requires SWI-Prolog (7.1.16+). Look into the _make_ script and move the executable to swipl/bin.
+Building from the source requires SWI-Prolog (7.1.16+). Run `make cosmos` and move the executable to
+swipl/bin. If you're on an environment where the Makefile doesn't work, look into the `make.sh`,
+`make.bat` or `make86.bat` scripts.
 
 Files
 ---
@@ -33,6 +35,34 @@ Files
   compiler.
 * `types.cosmos`, `lexer.cosmos`, `whitespacer.cosmos`, `parser.cosmos` and `gen.cosmos` contain
   the Cosmos compiler, `cosmos.cosmos` contains the compiler frontend.
+
+You can rebuild the standard library with
+```sh
+$ make stdlib-clean
+$ make stdlib
+```
+
+You can rebuild the compiler modules with
+```sh
+$ make compiler-clean
+$ make compiler
+```
+
+To build the compiler executable, use
+```sh
+$ make cosmos
+```
+
+To run the two test files, use
+```sh
+$ make test
+```
+
+Finally, you can rebuild the compiler, then rebuild the standard library with that compiler, and
+then rebuild the compiler with that new standard library with
+```sh
+$ make rebuild
+```
 
 Queries
 ----
