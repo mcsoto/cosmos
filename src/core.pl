@@ -80,6 +80,8 @@ s_slice(S1,I,J,S2) :- s_size(S1,L), (J < L -> End=J ; End=L), sub(End,I,JJ), _i 
 s_first(S1,S2) :- s_at(S1, 0, S2).
 s_le(S1,S2) :- S1 @=< S2.
 
+functor_info(F, Name, Terms) :- F =.. [Name|Terms].
+
 slice1([H|_], 1, 1, [H]).
 slice1([H|T], 1, To, [H|X]) :-
         N #= To - 1,

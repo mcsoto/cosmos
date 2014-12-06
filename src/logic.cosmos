@@ -54,27 +54,24 @@ rel toString(Any x, String s)
 		s='#relation'
 	elseif(pl::var(x))
 		s = '#var'
-	elseif(pl::is_assoc(x))
+	elseif(pl::is_assoc(x)) //table
 		rel bindingToString(b, s)
 			pl::get_binding(b, key, value)
-			toString(key,s1)
-			toString(value,s2)
-			s=s1+' = '+s2
-			//s=toString(key)+' = '+toString(value) //todo error?
+			s = toString(key) + ' = ' + toString(value)
 		pl::assoc_to_list(x,l)
-		list.map(l, bindingToString, l2)
-		list.join(l2, ' and ', s0)
+		list.join(list.map(l, bindingToString), ' and ', s0)
 		s = '{'+s0+'}'
 	elseif(pl::atom(x)) 
 		pl::atom_string(x, s0)
-		if(string.slice(s0, 0, 2, 'fc')) //functor
+		if(string.slice(s0, 0, 2, 'fc')) //atomic functor
 			string.slice(s0, 2, string.size(s0), s)
 		else //relation
 			s='#relation'
 	elseif(pl::compound(x)) //functor
-		pl::functor(x, s0, _)
-		string.slice(s0, 2, string.size(s0), name)
-		s=name+'(~)'
+		pl::functor_info(x, s0, args)
+		s = string.slice(s0, 2, string.size(s0)) + '(' + list.join(list.map(args, this.toString), ', ') + ')'
+	elseif(pl::number(x))
+		pl::number_string(x, s)
 	else
 		s=x
 	
