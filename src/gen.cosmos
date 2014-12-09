@@ -503,8 +503,9 @@ rel extract_type(f,type,env)
 		type=Cons('Relation',targs)
 	elseif(f=Op(a,b,op,info))
 		type=['Any']
-	elseif(f=TList(_))
-		type=['Functor']
+	elseif(f=TList(args))
+		extract_type_args(args,targs,env)
+		type = Cons('Functor', targs)
 	elseif(f=TTable(_))
 		type=['Table']
 	else
@@ -908,8 +909,8 @@ rel notblank(s)
 	
 rel generate_chunk(Functor f, String code, String module, opts)
 	stdlibs = [Lib('table','table'),Lib('list','list'),Lib('string','string'),Lib('math','math'),Lib('io','io'),Lib('logic','logic')]
-	stdvars = [Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])]
-	stdfcs = [Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']])]
+	stdvars = [Var('Cons','local',['FunctorObject']),Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])]
+	stdfcs = [Var('Cons','local',['Functor']),Var('Cons','',['Functor']), Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']])]
 	if(list.has(opts, '--no-std-libs'))
 		env_init(env, stdvars, stdfcs, [])
 	else
@@ -925,7 +926,7 @@ rel generate_chunk(Functor f, String code, String module, opts)
 	code=info + ':- style_check([-singleton,-no_effect]), ensure_loaded("core.pl").\n' + list.join(l_lambdas,'') + code_world + code_env + '.'
 
 rel generate_query(Functor f, String code, String prefix, Functor query_vars, module)
-	env_init(env_a, [Lib('list','list'),Lib('table','table'),Lib('string','string'),Lib('math','math'),Lib('io','io'),Lib('logic','logic'),Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])], [Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']])], [])
+	env_init(env_a, [Lib('list','list'),Lib('table','table'),Lib('string','string'),Lib('math','math'),Lib('io','io'),Lib('logic','logic'),Var('Cons','local',['FunctorObject']),Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])], [Var('Cons','',['Functor']),Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']]),Var('Left','',['Functor']),Var('Right','',['Functor'])], [])
 	extract_modules(env_a, ['list','table','string','math','io','logic'], env_b)
 	if(module='temp')
 		env=env_b
