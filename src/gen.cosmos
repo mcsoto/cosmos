@@ -93,6 +93,14 @@ rel env_push(env, f, env2)
 	env = [vars, fcs, lambda, mods]
 	env2 = [Cons(f, vars), fcs, lambda, mods]
 	
+rel env_push_if_not_found(env, f, env2)
+	env = [vars, fcs, lambda, mods]
+	f = Var(name, _ , _)
+	if(list.has(vars, Var(name, _, _)))
+		env2=env
+	else
+		env2 = [Cons(f, vars), fcs, lambda, mods]
+	
 rel env_push_functor(env, f, env2)
 	env = [vars, fcs, lambda, mods]
 	env2 = [vars, Cons(f, fcs), lambda, mods]
@@ -626,7 +634,7 @@ rel specialize_type(env, a, ta, tb, env2)
 		if(types.strict_type(ta,tb,tc))
 			//io.writeln('strict type')
 			//io.writeln(tc)
-			env_push(env, Var(name,'local',tc), env2)
+			env_push_if_not_found(env, Var(name,'local',tc), env2)
 		else
 			io.writeln([ta,tb])
 			logic.throw("no strict") //todo: ???

@@ -69,7 +69,7 @@ rel toString(Any x, String s)
 			s='#relation'
 	elseif(pl::compound(x)) //functor
 		pl::functor_info(x, s0, args)
-		s = string.slice(s0, 2, string.size(s0)) + '(' + list.join(list.map(args, this.toString), ', ') + ')'
+		s = string.slice(s0, 2, string.size(s0)) + '(' + list.join(list.map(args, toString), ', ') + ')'
 	elseif(pl::number(x))
 		pl::number_string(x, s)
 	else
