@@ -1,4 +1,3 @@
-functor(Cons, Functor)
 require('string', string)
 require('math', math)
 require('io', io)

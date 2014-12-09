@@ -458,7 +458,7 @@ rel extract_type(f,type,env)
 	elseif(f=Id(name, type_id))
 		if(type_id!=[]) //type annotation is not empty, this is a declaration
 			type_id=Cons(type_name, _)
-			if(list.has(['Any','Number','Integer','Real','Functor','Relation','String','Table','File'],type_name))
+			if(list.has(['Any','Number','Integer','Real','Functor','Relation','String','Table','File'], type_name))
 				type=type_id
 			else
 				logic.throw('"'+type_name+'" is not a type')
@@ -807,7 +807,10 @@ rel generate_body(Functor f, code, env, env2, module)
 	
 	elseif(f=Host('pl', name, args))
 		extract_args(args,sargs,env,env2,prefix,module)
-		code=prefix+name+'('+sargs+')'
+		if(args = [])
+			code = prefix+name
+		else
+			code = prefix+name+'('+sargs+')'
 	
 rel generate_world(f, code, env1, env2, module)
 	if(f=And(a,b))

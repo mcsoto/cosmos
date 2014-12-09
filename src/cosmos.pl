@@ -4,7 +4,7 @@ cosmos4(Env0,_e) :- obj_call2(Env0,"io","write",["RuntimeError: "]),writeln(_e).
 cosmos3(Env0,_e) :- string_concat("CosmosError: ",_e,T34),obj_call2(Env0,"io","writeln",[T34]),false.
 cosmos2(Env0,__,_y) :- eq(_y,_z).
 cosmos1(Env0,_x,_s) :- string_concat("_",_x,T35),eq(_s,T35).
-cosmos0(Env0,_e) :- string_concat("CosmosError: ",_e,T36),obj_call2(Env0,"io","writeln",[T36]).
+cosmos0(Env0,_e) :- string_concat("CosmosError: ",_e,T36),obj_call2(Env0,"io","writeln",[T36]),obj_call2(Env0,"logic","exit",[]).
 :- ensure_loaded("lexer.pl").
 :- ensure_loaded("parser.pl").
 :- ensure_loaded("whitespacer.pl").

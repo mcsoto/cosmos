@@ -2,11 +2,11 @@ require('list', list)
 require('string', string)
 require('math', math)
 
-rel listOf(x, Relation p, args, Functor l)
-	pl::list_of(x, p, args, l)
-
-rel between(i, j, x)
-	pl::between(i, j, x)
+rel throw(x)
+	pl::throw(x)
+	
+rel exit()
+	pl::halt()
 	
 rel apply(Relation p, Functor l)
 	pl::apply(p,l)
@@ -17,6 +17,12 @@ rel applyOnce(Relation p, Functor l)
 rel applyCatch(Relation p, Functor l, Relation q)
 	pl::apply_catch(p,l,q)
 	
+rel listOf(x, Relation p, args, Functor l)
+	pl::list_of(x, p, args, l)
+
+rel between(i, j, x)
+	pl::between(i, j, x)
+	
 rel iterate(Relation p, Integer n, x, y)
 	if(n=0)
 		y=x
@@ -24,9 +30,6 @@ rel iterate(Relation p, Integer n, x, y)
 		p(x,x2)
 		iterate(p, n-1, x2, y)
 
-rel throw(x)
-	pl::throw(x)
-	
 rel type(x,y)
 	pl::nonvar(x)
 	if(pl::number(x))
@@ -74,4 +77,3 @@ rel toString(Any x, String s)
 		pl::number_string(x, s)
 	else
 		s=x
-	

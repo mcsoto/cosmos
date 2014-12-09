@@ -52,7 +52,7 @@ rel compile(code_cosmos, code_prolog, module)
 rel compile_module(module, x, opts)
 	//s1=module+'.'+'cosmos'
 	s2=module+'.'+'pl'
-	logic.applyCatch(compile_to_file, [module, s2, x, opts], rel(e) io.writeln('CosmosError: '+e);)
+	logic.applyCatch(compile_to_file, [module, s2, x, opts], rel(e) io.writeln('CosmosError: '+e) and logic.exit();)
 	
 rel eval_vars(code, prefix, vars, module)
 	//store code on temporary file, then consult file
