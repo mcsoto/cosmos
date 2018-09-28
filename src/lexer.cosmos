@@ -87,6 +87,8 @@ rel navigate_ws2(String s,Integer i,Integer i2,line,col,info2)
 			navigate_ws2(s,i+1,i2,line+1,1,info2)
 		elseif(c='\t')
 			navigate_ws2(s,i+1,i2,line,col+4,info2)
+		elseif(c='\r')
+			navigate_ws2(s,i+1,i2,line,col,info2)
 		else
 			this.whitespace(c)
 			navigate_ws2(s,i+1,i2,line,col+1,info2)

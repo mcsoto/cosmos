@@ -119,7 +119,7 @@ rel ws(tks, ind, tk_prev, tks2)
 
 rel run(tks1,tks2)
 	if(tks1=Cons(Token(_,'whitespace',_), tks_tail)) //remove whitespace at the beginning
-		this.ws(tks_tail, Cons, Token('','SOF',_), tks2)
+		this.run(tks_tail, tks2)
 	else
 		this.ws(tks1, Cons, Token('','SOF',_), tks2)
 

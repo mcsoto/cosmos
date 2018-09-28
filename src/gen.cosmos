@@ -375,10 +375,16 @@ rel extract_name(Functor f, String s2, env, env2, String prefix, String module)
 		gensym('T',c)
 		if(a='this')
 			prefix='env_get(Env0,"'+b+'",'+c+'),'
+			s2='closure('+c+',Env0)'
 		else
-			prefix='obj_get(Env0,"'+a+'","'+b+'",'+c+'),'
-		s2='closure('+c+',Env0)'
-		
+			if(env_has_var(env, Lib(a,_)))
+				io.writeln('yes')
+				prefix='obj_get(Env0,"'+a+'","'+b+'",'+c+'),'
+				s2='closure('+c+',Env0)'
+			else
+				io.writeln('no')
+				prefix='normal_get(_'+a+',"'+b+'",'+c+'),'
+				s2=c
 	elseif(f=Func(name,args,info))
 		if(name='Cons')
 			extract_args(args,sb,env,env2,prefix,module)
