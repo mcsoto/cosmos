@@ -6,7 +6,24 @@ Cosmos
 
 Cosmos is a modern logic programming language.
 
-> **Note:** the language is in very early alpha.
+_Cosmos 0.12 VM - Alpha version released._
+
+---
+
+The language is in testing stage.
+
+This was published only to release the current code.
+
+Ideally, it'll go:
+
+alpha -> beta (most bugs fixed, no missing features)
+beta -> full (decent performance)
+
+This answers any "when is it done?" questions.
+
+The focus is on fixing issues and making it easy to try the language instead of performance, so as to make it usable for simple scripts, however.
+
+See details.
 
 Download
 ---
@@ -16,53 +33,18 @@ _Coming soon._
 Documentation
 ---
 
-_Coming soon._
+_Wait for it._
 
 Building
 ---
 
-Building from the source requires SWI-Prolog (7.1.16+). Run `make cosmos` and move the executable to
-swipl/bin. If you're on an environment where the Makefile doesn't work, look into the `make.sh`,
-`make.bat` or `make86.bat` scripts.
+Use `make` or `make cosmos`
 
-Files
----
+It should only require gcc (7.4.0)
 
-* `list.cosmos`, `string.cosmos`, `math.cosmos`, `io.cosmos`, `logic.cosmos` and `table.cosmos`
-  contain the standard library for Cosmos programs.
-* `core.pl` contains the language core. It is the only part of the Cosmos implementation that is
-  not written in Cosmos itself, but in Prolog. It's used by the standard library as well as the
-  compiler.
-* `types.cosmos`, `lexer.cosmos`, `whitespacer.cosmos`, `parser.cosmos` and `gen.cosmos` contain
-  the Cosmos compiler, `cosmos.cosmos` contains the compiler frontend.
+Tested using cygwin.
 
-You can rebuild the standard library with
-```sh
-$ make stdlib-clean
-$ make stdlib
-```
-
-You can rebuild the compiler modules with
-```sh
-$ make compiler-clean
-$ make compiler
-```
-
-To build the compiler executable, use
-```sh
-$ make cosmos
-```
-
-To run the two test files, use
-```sh
-$ make test
-```
-
-Finally, you can rebuild the compiler, then rebuild the standard library with that compiler, and
-then rebuild the compiler with that new standard library with
-```sh
-$ make rebuild
-```
+See readme.txt for dev info.
 
 Queries
 ----
@@ -78,13 +60,14 @@ $ cosmos -i
 | x = 2
 ```
 
+This will compile and run a file `test1.co`.
+
+```
+$ cosmos -l test1
+```
+
 Overview
 ====
-
-Philosophy
-----
-
-The design of the language aims for simplicity and minimalism. This is done by adopting few but powerful core features: relations, functors, tables and types. As a result, the language is concise and easy-to-learn without sacrificing expressiveness.
 
 ```javascript
 rel main()
@@ -94,38 +77,34 @@ rel main()
 
 The syntax is close to that of a typical scripting language (Python/JavaScript/Lua). The difference is that whereas traditional scripting languages tend to focus on imperative programming, Cosmos focuses on declarative (logic and functional) programming.
 
+
+A Neutral Language
+----
+
+Although it is a logic programming language, code in this language can look and behave very conventionally: code might seem imperative or functional.
+
+However, it's a declarative language. As such, variables are immutable. Instead of modifying a value we create a new one.
+
+```
+list.push(l, 55, l2) //instead of modifying l, we create a new variable l2
+io.writeln(l)  //[1, 2, 3]
+io.writeln(l2) //[1, 2, 3, 55]
+```
+
+Cosmos adopts principles from (procedural) scripting languages, logic programming and functional programming. You may write using an almost imperative style, this will however compile to logic code.
+
+Cosmos adopts many principles and features that are common in functional programming languages (although the principles apply to *relations* rather than *functions*).
+
+
 Relations
 ----
 
 Instead of functions, Cosmos has relations.
 
-Relations allow input and output parameters to be used interchangeably.
-
-```javascript
-//note that the there is no 'return' in the definition
-//instead, the parameter y is explicit
-rel double(x, y)
-    y = x*2
-    
-rel main()
-    double(3, y) //y is 6
-    double(x, 6) //x is 3
-    io.writeln('the double of '+math.integerToString(x)+' is '+math.integerToString(y)) //the double of 3 is 6
-```
-
-When a relation is nested, the last parameter is hidden.
-
-```javascript
-rel main()
-    io.writeln(double(3)) //this will print 6
-    x = double(4) //x is 8
-```
-
-Although it is a logic programming language, code in this language can look and behave very conventionally: the above code might seem imperative or functional.
-
 Whereas functions have one output, relations may have zero, one or more outputs. You can check this by making queries at the interpreter.
 
-```javascript
+```$
+cosmos -i
 > x=1 or x=2 //this query has two answers (outputs)
 | x = 1
 | x = 2
@@ -142,31 +121,37 @@ rel main()
 	x!=1
 	io.writeln(x) //2
 ```
-Relations are first-class values. It's possible to define a relation within another.
+
+
+When a relation is nested, the last parameter is hidden.
+
+```javascript
+//note that the there is no 'return' in the definition
+//instead, the parameter y is explicit
+//this is typically the 'output' parameter
+rel double(x, y)
+    y = x*2
+
+io.writeln(double(3)) //this will print 6
+double(4,x) //x is 8
 ```
-rel p(x)
-    rel temp(x)
-        x = 2
-    temp(x)
-    
-rel main(x)
-    p(x) //x is 2
+
+Logic-wise, `double(4,x)` is read as a statement: "the double of 4 is x".
+
+Relations may adopt function syntax. When nesting, for example,
+
+```javascript
+print(double(3)) //this will print 6
 ```
-Alternatively:
-```
-rel p(x)
-    temp = rel(x)
-        x = 2
-    temp(x)
-```
+
 
 Functors
 ----
 
 Functors are composite data.
 ```
-FunctorObject F //declares an object for creating functors
-x = F(1, 2) //x is assigned to a functor F composed by the values 1 and 2
+functor(F, Functor) //declares an object for creating functors
+x = F(1, 2) //x is assigned to a functor F with the values 1 and 2
 x = F(1, a) //uses pattern matching to match F(1, 2) against F(1, a)
 print(a) //2
 ```
@@ -181,67 +166,29 @@ l = Cons(1, Cons(2, Cons))
 Relations such as _first_, _map_ and _filter_ can be used to manipulate lists.
 
 ```
+require('io', io)
+require('math', math)
+require('list', list)
+
 rel main()
     l = [1,2,3]
     list.first(l, head) //head is 1
     list.rest(l, tail) //tail is [2, 3]
     list.map(l, math.inc, l2) //l2 is [2, 3, 4]
-    list.map(l3, math.inc, l) //l3 is [0, 1, 2]
     list.filter(l, rel(x) x!=3;, l4) //l4 is [1, 2]
 ```
-
-Immutability
-----
-
-Variables are immutable. Instead of modifying a value we create a new one.
-
-```
-    l2 = list.push(l, 55) //instead of modifying l, we create a new variable l2
-    io.writeln(l)  //[1, 2, 3]
-    io.writeln(l2) //[1, 2, 3, 55]
-```
-
-Cosmos adopts many principles and features that are common in functional programming languages (although the principles apply to *relations* rather than *functions*).
-
-Types
-----
-
-Cosmos manages a balance between strictness and non-strictness. Writing the type of a variable is (almost always) optional.
-
-```javascript
-    Integer n = 7
-    Real x = 5.2
-    String s = 'abc'
-    z = 5 //z is implied to be an Integer
-    Functor l = [1, 2, 3]
-    FunctorObject F
-    Functor f = F('apple', 5)
-```
-
-The type system supports *composite types*.
-```
-    Functor String Number f2 = F('apple', 2)
-```
-*Functor String Number* is a composite type that accepts any functor whose first element is a string and second is a number.
-```
-    Relation Any Any p = double
-```
-Relations get composite types. *Relation Any Any* is a type that accepts any relation with exactly two arguments.
 
 Tables
 ----
 
-Tables are structures that map keys to values.
+Tables (also known as maps, dictionaries, etc.) are structures that map keys to values.
 
-```
-    Table t = {}
-    table.set(t, 'a', 1, t2)
-    table.set(t2, 'b', 2, t3)
-    table.get(t2, 'a', x)
-    
-    io.writeln(t) //{}
-    io.writeln(t3) //{a = 1 and b = 2}
-    io.writeln(x) //1
+```javascript
+Table t = {x=1 and y=2}
+table.set(t, 'a', 1, t2)
+
+print(t) //{'x': 1, 'y': 2}
+print(t2) //{'x': 1, 'y': 2, 'a': 1}
 ```
 
 Booleans
@@ -252,19 +199,33 @@ There is no boolean type. Instead, relations themselves are "booleans".
 Code such as
 
 ```
-    if(s = 'a')
-        x = 0
-    elseif(s = 'b')
-        x = 1
-    else
-        x = 2
+if(s = 'a')
+	x = 0
+elseif(s = 'b')
+	x = 1
+else
+	x = 2
 ```
 
 is simply sugar for
 
 ```
-    (s = 'a' and x = 0) or (s = 'b' and x = 1) or x = 2
+(s = 'a' and x = 0) or (s = 'b' and x = 1) or x = 2
 ```
+
+For a less imperative-looking code,
+
+```
+case
+	s = 'a'
+	x = 0
+case
+	s = 'b'
+	x = 1
+case
+	x = 2
+```
+
 
 Whitespace
 ----
@@ -283,12 +244,14 @@ It's possible to drop the whitespace semantics by writing the unnecessary charac
 
 Note that relations from different lines are separated by _ands_ (semicolons are only used to end the indendation).
 
-Host
+Details
 ----
 
-Cosmos is currently compiled into Prolog. As such, it's possible to call predicates of Prolog from Cosmos.
-
-```
-rel write(x)
-    pl::write(x) //calls Prolog predicate 'write'
-```
+With the advent of the Cosmos 0.12 VM,
+- It's still in alpha.
+- C++ VM released. Parser is still built in Cosmos(!) itself.
+- The VM is based on the WAM, as it provides a set of bytecode instructions for Prolog. Temporary variables are not used. See original WAM paper.
+- The parser makes use of an intermediary language, "CWAM". `Put(Var(0), 1)` translates to `put_variable 0,1`.
+- This has missing features, however, it's already more than (raw) Prolog. Again, this was uploaded only to give the language a basis.
+- It has its own license.
+- For language samples, see test examples.

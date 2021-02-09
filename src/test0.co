@@ -1,0 +1,120 @@
+true
+/*
+rel print(i) c::print(i);
+rel require(i,i2) c::require(i, i2);
+
+
+//c::print(1,x)
+//x=2
+*/
+functor(Cons, Functor)
+
+require('list5', list)
+
+	
+functor(F, Functor)
+
+//c::break()
+j=2
+rel print2(i)
+	//c::print(i)
+	x=1
+	x=2
+//t={true}
+//t={1=2 and 4=3 and 's'=3}
+i=1
+print(i)
+print('='+i)
+//i='asd'
+rel p(i)
+	i='asd'
+//p(1,2)
+name='asd'
+msg='calling relation '//+name+' with wrong type'
+print2(msg)
+//Relation extract_types
+//p(1,rel(x) true;,2)
+
+l=[1,2,3]
+list.find(l,2,_)
+
+//p=rel (Number x) x=2;
+if(x=1)
+	true
+else
+	true
+//require('table.bc', table)
+
+//list.push([1],2,l)
+y=2
+//require('list4.bc', list2)
+//require('test1.bc', a)
+c::require('nil.bc', _)
+a=11
+c::print('-')
+c::require('nil.bc', _)
+x=1
+rel p2(x,y) y=x+1;
+list.map(l,p2,l2)
+print(l2)
+//x=''
+//require('string.bc', string)
+require('env6.bc', env14)
+//require('env.bc', env)
+l=[]+[2]
+print(env14)
+print(l)
+print(2)
+
+//c::require('list4.bc', list)
+c::print('list4.bc',list)
+xs=1+2
+print(x)
+//print(2,1)
+list.push(l,l2)
+
+
+rel print_(i,io) c::print(i);
+
+require('list5.bc', list)
+/*
+t2={
+	'x'=1
+	'y'=t
+	'print'=print
+}
+
+//c::require('lexer5.bc', lexer)
+c::require('table5.bc', table)
+//c::require('env5.bc', env14)
+print(t)
+//env14.size(env.upvals,n2)
+print(t.x)
+print(t2.y)
+table.get(t2.y,'x',z)
+//t2.print(t.x,z)
+print(t2['print'])
+print(z)
+
+t={
+	'x'=1
+	'y'=2
+}
+
+t={
+	//'p'=rel() x=1;
+	'p'=rel()
+		x=1
+}
+x=t['p']
+print(x)
+x()
+x=''*/
+String s=x
+//Number s=x
+x=2
+//s=1
+t=print()
+cut
+c::type(x,s)
+s=print()

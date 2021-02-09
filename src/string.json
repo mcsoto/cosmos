@@ -1,0 +1,9 @@
+{"and" :[{"rel" :[{"name" : "slice"}, [{"name" : "s"},{"name" : "n"},{"name" : "n2"},{"name" : "s2"}], {"host" :[{"name" : "slice"}, [{"name" : "s"},{"name" : "n"},{"name" : "n2"},{"name" : "s2"}]]}]}
+,{"and" :[{"rel" :[{"name" : "substr"}, [{"name" : "s"},{"name" : "n"},{"name" : "n2"},{"name" : "s2"}], {"host" :[{"name" : "substr"}, [{"name" : "s"},{"name" : "n"},{"name" : "n2"},{"name" : "s2"}]]}]}
+,{"and" :[{"rel" :[{"name" : "code"}, [{"name" : "s"},{"name" : "n"}], {"host" :[{"name" : "code"}, [{"name" : "s"},{"name" : "n"}]]}]}
+,{"and" :[{"rel" :[{"name" : "get"}, [{"name" : "s"},{"name" : "x"},{"name" : "c"}], {"host" :[{"name" : "at"}, []]}]}
+,{"and" :[{"rel" :[{"name" : "size"}, [{"name" : "s"},{"name" : "i"}], {"host" :[{"name" : "size"}, []]}]}
+,{"and" :[{"rel" :[{"name" : "at"}, [{"name" : "s"},{"name" : "i"},{"name" : "c"}], {"host" :[{"name" : "at"}, []]}]}
+,{"and" :[{"rel" :[{"name" : "lessOrEqual"}, [{"name" : "S1"},{"name" : "S2"}], {"host" :[{"name" : "s_le"}, [{"name" : "S1"},{"name" : "S2"}]]}]}
+,{"rel" :[{"name" : "findIndex"}, [{"name" : "s1"},{"name" : "s2"},{"name" : "i"},{"name" : "pos"}], {"host" :[{"name" : "findIndex"}, [{"name" : "s1"},{"name" : "s2"},{"name" : "i"},{"name" : "pos"}]]}]}
+]}]}]}]}]}]}]}

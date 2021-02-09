@@ -1,0 +1,13 @@
+functor(Cons, Functor)
+
+rel each2(l,p)
+	case
+		l=[]
+	case
+		l=[e,e2|l2]
+		//p(e,e2)
+		each2(l2,p)
+
+each2(['lexer9.bc', lexer, 'parser9.bc', parser], print)
+
+c::eval('false')

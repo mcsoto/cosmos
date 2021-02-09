@@ -1,0 +1,23 @@
+
+//true
+functor(Cons, list)
+functor(Cons2, Functor)
+functor(F, list String)
+functor(F, list Number)
+/*
+rel p(a,b,c,d)
+	true
+
+x=y
+y=1
+print(x)
+print(y)
+rel p(list a)
+	true
+
+f=F(1)
+p(Cons2)*/
+f2=Cons2
+f2=F(1)
+//f=f2
+//f=Cons

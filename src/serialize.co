@@ -1,0 +1,625 @@
+
+functor(Info, Functor)
+functor(Token, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+	
+//require('string.bc', string)
+//string lib
+
+rel s_slice(String s, Integer n, Integer n2, String s2)
+	c::slice(s,n,n2,s2)
+
+//gets code of char (string must have size 1)
+rel codeChar(String s, Integer n)
+	c::code(s,n)
+
+rel s_size(s,i)
+	c::size()
+	
+rel at(s,i,c)
+	c::at()
+		
+rel lessOrEqual(String S1, String S2)
+	c::s_le(S1,S2)	
+
+rel findIndex(String s1, String s2, Integer i, Integer pos)
+	c::findIndex(s1, s2, i, pos)
+	
+rel s_find(String s1, String s2, Integer pos)
+	findIndex(s1,s2,0,pos)
+	
+//parser
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Exclamation, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+
+//gen
+
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Put, Functor)
+
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor Functor)
+functor(TTable, Functor Functor)
+	
+//bc
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+
+functor(Bind, Functor)
+
+functor(Nil, Functor)
+functor(Call, Functor)
+functor(Val, Functor)
+functor(Const, Functor)
+functor(Upvalue, Functor)
+
+//lib
+
+rel iterate(Relation p, Integer n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+
+rel s_concat(String s,String s2,String s3)
+	c::concat(s,s2,s3)
+		
+//list lib
+
+rel first(Functor l, Any a)
+	l=Cons(a,_)
+
+rel rest(Functor l, Any b)
+	l=Cons(_,b)
+
+rel has(Functor l, Any e)
+	if(l=Cons(e, _))
+		true
+	else
+		l=Cons(_, tail)
+		has(tail,e)
+
+rel find(Functor l, Any e, Integer i)
+	l=Cons(x,tail)
+	if(e=x)
+		i=0
+		c::cut()
+	else
+		find(tail,e,j)
+		i=j+1
+		c::cut()
+
+rel fold(Functor l, pred, Any a, Any result)
+	if(l=Cons(b,tail))
+		pred(a,b,c)
+		fold(tail, pred, c, result)
+	else
+		l=Cons
+		result=a
+
+rel size(Functor l, Integer n)
+	if(l=[])
+		n=0
+	else
+		l=Cons(_, tail)
+		size(tail,j)
+		n=j+1
+
+rel push(l, n, l2)
+	l2=Cons(n, l)
+		
+rel filter(Functor l, Relation Any p, Functor l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		if(p(head))
+			l2=Cons(head, tail2)
+			filter(tail, p, tail2)
+		else
+			filter(tail, p, l2)
+
+rel concat(Functor l, Functor l2, Functor l3)
+	case
+		l=[]
+		l3=l2
+	case
+		l=Cons(e, t1)
+		concat(t1, l2, l0)
+		l3=Cons(e, l0)
+
+rel reverse(Functor l, Functor l2)
+	if(l=Cons(a,tail))
+		reverse(tail, ltemp)
+		concat(ltemp, Cons(a,Cons), l2)
+	else
+		l=Cons
+		l2=Cons
+
+//helpers
+	
+rel put_args(l,l2)
+	case
+		l=Cons(n,t1)
+		l2=Cons(30,Cons(n,Cons(n,t2)))
+		put_args(t1, t2)
+	case
+		l=Cons
+		l2=Cons
+	
+rel put_vars(l,l2)
+	case
+		l=Cons(n,t1)
+		l2=Cons(26,Cons(n,Cons(0,t2)))
+		put_vars(t1, t2)
+	case
+		l=Cons
+		l2=Cons
+	
+rel list_to_and(l, t)
+	if(l=Cons(a,Cons))
+		//print(F(a,t))
+		t=a
+	elseif(l=Cons(a,b))
+		list_to_and(b,t1)
+		t=And(a,t1)
+		
+rel list_to_cons(l, t)
+	if(l=Cons(a,l2))
+		t=Func('Cons', [a, t2], _)
+		list_to_cons(l2, t2)
+	else
+		l=Cons
+		t=Id('Cons', [])
+
+rel get_prefix(f, l, c)
+	if(l=Cons)
+		c=f
+	else
+		l=Cons(a,tail)
+		get_prefix(f,tail,c1)
+		c=And(a, c1)
+	
+/*
+	serializing helpers
+*/
+	
+rel put_fc(a,x,x2)
+	if(a=Val(x2))
+		x=34
+	elseif(a=Var(x2))
+		x=35
+	elseif(a=Void(x2))
+		x=58
+	elseif(a=Const(x2))
+		x=33
+	else
+		c::throw('not done')
+	
+rel put(a,x,x2,size)
+	if(a=Val(x2))
+		x=25
+	elseif(a=Var(x2))
+		x=26
+	elseif(a=Void(x2))
+		x=58
+	elseif(a=Const(x2))
+		x=17
+	elseif(a=Upvalue(i))
+		//print(F(size))
+		x=25
+		x2=i+size
+	else
+		c::throw('not done')
+	
+rel push_pred(l,l2,n,w)
+	case
+		l=Cons(a,t1)
+		put(a,x,x2,w)
+		l2=Cons(x,Cons(x2,Cons(n,t2)))
+		push_pred(t1, t2, n+1, w)
+	case
+		l=Cons
+		l2=Cons
+	
+rel push_fc(l,l2)
+	case
+		l=Cons(a,t1)
+		put_fc(a,x,x2)
+		l2=Cons(x,Cons(x2,t2))
+		push_fc(t1, t2)
+	case
+		l=Cons
+		l2=Cons
+	
+/*
+	bit
+*/
+
+
+rel byte(f, x)
+	//pl::put_byte(f, x)
+	c::write8(f, x)
+
+rel word(f, n)
+	//pl::writeInt32(f, n)
+	c::write32(f, n)
+	
+rel integerToBytes(n, l)
+	//pl::getInt32(n, l)
+	print(n)
+	c::bit_and(n, 255, b1)
+	c::bit_shr(b1, 8, n1)
+	c::bit_and(n1, 255, b2)
+	c::bit_shr(b2, 16, n2)
+	c::bit_and(n2, 255, b3)
+	c::bit_shr(b3, 24, n3)
+	c::bit_and(n3, 255, b4)
+	l=[b1,b2,b3,b4]
+
+/*
+	serializing
+*/
+
+rel cond2(elif, first)
+	case
+		elif=0
+		first=12
+	case
+		first=13
+		
+Relation _serialize
+			
+rel _serialize_cond(f, n, size1, l0, l, last_clause, branch, elif)
+	if(f=Cons(b, tail))
+		size(l0,n0)
+		size(last_clause,temp)
+		//jmp to prev+#body1+(halt or jmp)+#[12,x]
+		cond2(elif,h1)
+		integerToBytes(n+n0+temp+5,x)
+		concat([h1], x, x1)
+		concat(l0, last_clause, x2)
+		concat(x1, x2, l1)
+		//n=prev+prev_puts...
+		//n1=body1
+		size(l1,n1)
+		//print(F(l1, '#'+n1, '#'+n))
+		print(['-else', branch])
+		print(l1)
+		//print(b)
+		//+5?
+		
+		if(tail=Cons(c, _)) //add elseif
+			_serialize(b, n1+n+5, size1, 0, branch, l2) //send current+prev... to get new l2
+			//print(TList(l2, '#'+#l2))
+			_serialize_cond(tail, n1+n, size1, l2, l3, last_clause, branch, 1) //send l2 as prev to merge into l3
+			concat(l1, l3, l)
+		else //add else
+			_serialize(b, n1+n+1, size1, 0, branch, l2) //send current+prev... to get new l2
+			print(l2)
+			concat(l1, [14], y1)
+			concat(l2, last_clause, y2)
+			concat(y1, y2, l)
+			print(l)
+			//concat([14], y2, temp2)
+			//print(F2(temp2, '#'+#temp2))
+			//print(F(l2, '#'+#l2))
+			
+	elseif(f=Cons(b,Cons))
+		c::throw('???')
+	else
+		f=Cons(b,Cons)
+		
+			
+rel _serialize(f, n, size1, next, branch, l)
+	//c::write('-')
+	//print(f)
+	if(f=And(a, b))
+		_serialize(a, n, size1, 1, branch, l0) //set 1 if there's a following stm
+		size(l0,n0)
+		_serialize(b, n+n0, size1, 0, branch, l1) //last stm
+		concat(l0, l1, l)
+	
+	elseif(f=Cond(a, lc, t))
+		print(['-if', branch+1, t])
+		print(lc)
+		put_vars(t, l1)
+		size(l1,n1)
+		//print(Prev('#'+n,'#'+n1))
+		print(next)
+		print(branch)
+		if(next=1 or c::ge(branch, 1))
+			//last=[46,n3]
+			concat([46],l3,last_clause) //jmp last
+			size(l3, 4)
+		else
+			print('-')
+			last_clause=[16]
+		//add 5 for branching
+		_serialize(a, n+n1+5, size1, 0, branch+1, l0)
+		_serialize_cond(lc, n+n1, size1, l0, l2, last_clause, branch+1, 0)
+		size(l2,n2)
+		integerToBytes(n2+n1+n, l3)
+		print(F('l3',l3))
+		concat(l1,l2,l)
+		//debug-only
+		//print(HeaderTop(l1,'#'+n1, l2,'#'+n2, Tuple('#'+n0)))
+		
+	elseif(f=Eq(a,b))
+		put(a,x,x2,size1)
+		if(b=Func(args))
+			y=31
+			size(args,n_args)
+			l0=[x,x2,0,y,251,0, n_args]
+			push_fc(args,l1)
+			concat(l0,l1,l)
+			
+		elseif(b=Func(name,args))
+			y=31
+			size(args,n_args)
+			l0=[x,x2,0,y,name,0, n_args]
+			push_fc(args,l1)
+			concat(l0,l1,l)
+			
+		else
+			if(b=Val(y2))
+				y=29
+			elseif(b=Var(y2))
+				y=30
+			elseif(b=Const(y2))
+				y=20
+				
+			//using 'eq x,y' instruction
+			if(x=26 and y=20)
+				l=[51,x2,y2] //sets var
+			elseif(x=25 and y=20)
+				l=[52,x2,y2] //sets val
+			else
+				l=[x,x2,0,y,y2,0]
+			
+	elseif(f=Put(a))
+		put(a,x,x2,size1)
+		l=[x,x2,0]
+		
+	elseif(f=Put(a,b))
+		put(a,x,x2,size1)
+		l=[x,x2,b]
+		
+	elseif(f=Pred(l1, a))
+		//print('#'+size1)
+		push_pred(l1,l2,0,size1)
+		if(a=Upvalue(i))
+			concat(l2, [11,i+size1], l)
+		else
+			concat(l2, [11,a], l)
+	elseif(f=ObjPred(l1, obj, a))
+		push_pred(l1,l2,0,size1)
+		size(l1,n1)
+		if(obj=Upvalue(i))
+			x=i+size1
+			concat(l2, [17,a,11, 40,x,n1, 42,n1], l)
+		else
+			concat(l2, [17,a,11, 40,obj,n1, 42,n1],l)//[11,a], l) //put_const(a, 11), obj_get, call_reg
+	elseif(f=ObjGet(obj, a, reg))
+		print(f)
+		if(obj=Upvalue(i))
+			x=i+size1
+			concat(l2, [53,x,a,reg], l)
+		else
+			concat(l2, [53,obj,a,reg], l)
+		print(l)
+	elseif(f=ObjGet(obj, a))
+		print(f)
+		if(obj=Upvalue(i))
+			x=i+size1
+			concat(l2, [17,a,11, 40,x,a], l)
+		else
+			concat(l2, [17,a,11, 40,obj,a],l)//[11,a], l) //put_const(a, 11), obj_get, call_reg
+	elseif(f=Host(l1, a))
+		print(f)
+		push_pred(l1,l2,0,size1)
+		concat(l2, [24, a], l)
+		print(l)
+	elseif(f=False)
+		l=[44]
+	else
+		l=[]
+	
+rel byte_array(f,l)
+	if(l=Cons(a,t1))
+		byte(f, a)
+		byte_array(f, t1)
+	else
+		l=Cons
+	
+rel serialize_string(f,s)
+	if(s='')
+		true
+	else
+		c::code(s,c1)
+		byte(f, c1)
+		s_size(s,w)
+		c::slice(s,1,w,s2)
+		serialize_string(f,s2)
+	
+Relation write_rel
+		
+rel write_string(f, sa)
+	s_size(sa, n1)
+	c::sub(n1,1,x)
+	c::slice(sa,1,x,sb) //removes outer delimiters
+	//fix_string(sb, 0, sc)
+	//sb=sc
+	c::write(sb)
+	s_size(sb, n2)
+	c::write(n2)
+	word(f, n2)
+	serialize_string(f, sb)
+	
+rel write_consts(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(fc,b)
+		//print(fc)
+		if(fc=Num(a))
+			byte(f, 2)
+			c::stringToNumber(a,c)
+			word(f, c)
+		elseif(fc=Str(a))
+			byte(f, 3)
+			write_string(f, a)
+		elseif(fc=TList(a))
+			byte(f, 0)
+		elseif(fc=Rel(t, env))
+			//print(fc)
+			byte(f, 4)
+			write_rel(f, t, env)
+		else
+			print(fc)
+			c::throw(f)
+		write_consts(f, b)
+
+rel write_upvals(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(x,b)
+		c::write('upval:')
+		word(f,x)
+		write_upvals(f, b)
+	
+
+rel serialize_rel(f, l2)
+	c::write('\nrel ')
+	print(f)
+	f=[_, l0, f1, size1]
+	//l2=list.concat(list.concat(l0, _serialize(f1, #l0, size, 0, 0)), [16])
+	size(l0, n0)
+	_serialize(f1, n0, size1, 0, 0, t1)
+	concat(l0, t1, t2)
+	concat(t2, [16], l2)
+	print('')
+
+rel write_rel(f, t, env)
+	c::table_get(env,'vars',vars)
+	c::table_get(env,'consts',consts)
+	c::table_get(env,'upvals',upvals)
+	size(vars,n1)
+	size(consts,n2)
+	size(upvals,n3)
+	reverse(consts,c2)
+	reverse(upvals,u2)
+	reverse(vars,v2)
+	//consts, vars, upvals
+	word(f, n2)
+	write_consts(f, c2)
+	word(f, n1)
+	byte(f, n3)
+	//print(env.upvals)
+	write_upvals(f, u2)
+	//insts
+	serialize_rel(t, l2)
+	c::cut()
+	//print(F2(l2))
+	size(l2,bc)
+	word(f, bc)
+	byte_array(f, l2)
+	//debug
+	byte(f, 1)
+	//size(name), name, n_args
+	t=[Pair(name,args), _, _, size1]
+	print('')
+	print(F(name,n2,n1,n3))
+	if(name='')
+		byte(f, 1)
+		byte(f, 0)
+	else
+		s_size(name,w)
+		word(f,w)
+		serialize_string(f, name)
+	word(f, args)
+	
+rel serialize(f, fc)
+	fc=Rel(a, env)
+	c::get(env, 'vars', vars)
+	c::cut()
+	size(vars,n_vars)
+	write_rel(f, [Pair('::main',0), [], a, n_vars], env)
+
+/*
+	elseif(a=Func(name,args,_))
+		if(find(fcs, Var(name,n2,_), _)) //term is a functor
+			temp=make_temp()
+			generate_body(Eq(temp, a, _),prefix,env,env2)
+			temp=Id(name2,_)
+			env_vars(env2, vars2)
+			find(vars2, Var(name2,n,_), _)
+			f=Val(n)
+			//print(['prefix',prefix,temp,f])
+		else //term is a relation in function syntax
+			temp=make_temp()
+			l1=Cons(temp, args)
+			generate_body(And(Pred(name,l1,_), Eq(a, temp, _)),t,env,env2)
+			*/
+c::table_new(t)
+c::table_set(t,'write_rel',write_rel,t1)
+c::table_set(t1,'_serialize',_serialize,t2)
+
+print(t2)
+export(t2)

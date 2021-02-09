@@ -55,6 +55,9 @@ rel compare_types(t1, t2)
 	if(b1=Cons or b2=Cons)
 		true //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
 	else
+		/*io.writeln('-')
+		io.writeln(b1)
+		io.writeln(b2)*/
 		this.compare_types2(b1,b2)
 	
 rel strict_type_atomic(String ta, String tb, String tc)
@@ -84,6 +87,7 @@ rel strict_type(t1, t2, t3)
 	t1=Cons(a1,b1)
 	t2=Cons(a2,b2)
 	this.strict_type_atomic(a1,a2,a3)
+	//io.writeln([a1,a2,a3])
 	if(b1=Cons)
 		t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
 	elseif(b2=Cons)

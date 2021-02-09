@@ -1,0 +1,40 @@
+//upvalues and math
+
+/*
+*/
+Relation p
+
+rel p(f)
+	f(2)
+
+p(print)
+
+rel p(f)
+	f(2+1)
+/*
+
+
+y=2
+rel q()
+	//y=3
+	//print(1)
+	c::print(y)
+	//p(print)
+
+q()	
+
+c::require('string5.bc', string)
+
+require('string5.bc', string1)
+require('string5', string2)
+require('string5', string3)
+
+print(string)
+
+string.at('as',1)
+print(string.at('as',1))
+
+//at=string.at
+at=string['at']
+print(at('as',0))
+*/

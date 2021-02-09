@@ -23,7 +23,8 @@ rel last(String s, String c)
 	get(s, size(s)-1, c)
 	
 rel findIndex(String s1, String s2, Integer i, Integer pos)
-	if(get(s1, i, s2))
+	//if(get(s1, i, s2))
+	if(slice(s1, i, i+size(s2), s2))
 		i=pos
 	else
 		i<size(s1)

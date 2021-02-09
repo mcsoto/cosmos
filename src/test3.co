@@ -1,0 +1,22 @@
+require('list5.bc', list)
+cut
+functor(Cons, Functor)
+
+x=1
+
+rel p(c) 
+	true
+i=2+1
+p(i+1)
+print(i)
+l=[1]
+n=#l
+s='s'
+t={}
+t2={1=2}
+print([l,t,t2])
+//print({1=2})
+x2=p()
+x!=2
+2!=x
+1!=2

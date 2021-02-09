@@ -1,0 +1,160 @@
+
+functor(Cons, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Lib, Functor)
+	
+//list lib
+
+require('list5.bc', list)
+
+rel size(Functor l, Integer n)
+	list.size(l,n)
+
+/*
+	env methods
+*/
+
+rel set(t,o,o2,t2)
+	table.set(t,o,o2,t2)
+	c::cut()
+	
+rel get(t,o,o2)
+	table.get(t,o,o2)
+	c::cut()
+
+rel env_init(env, vars, fcs, consts, prev)
+	//c::table_new(t)
+	if(get(prev,'types',t))
+		c::cut()
+		true
+	else
+		table.new(t)
+	
+	env={
+		'vars'=vars
+		'fcs'=fcs
+		'types'=t
+		'consts'=consts
+		'upvals'=[]
+		'branch'=0
+		'top'=[]
+		'prev'=prev
+	}
+	true
+	
+rel env_new(env, fcs, prev)
+	env_init(env, [], fcs, [], prev)
+	
+rel env_size(env, n)
+	x=env['vars']
+	size(x, n)
+	
+rel env_vars(env, x)
+	x=env['vars']
+
+rel env_functors(env, x)
+	x=env['fcs']
+	
+rel env_push(env, f, env2)
+	f=Var(name,n,type)
+	c::def(n)
+	set(env, 'vars', Cons(f, env_vars(env)), env2)
+	
+rel env_push_on(env, String str, f, env2)
+	set(env, str, Cons(f, get(env, str)), env2)
+	
+rel env_set(env, s, x, env2)
+	table.set(env,s,x,env2)
+	
+rel env_push_var(env, env2, f)
+	env_push_on(env, 'vars', f, env2)
+		
+rel env_push_if_not_found(env, f, env2)
+	//vars = env.vars
+	get(env, 'vars', vars)
+	f = Var(name, _ , _)
+	if(list.has(vars, Var(name, _, _)))
+		env2=env
+	else
+		set(env,'vars', Cons(f, vars), env2)
+	
+/* 
+	env searching
+*/
+
+rel _env_get_var(l, a, f)
+	case
+		l=Cons(head, _)
+		head=Var(a,_,_)
+		f=head
+		//print(l)
+	case
+		l=Cons(_, tail)
+		_env_get_var(tail, a, f)
+	
+rel env_get_var(env, a, f)
+	vars=env['vars']
+	_env_get_var(vars, a, f)
+	
+rel env_get(env, s, t)
+	t=env[s]
+	
+rel env_prevs(env, a, f)
+	prev=env['prev']
+	vars=prev['vars']
+	//vars=env.prev.vars
+	_env_get_var(vars, a, f)
+	
+//require('list.bc', list)
+
+t14={
+	'new'=env_new
+	'vars'=env_vars
+	'push_on'=env_push_on
+	'push'=env_push
+	'update'=env_push_if_not_found
+	'functors'=env_functors
+	'size'=env_size
+	'prevs'=env_prevs
+	'get_var'=env_get_var
+	'init'=env_init
+	'get'=env_get
+	'set'=env_set
+	'push_var'=push_var
+}
+//print(t14)
+export(t14)
+/*
+env_new(e,[],{})
+print(e)
+env_push(e,Var(2,1,_),e2)
+print(e2)
+env_get_var(e2, 2, f)
+print(f)
+env_get(e, 'types', o)
+print(o)
+cut
+table.new(env)
+set(env, 'a', [], env2)
+get(env2, 'a', l)
+cut
+//set(env2, str, Cons(f, l), env3)
+set(env2, 'b', F(1, 2), env3)
+print(env3)
+cut
+table.new(env)
+set(env, 'a', [], env2)
+cut
+//set(env2, str, Cons(f, l), env3)
+set(env2, 'b', Cons(f,get(env2, 'a')), env3)
+print(env3)
+cut
+env_new(e,[],{})
+//vars=e['prev']//.prev.vars
+vars=e['vars']
+print(vars)
+*/

@@ -1,0 +1,50 @@
+t={
+	rel sqrt(Real x, Real y)
+		c::sqrt(x, y)
+
+	rel random(Real x)
+		c::random(x)
+
+	rel abs(Integer x, Integer y)
+		c::abs(x, y)
+		
+	rel floor(Real x, Integer y)
+		c::floor(x, y)
+		
+	rel ceil(Real x, Integer y)
+		c::ceiling(x, y)
+
+	/* ... */
+		
+	rel add(Integer x,Integer y,Integer z)
+		c::add(x,y,z)
+	rel sub(Integer x,Integer y,Integer z)
+		c::sub(x,y,z)
+	rel mul(Integer x,Integer y,Integer z)
+		c::mul(x,y,z)
+	rel div(Integer x,Integer y,Integer z)
+		c::div(x,y,z)
+
+	rel inc(Integer x,Integer y)
+		y=x+1//c::inc(x,y)
+	rel dec(Integer x,Integer y)
+		c::dec(x,y)
+
+	/* ... */
+
+	rel stringToNumber(s,n)
+		c::number_string(n,s)
+		
+	rel integerToString(Integer n, String s)
+		c::number_string(n,s)
+
+	rel realToString(Real n, String s)
+		c::number_string(n,s)
+
+	rel integerToReal(Integer n, Real x)
+		c::integer_float(n,x)
+		
+	rel realToInteger(Real n, Real x)
+		c::integer_float(n,x)
+}
+export(t)

@@ -2,12 +2,16 @@
 :- use_module(library(clpr)).
 :- use_module(library(assoc)).
 
+print(X) :- writeln(X).
+
 add(X,Y,Z) :- fd_add(X,Y,Z).
 sub(X,Y,Z) :- fd_sub(X,Y,Z).
 mul(X,Y,Z) :- fd_mul(X,Y,Z).
 div(X,Y,Z) :- fd_div(X,Y,Z).
 inc(X,Y) :- fd_inc(X,Y).
 dec(X,Y) :- fd_dec(X,Y).
+
+mod(X,Y,Z) :- Z is X mod Y.
 
 r_add(X,Y,Z) :- {Z = X+Y}.
 r_sub(X,Y,Z) :- {Z = X-Y}.
@@ -23,7 +27,7 @@ fd_add(X,Y,Z) :- Z #= X+Y.
 fd_inc(X,Y) :- X+1 #= Y.
 fd_dec(X,Y) :- X-1 #= Y.
 
-dynamic_add(X,Y,Z) :- (number(X) -> add(X,Y,Z) ; string_concat(X,Y,Z)).
+dynamic_add(X,Y,Z) :- (number(X) -> add(X,Y,Z) ; (is_list(X) -> append(X,Y,Z); string_concat(X,Y,Z))).
 
 r_le(X,Y) :- {X =< Y}.
 r_ge(X,Y) :- {X >= Y}.
@@ -80,6 +84,8 @@ s_slice(S1,I,J,S2) :- s_size(S1,L), (J < L -> End=J ; End=L), sub(End,I,JJ), _i 
 s_first(S1,S2) :- s_at(S1, 0, S2).
 s_le(S1,S2) :- S1 @=< S2.
 
+dynamic_size(X,Y) :- (string(X) -> s_size(X,Y) ; length(X,Y)).
+
 functor_info(F, Name, Terms) :- F =.. [Name|Terms].
 
 slice1([H|_], 1, 1, [H]).
@@ -110,18 +116,31 @@ replace_word(Old, New, Orig, Replaced) :-
 	
 % records %
 
-new(T) :-
-	empty_assoc(T).
 
-get(T, Key, Value) :-
-	get_assoc(Key, T, Value).
+new(T) :-
+	T=[].
+
+%get([H], Key, Value) :-	H=Key-Value.
+
+get([H|T], Key, Value) :-
+	(H=Key-Value ;
+	get(T, Key, Value)).
+	
+find([H|T], Key, L1, L2) :-
+	(H=Key-Value ->
+	L2=T,
+	L1=[]
+	;
+	L1=[H|L3],
+	find(T, Key, L3, L2)).
 	
 get_binding(B, Key, Value) :-
 	B=Key-Value.
 	
 set(T, Key, Value, T2) :-
-	put_assoc(Key, T, Value, T2).
-
+	(find(T,Key,L1,L2) -> append(L1,[Key-Value],L0), append(L0, L2, T2) ;
+	T2=[Key-Value | T]).
+	
 each(T, P, T2) :-
 	map_assoc(P, T2).
 
@@ -130,6 +149,52 @@ fopen(Filename,Mode,File) :-
 		(Mode="write" -> open(Filename,write,File) ;
 			(Mode="update" -> open(Filename,update,File) ; throw("not a correct mode for 'open'.")))).
 	
+fopen_binary(Filename,Mode,File) :-
+	(Mode="read" -> open(Filename,read,File,[type(binary)]) ;
+		(Mode="write" -> open(Filename,write,File,[type(binary), encoding(octet)]) ;
+			(Mode="update" -> open(Filename,update,File,[type(binary)]) ; throw("not a correct mode for 'open'.")))).
+	
+writeInt32(OS, Number) :-
+    B0 is Number /\ 255,
+    B1 is (Number >> 8) /\ 255,
+    B2 is (Number >> 16) /\ 255,
+    B3 is (Number >> 24) /\ 255,
+	put_byte(OS, B0),
+    put_byte(OS, B1),
+    put_byte(OS, B2),
+    put_byte(OS, B3).
+
+getInt32(Number, L) :-
+    B0 is Number /\ 255,
+    B1 is (Number >> 8) /\ 255,
+    B2 is (Number >> 16) /\ 255,
+    B3 is (Number >> 24) /\ 255,
+	L=[B0, B1, B2, B3].
+	
+serialize_list(F,[]).	
+serialize_list(F,L) :-
+	L=[H|T],
+	put_byte(F,H),
+	serialize_list(F,T).
+	
+serialize_string(F,"") :-
+	N2 is 0,
+	writeInt32(F,N2)
+.
+
+serialize_string(F,S0) :-
+	(get_string_code(1,S0,39) -> %hack for 'asd' strings
+	split_string(S0, "'", "", L0),
+	L0=[_, S, _]
+	; S=S0
+	),
+	%write("Code S:"),writeln(C),
+	string_length(S,N),
+	N2 is N+1,
+	writeInt32(F,N2),
+	string_to_list(S,L), append(L,[0],L1),
+	serialize_list(F,L1).
+
 ioread(S) :- read_string(user_input,"\n","\r",_,S).
 fread(F,S) :- read_string(F,"\n","\r",_,S).
 fread_all(F,S) :- read_string(F,"","",_,S).
@@ -143,6 +208,7 @@ obj_call2(Env,Obj,Method,Arg) :- get(Env,Obj,_t1), get(_t1,Method,_t2), apply(_t
 obj_call(Env,Obj,Method,Arg) :- get(Env,Obj,_t1), get(_t1,Method,_t2), apply(_t2, Arg).
 env_call(Env,Method,Arg) :- get(Env,Method,_t2), apply(_t2, Arg).
 obj_get(Env,Obj,Method,X) :- get(Env,Obj,_t1), get(_t1,Method,X).
+normal_get(Obj,Key,X) :- get(Obj,Key,X).
 env_get(Env,Method,X) :- get(Env,Method,X).
 
 % global_call(Obj,Method,Arg) :- global(G), get(G,Obj,_t1), get(_t1,Method,_t2), apply(_t2, Arg).

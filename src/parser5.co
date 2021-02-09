@@ -1,0 +1,543 @@
+
+functor(Cons, Functor)
+functor(Tuple, Functor)
+functor(Info, Functor)
+functor(Token, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+	
+//require('string.bc', string)
+//string lib
+
+rel at(s,i,c)
+	c::at()
+	
+//parser
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Mut, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(ObjGet2, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Put, Functor)
+
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor Functor)
+//functor(TTable, Functor Functor)
+functor(Op, Functor)
+	
+/* misc */
+
+rel parse_type(l,tail,type)
+	l = [Token(_,type,_)|tail]
+	
+rel parse_string(l,tail,str)
+	l = [Token(_,str,_)|tail]
+
+rel get_info(l,info)
+	l = [Token(_,_,info)|_]
+	
+rel get_line(l,info1)
+	l = [Token(_,_,info)|_]
+	info=Info(info1,_)
+	
+rel custom_throw(String msg, Functor info)
+	//info=Info(line, col)
+	//logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+	c::throw(msg)
+	
+	
+/* ... */
+
+Relation parse_exp
+rel parse_args(l,tail,f)
+	case
+		parse_exp(l,l1,f1)
+		parse_type(l1,l2,',')
+		parse_args(l2,tail,f2)
+		f=[f1|f2]
+	case
+		parse_exp(l,tail,f1)
+		f=[f1]
+	case	
+		f=[]
+		tail=l
+			
+rel parse_args2(l,tail,f)
+	case
+		parse_exp(l,l1,f1)
+		parse_type(l1,l2,s)
+		if(s='|')
+			parse_exp(l2,tail,f2)
+			f=[f1,Tuple(f2)]
+		elseif(s=',')
+			parse_args2(l2,tail,f2)
+			f=[f1|f2]
+		else
+			false
+	case
+		parse_exp(l,tail,f1)
+		f=[f1]
+	case	
+		f=[]
+		tail=l
+		
+/* expression parsing */
+
+rel parse_obj_get(l,tail,f)
+	l = [Token(a,'id',_),Token(_,'.',_),Token(b,'id',_)| tail]
+	f=ObjGet(a,b)
+	
+rel parse_obj_get2(l,tail,f)
+	l = [Token(a,'id',_),Token(_,'[',_)|l2]
+	parse_exp(l2,l3,f1)
+	l3=[Token(_,']',_)|tail]
+	f=ObjGet2(a,f1)
+	
+rel parse_exp_call(l,tail,f)
+	l = [Token(name,'id',_),Token(_,'(',_)| l2]
+	parse_args(l2,l3,args)
+	l3=[Token(_,')',_)|tail]
+	f=Func(name,args,get_info(l))
+
+rel parse_obj_pred(l,tail,f)
+	l = [Token(obj,'id',_),Token(_,'.',_),Token(a,'id',_),Token(_,'(',_)| l2]
+	parse_args(l2,l3,code_args)
+	l3=[Token(_,')',_)|tail]
+	f=ObjPred(obj,a,code_args,get_info(l))
+
+rel parse_list(l,tail,f)
+	l = [Token(_,'[',_)|l2]
+	parse_args2(l2,l3,args)
+	l3=[Token(_,']',_)|tail]
+	f=TList(args)
+
+Relation parse_body
+	
+
+rel parse_lambda(l,tail,f)
+	l=Cons(Token(_,'rel',_),Cons(Token(_,'(',_), l2))
+	parse_args(l2, l3, args)
+	l3=Cons(Token(_,')',_),l4)
+	parse_body(l4, l5, body)
+	l5=Cons(Token(_,';',_), tail)
+	f=Rel(args,body)
+
+rel parse_table(l,tail,f)
+	l = Cons(Token(_,'{',_),l2)
+	//print('table')
+	//cut
+	//parse_args(l2,l3,args)
+	parse_body(l2,l3,args)
+	//l2=l3
+	//print('table=')
+	l3=Cons(Token(_,'}',_),tail)
+	//print(args)
+	//args=[]
+	f=TTable(args)
+/*
+rel parse_table2(l,tail,f)
+	print('table')
+	l = [Token(_,'{',_),Token(_,'}',_)|tail]
+	args=[]
+	f=TTable(args)
+*/
+rel name_list_to_type2(l,l2)
+	if(l=[head])
+		l2=[[head]]
+	else
+		l=Cons(head, tail)
+		name_list_to_type2(tail, tail2)
+		l2=Cons([head], tail2)
+		
+//e.g. [Rel, Num] ==> [Rel, [Num]]
+rel name_list_to_type(l,l2)
+	if(l=[])
+		l2=l
+	elseif(l=[a]) //atomic type
+		l2=l
+	else //composite type
+		l=Cons(a,tail)
+		name_list_to_type2(tail,tail2)
+		l2=Cons(a,tail2)
+	
+rel parse_name2(l,tail,type,name) //id or type followed by id
+	case
+		l=[Token(a,'id',_)|l2]
+		//pause()
+		parse_name2(l2,tail,type2,name)
+		type=[a|type2] //many ids -> type is declared
+		print([name,type])
+	case
+		l=[Token(a,'id',_)|tail]
+		type=[]
+		name=a
+	
+rel parse_name(l,tail,type,name)
+	parse_name2(l,tail,name_list,name) //once
+	name_list_to_type(name_list,type)
+	//name_list=type
+	//c::cut()
+
+rel parse_value(l,tail,f) //str, number or -number
+	case
+		l=[Token(a,'string',_)| tail] and f=Str(a)
+	case
+		l=[Token(_,'-',_), Token(a,'number',_) | tail] and f=Num('-'+a)
+	case
+		l=[Token(a,'number',_)| tail] and f=Num(a)
+
+rel parse_excl(l,tail,code)
+	l = Cons(Token(_,'!',_), Cons(Token(a,'id',_), tail))
+	//code=Exclamation(a,get_info(l))
+	code=Mut(a)
+		
+rel parse_length(l,tail,code)
+	//l=Cons(Token(_,'#',_), Cons(Token(a,'id',_), tail))
+	l=[Token(_,'#',_)| l2]
+	parse_exp(l2,tail,a)
+	code=Size(a,get_info(l))
+		
+//parses atomic expression
+rel parse_exp2(l,tail,f)
+	//parse_exp_obj_call(l,tail,f) or
+	case
+		parse_exp_call(l,tail,f)
+	case
+		parse_obj_pred(l,tail,f)
+	case
+		parse_obj_get(l,tail,f)
+	case
+		parse_obj_get2(l,tail,f)
+	case
+		parse_list(l,tail,f)
+	case
+		parse_table(l,tail,f)
+		print(f)
+		c::cut()
+	case
+		parse_lambda(l,tail,f)
+	case
+		parse_name(l,tail,type,name) and f=Id(name,type)
+	case
+		parse_length(l,tail,f)
+	case
+		parse_excl(l,tail,f)
+	case
+		parse_value(l, tail,f)
+Relation parse_math0
+
+//parses expressions joined by math operators
+rel parse_math2(l,tail,prev,f)
+	parse_string(l,l2,op)
+	if(op='+' or op='-' or op='*' or op='/')
+		parse_exp2(l2,l4,b)
+		//get_info(l,info)
+		fcur = Op(prev,b,op,get_info(l))
+		parse_math2(l4,tail,fcur,fnext)
+		if(fnext=None)
+			f=fcur
+		else
+			f=fnext
+	else
+		f=None
+		tail=l
+	
+rel parse_math1(l,tail,f)
+	parse_exp2(l,l2,a)
+	parse_math2(l2,tail,a,f2)
+	if(f2=None)
+		f=a
+	else
+		f=f2
+	
+rel parse_exp(l,tail,f)
+	parse_math1(l,tail,f)
+	/*c::cut()
+	case
+		//parse_name(l,tail,type,name)
+		//f=Id(name,type)
+	case
+		parse_value(l, tail,f)*/
+			
+/* expression parsing */
+
+/* parses body */
+				
+/* composite statements */
+
+//Relation parse_body
+
+rel parse_elseifs(l,tail,cond)
+	case
+		l = Cons(Token(_,'elseif',_), Cons(Token(_,'(',_), l1))
+		parse_body(l1, l2, f1)
+		l2=Cons(Token(_,')',_), l3)
+		parse_body(l3, l4, f2)
+		parse_elseifs(l4, tail, cond2)
+		cond=Cons(And(f1,f2), cond2)
+	case
+		l = Cons(Token(_,'else',_), l10)
+		parse_body(l10,tail,f1)
+		cond=[f1]
+	case
+		cond=Cons
+		tail=l
+
+rel parse_if(l,tail,f)
+	if(l = Cons(Token(_,'if',_), l0))
+		f=Cond(fbody1,fbody2,cond)
+	else
+		l = Cons(Token(_,'choose',_), l0)
+		f=SoftCut(fbody1,fbody2,cond)
+	l0 = Cons(Token(_,'(',_), l2)
+	parse_body(l2,l3,fbody1)
+	l3=Cons(Token(_,')',_), l4)
+	parse_body(l4,l5,fbody2)
+	parse_elseifs(l5,l11,cond)
+	l11=Cons(Token(_,';',_), tail)
+	//pl::writeln(cond)
+
+rel parse_case2(l,l1)
+	case
+		l = [Token(_,'case',_)| l1]
+	case
+		l = [Token(_,'cond',_)| l1]
+	
+rel parse_case1(l,tail,f)
+	case
+		parse_case2(l,l1)
+		parse_body(l1,l2,f1)
+		parse_case1(l2,tail,cond)
+		f=[f1|cond]
+	case
+		f=[]
+		tail=l
+	
+rel parse_case(l,tail,f)	
+	parse_case2(l,l1)
+	parse_body(l1,l2,f1)
+	parse_case1(l2,l3,cond)
+	l3=[Token(_,';',_)| tail]
+	f=Cond(True,f1,cond)
+	print(f)
+	//pl::writeln(f)
+	
+/* simple statements */
+		
+rel parse_eq(l,tail,f)
+	parse_exp(l,l2,a)
+	parse_type(l2,l3,'=')
+	parse_exp(l3,tail,b)
+	get_info(l,info)
+	f=Eq(a,b,info)
+
+rel parse_neq(l,tail,f)
+	parse_exp(l,l2,a)
+	parse_type(l2,l3,'!=')
+	parse_exp(l3,tail,b)
+	f=Neq(a,b)
+
+rel parse_true(l,tail,f)
+	l = [Token(a,'true',_)|tail]
+	f=True
+
+rel parse_atom(l,tail,f)
+	l = [Token('cut','id',_)|tail]
+	f=Fact(a,[],get_info(l))
+	
+rel parse_false(l,tail,f)
+	l = [Token(a,'false',_)|tail]
+	f=False
+
+rel parse_inequality(l,tail,f)
+	parse_exp(l,l2,a)
+	parse_type(l2,l3,op)
+	if(op='<=' or op='>=' or op='>' or op='<' or op='!=')
+		parse_exp(l3,tail,b)
+		f=Inequality(a,b,op,get_info(l))
+	else
+		false
+
+rel parse_pred(l,tail,code)
+	l = Cons(Token(a,'id',_), Cons(Token(_,'(',_), l2))
+	parse_args(l2,l3,code_args)
+	l3=[Token(_,')',_)|tail]
+	if(a='functor')
+		code=Fact(a,code_args,get_info(l))
+	elseif(a='throw')
+		code=Fact(a,code_args,get_info(l))
+	elseif(a='cut')
+		code=Fact(a,code_args,get_info(l))
+	else
+		code=Pred(a,code_args,get_info(l))
+
+rel parse_host(l,tail,code)
+	case
+		l = Cons(Token(obj,'id',_),Cons(Token(_,'::',_),Cons(Token(a,'id',_),Cons(Token(_,'(',_), l2))))
+		parse_args(l2,l3,code_args)
+		l3=[Token(_,')',_)|tail]
+		code=Host(obj,a,code_args)
+		//print(code)
+	case
+		l = Cons(Token(obj,'id',_),Cons(Token(_,'::',_), l2))
+		l2=[Token(str,'string',_)|tail]
+		code=Host(obj, str)
+	
+rel parse_declaration(l,tail,code)
+	parse_name(l,tail,type,name) //todo: throw error when type is empty (doesn't work now due to backtracking)
+	code=Declaration(name,type)
+
+Relation parse_definition
+	
+//parse any simple statement
+rel parse_call(l,tail,code)
+	parse_true(l,tail,code) or
+	parse_false(l,tail,code) or
+	parse_atom(l,tail,code) or
+	parse_if(l,tail,code) or
+	parse_case(l,tail,code) or
+	parse_eq(l,tail,code) or
+	parse_neq(l,tail,code) or
+	//parse_inequality(l,tail,code) or
+	parse_pred(l,tail,code) or
+	parse_obj_pred(l,tail,code) or
+	parse_definition(l,tail,code)or
+	parse_host(l,tail,code) or
+	parse_declaration(l,tail,code)
+
+rel parse_body2(l2,tail,s1,code)
+	if(l2=Cons(Token(conn,'connective',_), l3))
+		if(conn='and')
+			get_line(l2,i1)
+			get_line(l3,i2)
+			//print([i1,i2])
+			//c::def(i1)
+			code=And(s1,s2,Tuple(i2,i2))
+		elseif(conn='or')
+			code=Or(s1,s2)
+		parse_body(l3,tail,s2)
+	else
+		l2=tail
+		s1=code
+
+rel parse_body(l,tail,code)
+	parse_call(l,l2,s1)
+	parse_body2(l2,tail,s1,code)
+
+rel parse_definition(l,tail,f)
+	l=[Token(_,'rel',_),Token(name,'id',_),Token(_,'(',_)| l2]
+	parse_args(l2, l3, args)
+	l3=[Token(_,')',_)|l4]
+	parse_body(l4, l5, body)
+	l5=[Token(_,';',_)|tail]
+	f=Rel(name,args,body)
+
+rel run(l,code)
+	parse_body(l,tail,code)
+	print(tail) //todo
+	if(tail=[Token('EOF',_,_)])
+		true
+	else
+		print(tail)
+		custom_throw('parser error',_)
+
+
+/*
+	run
+*/
+
+//require('test9.bc', lexer)
+//require('lexer5.bc', lexer)
+//c::cut()
+//lexer.run('rel=a',0, l2)
+//lexer.run('rel=a',0,l)
+//lexer.run('a=b',0,l)
+//s='q.p(a,1,2)'
+s='x=-1'
+//s='rel p() x=1+a;'
+//s='1+2'
+//print(l)
+/*
+require('io4.bc', io)
+//s='x=1 and a=2'
+//io.readFile('test0.co',s)
+//s="p(a,1,2,'a')"
+lexer.run(s,0,l)
+print(['l',l])
+require('ws4.bc', ws)
+ws.run(l,l2)
+c::cut()
+print(['l',l2])
+//parse_eq(l2,l3,f)
+//parse_name(l2,tail,type,f)
+//parse_exp(l2,l3,f)
+//parse_call(l2,l3,f)
+parse_body(l2,l3,f)
+//parse_body(l2,l3,f)
+//run(l2,l3,f)
+print(['l',f])
+*/
+//require('table5.bc', table)
+t={
+	'parse_exp'=parse_exp
+	'parse_call'=parse_call
+	'parse_body'=parse_body
+	'run'=run
+}
+print(l)
+print(l2)
+print(l3)
+print(f)
+print(t)
+export(t)

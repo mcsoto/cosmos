@@ -1,0 +1,181 @@
+
+functor(Cons, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Lib, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+	
+//list lib
+
+require('list5.bc', list)
+
+/*
+	env methods
+*/
+
+require('table5.bc', table)
+
+rel set(t,o,o2,t2)
+	table.set(t,o,o2,t2)
+	cut
+	
+rel get(t,o,o2)
+	table.get(t,o,o2)
+	cut
+
+rel env_init(env, vars, fcs, consts, prev)
+	//c::table_new(t)
+	if(get(prev,'types',t))
+		cut
+		true
+	else
+		table.new(t)
+	
+	env={
+		'vars'=vars
+		'fcs'=fcs
+		'types'=t
+		'consts'=consts
+		'upvals'=[]
+		'branch'=0
+		'top'=[]
+		'prev'=prev
+	}
+	true
+	
+rel env_new(env, fcs, prev)
+	env_init(env, [], fcs, [], prev)
+	
+rel env_size(env, n)
+	x=env['vars']
+	list.size(x, n)
+	
+rel remove(Functor l, n, l2)
+	case
+		l=[]
+		l2=l
+	case
+		l=[e|tail]
+		if(e=n)
+			l2=tail
+		else
+			l2=[e|l3]
+			remove(tail, n, l3)
+	
+rel env_remove(env, n, env2)
+	get(env,'vars',l)
+	c::halt()
+	//list.removeElement(l,n,l2)
+	remove(l,n,l2)
+	print(F2(l,l2))
+	c::halt()
+	set(env,'vars',l2,env2)
+	
+rel env_vars(env, x)
+	x=env['vars']
+
+rel env_functors(env, x)
+	x=env['fcs']
+	
+rel env_push(env, f, env2)
+	f=Var(name,n,type)
+	c::def(n)
+	set(env, 'vars', Cons(f, env_vars(env)), env2)
+	
+rel env_update(env, f, env2)
+	env_remove(env, f, env1)
+	env_push(env1, f, env2)
+	
+rel env_push_on(env, String str, f, env2)
+	set(env, str, Cons(f, get(env, str)), env2)
+	//c::throw('-')
+	
+rel env_set(env, s, x, env2)
+	table.set(env,s,x,env2)
+	
+rel env_push_var(env, env2, f)
+	env_push_on(env, 'vars', f, env2)
+		
+rel env_push_if_not_found(env, f, env2)
+	vars = env.vars
+	//get(env, 'vars', vars)
+	f = Var(name, _ , _)
+	if(list.has(vars, Var(name, _, _)))
+		env2=env
+	else
+		set(env,'vars', Cons(f, vars), env2)
+	
+/* 
+	env searching
+*/
+
+rel env_find(l, a, f)
+	case
+		l=Cons(head, _)
+		head=Var(a,_,_)
+		f=head
+		//print(l)
+	case
+		l=Cons(_, tail)
+		env_find(tail, a, f)
+	
+rel env_get_var(env, a, f)
+	vars=env['vars']
+	env_find(vars, a, f)
+	
+rel env_get(env, s, t)
+	t=env[s]
+	
+rel env_prevs(env, a, f)
+	prev=env['prev']
+	vars=prev['vars']
+	//vars=env.prev.vars
+	env_find(vars, a, f)
+	
+//require('list.bc', list)
+/* */
+t14={
+	'new'=env_new
+	'vars'=env_vars
+	'push_on'=env_push_on
+	'push'=env_push
+	'remove'=env_remove
+	'update'=env_update
+	'functors'=env_functors
+	'size'=env_size
+	'prevs'=env_prevs
+	'get_var'=env_get_var
+	'init'=env_init
+	'get'=env_get
+	'set'=env_set
+	'push_var'=push_var
+}
+print(t14)
+export(t14)
+
+table.new(nil)
+env_new(e,[],nil)
+print(e)
+env_push(e,Var(2,1,_),e2)
+print(e2)
+env_remove(e,n,e3)
+print(e3)
+/*
+env_push_if_not_found(e2,Var(1,1,_),e3)
+print(e3)
+env_get_var(e2, 2, f)
+print(f)
+env_get(e, 'types', o)
+print(o)*/
+

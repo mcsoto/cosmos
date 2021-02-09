@@ -1,0 +1,24 @@
+
+x={
+	y=rel()
+		true
+		//x=1
+	//true; Rel('y', [], True), Eq(Id('y', []), Rel([], True),
+}/*
+x2={
+	rel y2()
+		true
+		//x=1
+	//true; Rel('y', [], True), Eq(Id('y', []), Rel([], True),
+}*/
+//true
+print(x)
+print(x2)
+
+functor(Cons, any)
+
+rel p(a,b,c,d)
+	true
+	
+p({},[],{y=rel()true;},[2])
+x.y()

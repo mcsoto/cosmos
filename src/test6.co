@@ -1,0 +1,96 @@
+//testing obj
+/*
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+*/
+functor(Cons, Functor)
+functor(Tuple, Functor)
+
+//require('table5.bc', table)
+
+//print(table)
+table.new(t)
+table.set(t,1,2,t2)
+table.get(t2,1,x)
+//print(x)
+x1=t2[1]
+//t2[1]=x1
+print(x1)
+table.set(t2,1,1,t3)
+print(t3)
+c::cut()
+table.get(t3,1,x2)
+
+//y=(t2[1]+1)
+y=t2[1]+1
+
+
+//String i=2
+i!=3
+b=t[1]
+l=t[1]
+b!=l
+Relation String p
+//p(1)
+//table.set(t,2,1,t2)
+//table.set2(t,t2,2,1)
+print(Tuple(t))
+//print(t[2])
+//string.at('as',i-1,c)
+//print(string.at('as',i-1))
+//1='asd'
+print(t)
+/*
+string.at('a',0,c)
+
+string.at('\t',0,c)
+
+
+rel p(i)
+	true
+	true
+//
+
+
+Integer a
+
+rel p(i)
+	true
+
+rel p(i)
+	true
+
+p(2)
+
+Integer x=2
+
+c::coll()
+p(2)
+
+//Relation p
+
+//p(p('string.bc'))
+
+Integer x
+
+Integer x=2
+
+rel p(i)
+	true
+p(2,1,3,3)
+
+rel p(y)
+	case
+		y=1
+	case
+		y=2
+		a=6
+	z=4
+
+x=p()
+require('test13.bc', t2)
+print(t2)
+*/

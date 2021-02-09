@@ -1,0 +1,508 @@
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+//require('math.bc', math)
+//require('list.bc', list)
+//require('logic.bc', logic)
+require('string.bc', string)
+
+//lib
+
+rel iterate(Relation p, Integer n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+
+rel s_concat(String s,String s2,String s3)
+	c::concat(s,s2,s3)
+		
+		
+//lib list
+		
+rel rest(Functor l, Any b)
+	l=Cons(_,b)
+
+rel fold(Functor l, pred, Any a, Any result)
+	if(l=Cons(b,tail))
+		pred(a,b,c)
+		fold(tail, pred, c, result)
+	else
+		l=Cons
+		result=a
+
+rel size(Functor l, Integer n)
+	if(l=[])
+		n=0
+	else
+		l=Cons(_, tail)
+		size(tail,j)
+		n=j+1
+
+//ws
+		
+functor(Cons, Functor)
+functor(Token, Functor)
+
+//require('lexer', lexer)
+
+rel find_last_char2(s,c,i,pos)
+	i!=-1
+	if(string.at(s, i, ci))
+		ci=c
+		pos=i
+	else
+		find_last_char2(s,c,i-1,pos)
+
+rel find_last_char(s,c,pos)
+	s!=''
+	string.size(s,n)
+	find_last_char2(s, c, n-1, pos)
+
+rel remove_from_start(s1,s2,s3)
+	once string.find(s1,s2,pos)
+	string.size(s2,n)
+	string.size(s1,n2)
+	k=n+pos
+	string.slice(s1, k, n2, s3)
+	
+rel remove_prev_inds(s1,ind,s2)
+	fold(ind, remove_from_start, s1, s2)
+
+rel remove_cur_inds(ind, sgoal, n)
+	case
+		fold(ind, s_concat, '', s)
+		s=sgoal
+		n=0
+	case
+		ind=Cons(h,tail)
+		remove_cur_inds(tail, sgoal, i)
+		n=i+1
+
+rel after_nl(a, a2)
+	string.size(a, i)
+	find_last_char(a,'\n',i2)
+	string.slice(a, i2+1, i, a2)
+
+rel push_semicolon(l,l2)
+	l2=Cons(Token(';', ';',_), l)
+
+rel do_semicolons(Integer i, Integer n,t2,tks2)
+	if(i<n)
+		tks2=t2
+	else
+		push_semicolon(t2,l)
+		do_semicolons(i+1,n,l,tks2)
+
+rel ws(tks, ind, tk_prev, tks2)
+	case
+		tks=Cons(Token(_,'EOF',_),Cons)
+		if(ind!=Cons)
+			tks2=Cons(Token(';',';',_),tks)
+		else
+			tks2=tks
+		true
+	case	
+		//not a whitespace
+		tks=Cons(h1, t1)
+		h1=Token(a, tk_type,_)
+		tk_type!='whitespace'
+		ws(t1, ind, h1, t2)
+		tks2=Cons(h1,t2)
+	case	
+		//two whitespace tokens found, ignore the first
+		tks=Cons(_, t1)
+		t1=Cons(h2, t2)
+		h2=Token(_, 'whitespace',_)
+		ws(t1, ind, tk_prev, t3)
+		tks2=t3
+	case	
+		tks=Cons(h1, t1)
+		h1=Token(a, 'whitespace',_)
+		once after_nl(a, a2)
+		tks=Cons(_, Cons(Token(_, type_next,_), _))
+		if(type_next='EOF') //end of file, do not add 'and's, add ';'s for the remaining indents
+			n=size(ind)
+			t2=t1
+			iterate(push_semicolon, n, t2, tks2)
+			//do_semicolons(0,n,t2,tks2)
+		elseif(remove_prev_inds(a2,ind,snew))
+			//snew is the string of the new indent (if old indent is '\t' and indent is '\t  ', snew is '  ')
+			//if the indent is the same, snew is ''
+			//io.writeln('snew:"'+snew+'"')
+			if(snew='')
+				//same indent
+				ind2=ind
+				tk_prev=Token(_, type_prev,_)
+				type_next!=';'
+				type_next!='connective'
+				type_next!='else'
+				type_next!='elseif'
+				type_next!='case'
+				type_prev!=';'
+				type_prev!='connective'
+				type_prev!='else'
+				type_prev!='elseif'
+				type_prev!='case'
+				ws(t1, ind2, h1, t2)
+				tks2=Cons(Token('and','connective',_), t2)
+			else
+				//more indent
+				snew!=''
+				ind2=Cons(snew, ind)
+				ws(t1, ind2, h1, t2)
+				tks2=t2
+		else
+			//unindent
+			remove_cur_inds(ind,a2,n)
+			iterate(rest, n, ind, ind2)
+			tk_prev=Token(_, type_prev,_)
+			type_next!=';'
+			type_next!='connective'
+			type_prev!='connective'
+			type_prev!='else'
+			type_prev!='elseif'
+			type_prev!='case'
+			if (type_prev!=';')
+				type_next!='else'
+				type_next!='elseif'
+				type_next!='case'
+				iterate(push_semicolon, n, Cons(Token('and','connective',_), t2), tks2)
+				ws(t1, ind2, h1, t2)
+			elseif(type_prev=';')
+				tks2=Cons(Token('and','connective',_), t2)
+				ws(t1, ind2, h1, t2)
+			else
+				n2=n-1 //math.sub
+				iterate(push_semicolon, n2, t2, tks2)
+				ws(t1, ind2, h1, t2)
+		true
+	case	
+		tks=Cons(h1, t1)
+		ws(t1, ind, h1, t2)
+		tks2=t2
+//lexer
+functor(Info, Functor)
+functor(Token, Functor)
+	
+rel inc(i,j)
+	c::add(i,1,j)
+
+//
+
+rel digit(c)
+	string.lessOrEqual(c,'9')
+	string.lessOrEqual('0',c)
+	
+rel letter(c)
+	string.lessOrEqual(c,'z') and string.lessOrEqual('a',c) or
+	string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+
+rel single_quote(c) 
+	string.code(c, 39)
+rel double_quote(c) 
+	c='\"'
+rel quote(c) 
+	single_quote(c) or double_quote(c)
+rel endline(c)
+	c='\n'
+rel slash(c) 
+	string.code(c, 92)
+rel newline(c)
+	string.code(c, 10)
+rel newline2(c)
+	string.code(c, 13)
+rel tab(c) 
+	string.code(c, 9)
+
+rel whitespace(c) 
+	c=' ' or c='\t' or c='\n'
+
+//matching utilities
+	
+rel match_rel2(s,i,i2,f)
+	if(true)
+		string.at(s,i,c)
+		inc(i,j)
+		f(c)
+		match_rel2(s,j,i2,f)
+	else
+		i=i2
+
+rel match_some(s,i,i2,f)
+	string.at(s,i,c)
+	j=i+1
+	f(c) and match_rel2(s,j,i2,f)
+
+rel match_one(s,i,i2,f)
+	i2=i+1
+	string.at(s,i,c)
+	f(c)
+
+rel match_any(s,i,i2,f)
+	case
+		string.at(s,i,c)
+		f(c)
+		match_any(s,i+1,i2,f)
+	case
+		i=i2
+
+rel match_until(s,i,i2,f)
+	string.at(s,i,c)
+	f(c) and i=i2 or
+	match_until(s,i+1,i2,f)
+
+rel match_string(s,i,i2,str)
+	string.size(str,size1)
+	c::add(i,size1,i2)
+	string.slice(s,i,i2,str2)
+	str2=str //todo unnecessary var
+
+//parsing
+	
+rel match_whitespace(s,i,i2)
+	match_some(s,i,i2,whitespace)
+
+rel parse_double_string(s,i,i2)
+	string.at(s,i,c)
+	if(double_quote(c))
+		i=i2
+	elseif(slash(c))
+		parse_double_string(s,i+2,i2)
+	else
+		parse_double_string(s,i+1,i2)
+		
+rel parse_string(s,i,i2)
+	j=i+1
+	string.at(s,i,c)
+	if(double_quote(c))
+		parse_double_string(s,j,j2)
+		i2=j2+1
+	else
+		single_quote(c)
+		match_until(s,j,j2,single_quote)
+		i2=j2+1
+		
+rel parse_number(s,i,i2)
+	match_some(s,i,i2,digit)
+	
+rel parse_id(s,i,i2)
+	match_some(s,i,x,letter)
+	match_any(s,x,i2,digit)
+
+//tries to find if word c is in list, if so set c=z
+rel match_list(l,s,z)
+	l=Cons(head, tail)
+	if(head=s) //choose
+		z=s
+	else
+		match_list(tail, s, z)
+		
+//parses whitespace and updates line/column information
+rel navigate_ws2(String s,Integer i,Integer i2,line,col,info2)
+	if(string.at(s,i,c))
+		if(c='\n')
+			navigate_ws2(s,i+1,i2,line+1,0,info2)
+		elseif(c='\t')
+			navigate_ws2(s,i+1,i2,line,col+4,info2)
+		elseif(c='\r')
+			navigate_ws2(s,i+1,i2,line,col,info2)
+		else
+			whitespace(c)
+			navigate_ws2(s,i+1,i2,line,col+1,info2)
+	else
+		i2=i
+		info2=Info(line,col)
+	
+rel navigate_whitespace(s,i,i2,info,info2)
+	string.at(s,i,c)
+	whitespace(c)
+	info=Info(line,col)
+	if(c='\n')
+		navigate_ws2(s,i+1,i2,line+1,0,info2)
+	else
+		navigate_ws2(s,i+1,i2,line,col,info2)
+
+
+rel step(s, i, j, z, info, info2)
+	if(navigate_whitespace(s,i,j,info,info2))
+		z='whitespace'
+	//elseif(navigate_comment(s,i,j,info,info2))
+	//	z='comment'
+	else
+		string.at(s,i,c)
+		k=i+1
+		l=['=',';']//,'(',')','{','}','.',',']
+		if(match_list(l, c, z))
+			j=i+1/*
+		elseif(letter(c))
+			case
+				match_string(s,i,j,'rel')
+				z='rel'*/
+		else
+			case
+				parse_id(s,i,j) and z='id'
+			case
+				parse_number(s,i,j) and z='number'
+			case
+				parse_string(s,i,j) and z='string'
+			case
+				match_string(s,i,j,'!=') and z='!=' //todo doesn't work if this goes first
+			case
+				match_string(s,i,j,'::') and z='::'
+			case
+				match_string(s,i,j,'<=') and z='<='
+			case
+				match_string(s,i,j,'>=') and z='>='
+			case
+				match_list(['+','-','<','>','[',']','/','*','#'], c, z) and j=k
+			case
+				match_one(s,i,j,single_quote) and z='single_quote'/*
+			case
+				match_one(s,i,j,double_quote) and z='double_quote'*/
+			//z='?'
+		//info2=info
+		//j=3
+		info=Info(line, col)
+		info2=Info(line, col+j-i)
+		
+		
+rel navigate_until_asterisk(s,i,i2,info,info2)
+	info=Info(line,col)
+	string.at(s,i,c)
+	if(c='*')
+		i=i2 and info2=info
+	else
+		if(c='\n')
+			c::add(line, 1, j)
+			info1=Info(j, 1)
+		else
+			if(c='\t')
+				c::add(col, 4, j)
+				info1=Info(line, j)
+			else
+				c::add(col, 1, j)
+				info1=Info(line, j)
+		inc(i,j2)
+		navigate_until_asterisk(s,j2,i2,info1,info2)
+
+//parses comment and updates line/column information
+rel navigate_comment(s,i,i2,info,info2)
+	if(match_string(s,i,x,'//'))
+		info2=info
+		string.findIndex(s,'\n',x,t)
+		if(t=-1)
+			string.size(s, i2)
+		else
+			i2=t
+	else
+		match_string(s,i,x,'/*')
+		navigate_until_asterisk(s,x,y,info,info2)
+		match_string(s,y,i2,'*/')
+
+rel step2(s, i, j, z, info, info2)
+	if(navigate_whitespace(s,i,j,info,info2))
+		z='whitespace'
+	elseif(navigate_comment(s,i,j,info,info2))
+		z='comment'
+	else
+		string.at(s,i,c)
+		k=i+1
+		l=['=',';','(',')','{','}','.',',']
+		if(match_list(l, c, z))
+			j=i+1
+		elseif(letter(c))
+			case
+				match_string(s,i,j,'rel')
+				z='rel'
+			case
+				match_string(s,i,j,'and')
+				z='connective'
+			case
+				match_string(s,i,j,'or')
+				z='connective'
+			case
+				match_string(s,i,j,'true')
+				z='true'
+			case
+				match_string(s,i,j,'false')
+				z='false'
+			case
+				match_string(s,i,j,'if')
+				z='if'
+			case
+				match_string(s,i,j,'case')
+				z='case'
+			case
+				match_string(s,i,j,'choose')
+				z='choose'
+			case
+				match_string(s,i,j,'elseif')
+				z='elseif'
+			case
+				match_string(s,i,j,'else')
+				z='else'
+			case
+				match_string(s,i,j,'once')
+				z='once'
+		else
+			case
+				match_string(s,i,j,'!=') and z='!='
+			case
+				match_string(s,i,j,'::') and z='::'
+			case
+				parse_id(s,i,j) and z='id'
+			case
+				parse_number(s,i,j) and z='number'
+			case
+				parse_string(s,i,j) and z='string'
+			case
+				match_string(s,i,j,'<=') and z='<='
+			case
+				match_string(s,i,j,'>=') and z='>='
+			case
+				match_list(['+','-','<','>','[',']','/','*','#'], c, z) and j=k
+			case
+				match_one(s,i,j,single_quote) and z='single_quote'
+			case
+				match_one(s,i,j,double_quote) and z='double_quote'/* */
+			//z='?'
+		//info2=info
+		//j=3
+		info=Info(line, col)
+		info2=Info(line, col+j-i)
+		
+rel step1(s, i, j, z, info, info2)
+	string.at(s,i,c)
+	k=i+1
+	l=['=']//,';','(',')','{','}','.',',']
+	if(match_list(l, c, z))
+		j=i+1
+	elseif(letter(c))
+		/*case*/
+		print(i)
+		match_string(s,i,j,'rel')
+		z='rel'
+	else
+		true
+	info=Info(line, col)
+	info2=Info(line, col+j-i)
+	print(info2)
+		
+		
+	
+rel run(tks1,tks2)
+	if(tks1=Cons(Token(_,'whitespace',_), tks_tail)) //remove whitespace at the beginning
+		run(tks_tail, tks2)
+	else
+		ws(tks1, Cons, Token('','SOF',_), tks2)
+
+f=Info(0, 0)
+step2('a32', 0, i2, z, f, f2)
+//match_any('a32', 1, i2, digit)
+print(f2)
+//print(i2)

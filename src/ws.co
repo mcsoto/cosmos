@@ -1,0 +1,375 @@
+/*
+t={}
+c::table_set(t,'x',2,t2)
+//x=t2.x
+x=3
+
+l=[1]
+s
+*/
+
+
+functor(Info, Functor)
+functor(Token, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+	
+//require('string.bc', string)
+//string lib
+
+rel s_slice(String s, Integer n, Integer n2, String s2)
+	c::slice(s,n,n2,s2)
+
+rel s_size(s,i)
+	c::size()
+	
+rel at(s,i,c)
+	c::at()
+		
+rel lessOrEqual(String S1, String S2)
+	c::s_le(S1,S2)	
+
+rel findIndex(String s1, String s2, Integer i, Integer pos)
+	c::findIndex(s1, s2, i, pos)
+	
+rel s_find(String s1, String s2, Integer pos)
+	findIndex(s1,s2,0,pos)
+	
+//parser
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Exclamation, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Put, Functor)
+
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor Functor)
+functor(TTable, Functor Functor)
+
+//lib
+
+rel iterate(Relation p, Integer n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+
+rel s_concat(String s,String s2,String s3)
+	c::concat(s,s2,s3)
+		
+//list lib
+
+rel first(Functor l, Any a)
+	l=Cons(a,_)
+
+rel rest(Functor l, Any b)
+	l=Cons(_,b)
+
+rel has(Functor l, Any e)
+	if(l=Cons(e, _))
+		true
+	else
+		l=Cons(_, tail)
+		has(tail,e)
+
+rel find(Functor l, Any e, Integer i)
+	l=Cons(x,tail)
+	if(e=x)
+		i=0
+		c::cut()
+	else
+		find(tail,e,j)
+		i=j+1
+		c::cut()
+
+rel fold(Functor l, pred, Any a, Any result)
+	if(l=Cons(b,tail))
+		pred(a,b,c)
+		fold(tail, pred, c, result)
+	else
+		l=Cons
+		result=a
+
+rel size(Functor l, Integer n)
+	if(l=[])
+		n=0
+	else
+		l=Cons(_, tail)
+		size(tail,j)
+		n=j+1
+
+rel push(l, n, l2)
+	l2=Cons(n, l)
+		
+rel filter(Functor l, Relation Any p, Functor l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		if(p(head))
+			l2=Cons(head, tail2)
+			filter(tail, p, tail2)
+		else
+			filter(tail, p, l2)
+
+rel concat(Functor l, Functor l2, Functor l3)
+	case
+		l=[]
+		l3=l2
+	case
+		l=Cons(e, t1)
+		concat(t1, l2, l0)
+		l3=Cons(e, l0)
+
+rel reverse(Functor l, Functor l2)
+	if(l=Cons(a,tail))
+		reverse(tail, ltemp)
+		concat(ltemp, Cons(a,Cons), l2)
+	else
+		l=Cons
+		l2=Cons
+
+//ws
+
+//require('lexer', lexer)
+
+rel find_last_char2(s,c,i,pos)
+	i!=-1
+	if(at(s, i, ci))
+		ci=c
+		pos=i
+	else
+		find_last_char2(s,c,i-1,pos)
+
+rel find_last_char(s,c,pos)
+	s!=''
+	s_size(s,n)
+	find_last_char2(s, c, n-1, pos)
+
+rel remove_from_start(s1,s2,s3)
+	//remove s2 from s1, e.g. remove_from_start('zxc',z') = 'xc'
+	s_find(s1,s2,pos) //might fail if s2 is not found
+	c::cut()
+	s_size(s2,n)
+	s_size(s1,n2)
+	k=n+pos
+	s_slice(s1, k, n2, s3) //s3 = s[#s2+s.find(s2) : #s] //
+	
+rel remove_prev_inds(s1,ind,s2)
+	//ind is a list of previous indents
+	fold(ind, remove_from_start, s1, s2)
+
+rel remove_cur_inds(ind, sgoal, n)
+	case
+		//concat ind (list) and compare to sgoal (string)
+		fold(ind, s_concat, '', s)
+		s=sgoal
+		n=0
+	case
+		ind=Cons(h,tail)
+		remove_cur_inds(tail, sgoal, i)
+		n=i+1
+
+rel after_nl(a, a2)
+	s_size(a, i)
+	find_last_char(a,'\n',i2)
+	s_slice(a, i2+1, i, a2)
+
+rel push_semicolon(l,l2)
+	l2=Cons(Token(';', ';',_), l)
+
+rel do_semicolons(Integer i, Integer n,t2,tks2)
+	if(i<n)
+		tks2=t2
+	else
+		push_semicolon(t2,l)
+		do_semicolons(i+1,n,l,tks2)
+
+rel ws(l, ind, tk_prev, l2)
+	case
+		l=Cons(Token(_,'EOF',_),Cons)
+		if(ind=Cons /*and tk_prev!=Token(_,';',_)*/)
+			l2=l
+		else
+			l2=Cons(Token(';',';',_),l)
+	
+	case
+		//not a whitespace
+		l=Cons(h1, t1)
+		h1=Token(a, tk_type,_)
+		tk_type!='whitespace'
+		ws(t1, ind, h1, t2)
+		l2=Cons(h1,t2)
+	
+	case
+		//two whitespace tokens found, ignore the first
+		l=Cons(_, t1)
+		t1=Cons(h2, t2)
+		h2=Token(_, 'whitespace',_)
+		ws(t1, ind, tk_prev, t3)
+		l2=t3
+		
+	case
+		//one whitespace
+		//check if a token needs to be added
+		//update indent
+		l=Cons(h1, t1)
+		h1=Token(a, 'whitespace',_)
+		after_nl(a, a2)
+		l=Cons(_, Cons(Token(_, type_next,_), _)) //l1 <- token(y2), l <- [l1]
+		//l2=t1
+		print([a2,ind,snew])
+		//c::break()
+		if(type_next='EOF') //end of file, do not add 'and's, add ';'s for the remaining indents
+			size(ind,n)
+			t2=t1
+			iterate(push_semicolon, n, t2, l2)
+			//do_semicolons(0,n,t2,l2)
+		else
+			if(remove_prev_inds(a2,ind,snew))
+				//snew is the string of the new indent (if old indent is '\t' and indent is '\t  ', snew is '  ')
+				//if the indent is the same, snew is ''
+				//if it's an unindent, e.g. ('',' ')
+				//it fails
+				print(['indent', snew])
+				//c::break()
+				if(snew='')
+					//same indent level, ''
+					ind2=ind
+					tk_prev=Token(_, type_prev,_)
+					type_next!=';'
+					type_next!='connective'
+					type_next!='else'
+					type_next!='elseif'
+					type_next!='case'
+					
+					type_prev!=';'
+					type_prev!='connective'
+					type_prev!='else'
+					type_prev!='elseif'
+					type_prev!='case'
+					//print(type_prev)
+					ws(t1, ind2, h1, t2)
+					l2=Cons(Token('and','connective',_), t2)
+				else
+					//more indent
+					snew!=''
+					ind2=Cons(snew, ind)
+					ws(t1, ind2, h1, t2)
+					l2=t2
+			else
+				//unindent
+				print('unindent')
+				remove_cur_inds(ind,a2,n)
+				iterate(rest, n, ind, ind2)
+				tk_prev=Token(_, type_prev,_)
+				print([';',type_prev,type_next,n])
+				type_next!=';'
+				type_next!='connective'
+				type_prev!='connective'
+				type_prev!='else'
+				type_prev!='elseif'
+				type_prev!='case'
+				if (type_prev!=';')
+					//type_next!='else'; type_next!='elseif'; type_next!='case'
+					print(1)
+					iterate(push_semicolon, n, Cons(Token('and','connective',_), t2), l2)
+					ws(t1, ind2, h1, t2)
+				elseif(type_prev=';')
+					print(2)
+					l2=Cons(Token('and','connective',_), t2)
+					ws(t1, ind2, h1, t2)
+				else
+					print(3)
+					n2=n-1 //math.sub
+					iterate(push_semicolon, n2, t2, l2)
+					ws(t1, ind2, h1, t2)
+		
+	case
+		//skip whitespace
+		l=Cons(h1, t1)
+		ws(t1, ind, h1, t2)
+		l2=t2
+
+rel run_ws(l1,l2)
+	if(l1=Cons(Token(_,'whitespace',_), tks_tail)) //remove whitespace at the beginning
+		run_ws(tks_tail, l2)
+		//l2=1
+	else
+		ws(l1, Cons, Token('','SOF',_), l2) //SOF=start of file token
+
+/*
+	run
+*/
+
+/*
+require('test9.bc', lexer)
+c::cut()
+//lexer.run('rel=a',0, l2)
+lexer.run('rel = a',0,l2)
+c::cut()
+
+run_ws(l2,l3)
+//parse_name(l,tail,type,f)
+
+print(l2)
+print(l3)
+*/
+
+c::table_new(t)
+c::table_set(t,'run',run_ws,t1)
+export(t1)

@@ -1,0 +1,210 @@
+functor(Cons, Functor)
+
+rel print(i)
+	//c::print(i)
+	true
+
+rel require(i,i2)
+	c::require(i, i2)
+
+require('string.bc', string)
+//require('math', math)
+require('io.bc', io)
+
+Relation type_to_string2
+
+rel type_to_string3(t,String s)
+	t=Cons(a,b)
+	s1=a
+	type_to_string2(b,s2)
+	if(s2='')
+		s=s1
+	else
+		s='('+s1+' '+s2+')'
+
+rel type_to_string2(t,String s)
+	if(t=Cons)
+		s=''
+	else
+		t=Cons(a,b)
+		type_to_string3(a,s1)
+		type_to_string2(b,s2)
+		if(s2='')
+			s=s1
+		else
+			s=s1+' '+s2
+
+rel type_to_string(t,String s)
+	t=Cons(a,b)
+	s1=a
+	type_to_string2(b,s2)
+	if(s2='')
+		s=s1 //todo 'Relation Null'?
+	else
+		s=s1+' '+s2
+	
+rel compare_types_atomic(s1, String s2)
+	s1='Any' or s2='Any' or
+	s1=s2 //or derived(s1,s2) or derived(s2,s1)
+	
+Relation compare_types
+rel compare_types2(t1, t2)
+	case
+		t1=Cons
+		t2=Cons
+	case
+		t1=Cons(a1,b1)
+		t2=Cons(a2,b2)
+		compare_types(a1,a2)
+		compare_types2(b1,b2)
+	
+rel compare_types(t1, t2)
+	t1=Cons(a1,b1)
+	t2=Cons(a2,b2)
+	compare_types_atomic(a1,a2)
+	if(b1=Cons or b2=Cons)
+		true //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+	else
+		/*print('-')
+		print(b1)
+		print(b2)*/
+		compare_types2(b1,b2)
+	
+rel strict_type_atomic(String ta, String tb, String tc)
+	if(ta='Any')
+		tc=tb
+	else
+		tc=ta
+	c::cut() //inheritance not implemented yet
+	
+Relation strict_type
+rel strict_type2(t1, t2, t3)
+	if(t1=Cons and t2=Cons)
+		t3=Cons
+	else
+		t1=Cons(a1,b1)
+		t2=Cons(a2,b2)
+		//print(a1)
+		//print(a2)
+		strict_type(a1,a2,a3)
+		//print('-')
+		//print(a3)
+		strict_type2(b1,b2,b3)
+		t3=Cons(a3,b3)
+
+//this is a hack, eventually will be replaced by strictest_type
+rel strict_type(t1, t2, t3)
+	t1=Cons(a1,b1)
+	t2=Cons(a2,b2)
+	strict_type_atomic(a1,a2,a3)
+	//print([a1,a2,a3])
+	if(b1=Cons)
+		t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+	elseif(b2=Cons)
+		t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+	else
+		strict_type2(b1,b2,b3)
+		t3=Cons(a3,b3)
+
+
+//t3 is the most strict combination of t1 and t2
+//e.g. strict_type(Rel Num Any, Rel Any Str) ==> Rel Num Str
+rel strictest_type(t1, t2, t3)
+	if(t1=['Any'])
+		t3=t2
+	elseif(t2=['Any'])
+		t3=t1
+	else
+		t1=Cons(a1,b1)
+		t2=Cons(a2,b2)
+		strict_type_atomic(a1,a2,a3)
+		//print(a3)
+		if(b1=Cons)
+			t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+			//print(t3)
+		elseif(b2=Cons)
+			t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+			//print(t3)
+		else
+			strict_type2(b1,b2,b3)
+			t3=Cons(a3,b3)
+			//print(t3)
+	c::cut()
+
+rel match_until_space(s,i,i2)
+	if(string.size(s,i))
+		i=i2
+	elseif(string.at(s,i,c))
+		c=' '
+		i=i2
+	else
+		match_until_space(s,i+1,i2)
+	c::cut()
+
+
+rel _string_to_type(s, i, final, type)
+	match_until_space(s,i,j)
+	print(j)
+	if(string.at(s,j-1,c)) //END BRACKET
+		c=')'
+		string.slice(s,i,j-1,s1)
+		type=[s1]
+		final=j
+	else
+		string.slice(s,i,j,s1)
+		//print('s1:'+s1)
+		if(string.size(s,j)) //EOF
+			type=[s1]
+			final=j
+		else //found first type, find rest
+			string.at(s,j+1,c)
+			//print('$'+c)
+			if(c='(') //???
+				_string_to_type(s,j+2,final0,t0)
+				//io.write('-t0:')
+				//print(t0)
+				if(string.size(s,final0))
+					type=Cons(s1, [t0])
+				else
+					_string_to_type(s,final0+1,final,t1)
+					t1=Cons(a,b)
+					type=Cons(s1,Cons(t0,Cons([a],b)))
+			else
+				_string_to_type(s,j+1,final,t0)
+				t0=Cons(a,b)
+				type=Cons(s1,Cons([a],b))
+/*				
+rel _string_to_type(s, i, final, type)
+	match_until(s,i,j)
+	//j=1
+	string.at(s,j-1,c)
+				*/
+rel string_to_type(s, type)
+	_string_to_type(s, 0, _, type)
+
+rel get_type(env, x, String s)
+	s='Relation'
+
+rel parse_type(String s, t)
+	string.split(s, ' ', t)
+	
+rel has_type(env, x, String s)
+	get_type(env, x, type1)
+	parse_type(s, type2)
+	compare_types(type1, type2)
+	
+rel main(x)
+	print(string_to_type('rel (Any)'))
+	print(string_to_type('Relation Any'))
+	print(string_to_type('Relation (Functor Any)'))
+	print(string_to_type('Rel (Rel Num Str) Str Num'))
+	print(string_to_type('Rel Rel Num Str Num'))
+	print(string_to_type('Rel (Rel Num (Rel Str) Num) Str Num'))
+	//print(string_to_type('Rel (Rel Num (Rel Str)) Str Num')) //todo
+//main(x)
+	
+c::table_new(t0)
+c::table_set(t0,'compare_types',compare_types,t1)
+c::table_set(t1,'strict_type',strict_type,t2)
+c::table_set(t2,'string_to_type',string_to_type,t)
+export(t)

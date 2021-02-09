@@ -1,0 +1,64 @@
+/*
+require('table6.bc',t0)
+
+rel fget(t,o,o2)
+	t0.get(t,o,o2)
+	cut
+
+c::table_set(t0,'fget',get,t)
+//export(t1)
+//exports=t3
+export(t)
+
+*/
+functor(T, Functor)
+functor(F, Functor)
+rel new(t)
+	t=T
+
+rel set(t,o,o2,t2)
+	case
+		t=T(e,v,tail)
+		if(e=o)
+			t2=T(o,o2,tail)
+		else
+			set(tail,o,o2,t3)
+			t2=T(e,v,t3)
+	case
+		t2=T(o,o2,t)
+
+rel set2(t,t2,o,o2)
+	set(t,o,o2,t2)
+	c::cut()
+
+rel get(t,o,o2)
+	case
+		t=T(o,o2,_)
+	case
+		t=T(_,_,t2)
+		//c::rec(t2,o,o2)
+		get(t2,o,o2)
+
+rel get2(t,o,o2)
+	if(get(t,o,o2))
+		cut
+	else
+		throw("variable not found in module")
+	
+c::table_new(t0)
+c::table_set(t0,'new',new,t1)
+c::table_set(t1,'get',get2,t2)
+c::table_set(t2,'set',set2,t3)
+c::table_set(t3,'set2',set2,t4)
+c::table_set(t4,'fget',get2,t)
+//export(t1)
+//exports=t3
+export(t)
+
+/*
+rel print(i) c::print(i);
+new(t)
+set(t,'new',x,t1)
+//t1=F(x,2)
+print(t1)
+*/

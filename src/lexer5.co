@@ -1,0 +1,367 @@
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+//require('math.bc', math)
+//require('list.bc', list)
+//require('logic.bc', logic)
+require('string5.bc', string)
+require('table5.bc', table)
+
+//lexer
+functor(Cons, Functor)
+functor(Token, Functor)
+functor(Info, Functor) //Info(line,column)
+
+rel digit(c)
+	string.lessOrEqual(c,'9')
+	string.lessOrEqual('0',c)
+
+rel letter(c)
+	string.lessOrEqual(c,'z') and string.lessOrEqual('a',c) or
+	string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+
+rel letter2(c)
+	case
+		string.lessOrEqual(c,'z') and string.lessOrEqual('a',c)
+	case
+		string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+	case
+		c='_'
+
+rel single_quote(c) 
+	string.code(c,x)
+	//print(x)
+	//c::break()
+	string.code(c, 39)
+rel double_quote(c) 
+	c='\"'
+rel quote(c) 
+	single_quote(c) or double_quote(c)
+rel endline(c)
+	c='\n'
+rel slash(c) 
+	string.code(c, 92)
+rel newline(c)
+	string.code(c, 10)
+rel newline2(c)
+	string.code(c, 13)
+rel tab(c) 
+	string.code(c, 9)
+
+rel whitespace(c) 
+	c=' ' or c='\t' or c='\n' or c='\r'
+
+//matching utilities
+	
+rel match_rel2(s,i,i2,f)
+	if(true)
+		string.at(s,i,c)
+		f(c)
+		match_rel2(s,i+1,i2,f)
+	else
+		i=i2
+
+rel match_some(s,i,i2,f)
+	string.at(s,i,c)
+	f(c) and match_rel2(s,i+1,i2,f)
+
+rel match_one(s,i,i2,f)
+	i2=i+1
+	string.at(s,i,c)
+	f(c)
+
+rel match_any(s,i,i2,f)
+	case
+		string.at(s,i,c)
+		f(c)
+		match_any(s,i+1,i2,f)
+	case
+		i=i2
+
+rel match_until(s,i,i2,f)
+	case
+		string.at(s,i,c)
+		f(c)
+		i=i2
+	case
+		match_until(s,i+1,i2,f)
+
+rel match_string(s,i,i2,str)
+	string.size(str,size1)
+	//print(i)
+	c::def(i)
+	i2=i+size1
+	string.slice(s,i,i2,str2)
+	c::def(i2)
+	str2=str //todo unnecessary var
+
+//parsing
+	
+rel match_whitespace(s,i,i2)
+	match_some(s,i,i2,whitespace)
+
+rel parse_double_string(s,i,i2)
+	string.at(s,i,c)
+	if(double_quote(c))
+		i=i2
+	elseif(slash(c))
+		parse_double_string(s,i+2,i2)
+	else
+		parse_double_string(s,i+1,i2)
+		
+rel parse_string(s,i,i2)
+	j=i+1
+	string.at(s,i,c)
+	if(double_quote(c))
+		parse_double_string(s,j,j2)
+		i2=j2+1
+	else
+		single_quote(c)
+		match_until(s,j,j2,single_quote)
+		i2=j2+1
+		
+rel parse_number(s,i,i2)
+	match_some(s,i,i2,digit)
+	
+rel parse_id(s,i,i2)
+	match_some(s,i,x,letter2)
+	match_any(s,x,i2,digit)
+
+//tries to find if word c is in list, if so set c=z
+rel match_list(l,s,z)
+	l=Cons(head, tail)
+	if(head=s) //choose
+		z=s
+	else
+		match_list(tail, s, z)
+		
+//parses whitespace and updates line/column information
+rel navigate_ws2(String s,Integer i,Integer i2,line,col,info2)
+	if(string.at(s,i,c))
+		if(c='\n')
+			navigate_ws2(s,i+1,i2,line+1,0,info2)
+		elseif(c='\t')
+			navigate_ws2(s,i+1,i2,line,col+4,info2)
+		elseif(c='\r')
+			navigate_ws2(s,i+1,i2,line,col,info2)
+		else
+			whitespace(c)
+			navigate_ws2(s,i+1,i2,line,col+1,info2)
+	else
+		i2=i
+		info2=Info(line,col)
+
+rel navigate_whitespace(s,i,i2,info,info2)
+	string.at(s,i,c)
+	whitespace(c)
+	info=Info(line,col)
+	if(c='\n')
+		navigate_ws2(s,i+1,i2,line+1,0,info2)
+	else
+		navigate_ws2(s,i+1,i2,line,col,info2)
+
+rel step4(s, i, j, z, c, info)
+	case
+		parse_string(s,i,j)
+		z='string'
+	case
+		parse_id(s,i,j)
+		z='id'
+	case
+		parse_number(s,i,j)
+		z='number'
+	case
+		match_string(s,i,j,'!=')
+		z='!=' //todo doesn't work if this goes first
+	case
+		match_string(s,i,j,'::')
+		z='::'
+	case
+		match_string(s,i,j,'<=')
+		z='<='
+	case
+		match_string(s,i,j,'>=')
+		z='>='
+	case
+		l=['+','-','<','>','[',']','/','*','#','_','!']
+		match_list(l, c, z) and	j=i+1
+	case
+		match_one(s,i,j,single_quote)
+		z='single_quote'
+	
+rel navigate_until_asterisk(s,i,i2,info,info2)
+	info=Info(line,col)
+	string.at(s,i,c)
+	if(c='*')
+		i=i2 and info2=info
+	else
+		if(c='\n')
+			info1=Info(line+1, 1)
+		elseif(c='\t')
+			info1=Info(line, col+4)
+		else
+			info1=Info(line, col+1)
+		navigate_until_asterisk(s,i+1,i2,info1,info2)
+	
+//parses comment and updates line/column information
+rel navigate_comment(s,i,i2,info,info2)
+	if(match_string(s,i,x,'//'))
+		info2=info
+		string.findIndex(s,'\n',x,i2) //todo fails on eof
+	else
+		match_string(s,i,x,'/*')
+		//c::info()
+		//c::pause()
+		navigate_until_asterisk(s,x,y,info,info2)
+		c::info()
+		//c::pause()
+		string.at(s,y,c1)
+		//print(c1)
+		match_string(s,y,i2,'*/')
+		c::cut()
+	
+rel step1(s, i, j, z, info, info2)
+	c::def(i)
+	if(navigate_whitespace(s,i,j,info,info2))
+		z='whitespace'
+	elseif(navigate_comment(s,i,j,info,info2))
+		z='comment'
+	else
+		string.at(s,i,c)
+		k=i+1
+		l=['=',';','(',')','{','}','.',',','|']
+		if(match_list(l, c, z))
+			j=i+1
+		elseif(letter(c))
+			//c::break()
+			case
+				match_string(s,i,j,'rel')
+				z='rel'
+			case
+				match_string(s,i,j,'and')
+				z='connective'
+			case
+				match_string(s,i,j,'or')
+				z='connective'
+			case
+				match_string(s,i,j,'true')
+				z='true'
+			case
+				match_string(s,i,j,'false')
+				z='false'
+			case
+				match_string(s,i,j,'if')
+				z='if'
+			case
+				match_string(s,i,j,'case')
+				z='case'
+			case
+				match_string(s,i,j,'elseif')
+				z='elseif'
+			case
+				match_string(s,i,j,'else')
+				z='else'
+			case
+				match_string(s,i,j,'choose')
+				z='choose'
+			case
+				match_string(s,i,j,'once')
+				z='once'
+
+		else
+			//c::break()
+			step4(s,i,j,z,c,info)
+			/*case
+				parse_string(s,i,j)
+				z='string'
+			case
+				parse_id(s,i,j)
+				z='id'
+			case
+				parse_number(s,i,j)
+				z='number'
+			case
+				match_string(s,i,j,'!=')
+				z='!=' //todo doesn't work if this goes first
+			case
+				match_string(s,i,j,'::')
+				z='::'
+			case
+				match_string(s,i,j,':')
+				z='::'
+			case
+				match_string(s,i,j,'<=')
+				z='<='
+			case
+				match_string(s,i,j,'>=')
+				z='>='
+			case
+				l=['+','-','<','>','[',']','/','*','#','_','!']
+				match_list(l, c, z)
+				j=i+1
+			case
+				match_one(s,i,j,single_quote)
+				z='single_quote'
+		*/
+			
+		info=Info(line, col)
+		info2=Info(line, col+j-i)
+		//print(info2)
+
+rel run_tk(tk, type, l0, l)
+	case
+		type!='comment'
+		l=Cons(tk,l0)
+	case
+		l=l0
+
+rel run2(s,start,l,info,info2)
+	case
+		//c::break()
+		step1(s,start,x,type,info,info1)
+		string.at(s,start,c)
+		//io.writeln(c)
+		c::cut()
+		run2(s,x,l0,info1,info2)
+		string.slice(s,start,x,lexeme)
+		run_tk(Token(lexeme, type, info), type, l0, l)
+		c::cut()
+	case
+		l=Cons(Token('EOF','EOF',_), Cons)
+		string.size(s,z)
+		z=start
+		info2=info
+	case
+		c::throw('error')
+		
+rel run(s,start,l)
+	run2(s,start,l,Info(1, 0),info2)
+	c::cut()
+
+rel test(s,i,j,z)
+	match_string(s,i,j,'rel')
+	z='rel'
+
+
+t={
+	'run'=run
+}
+export(t)
+
+f=Info(0, 0)
+//step('a32', 0, i2, z, f, f2)
+//run2('a32', 0, z, f, f2)
+run2('rel=a', 0, z, f, f2)
+//run2('x=1', 0, z, f, f2)
+//run2('rel', 0, z, f, f2)
+//run('rel = true', 0, z)
+//run('p(a,1)+ = true', 0, z)
+//run('a+1', 0, z)
+
+//step1('a', 0, z, a, f, f2)
+//print(f2)
+//test('rel', 0, 3, z)
+print(z)

@@ -1,4 +1,4 @@
-rel get(Table t, Any i, Table t2)
+rel get(Table t, Any i, t2)
 	pl::get(t,i,t2)
 	
 rel set(Table t, Any i, Any x, Table t2)

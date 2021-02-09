@@ -1,0 +1,15 @@
+x={
+	rel y()
+		x=1
+	rel y2()
+		true
+	x=2
+	rel y3()
+		z=2
+	rel pause()
+		c::read(x)
+
+	true
+}
+true
+print(x)

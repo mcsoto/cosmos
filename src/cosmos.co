@@ -1,0 +1,259 @@
+	
+//write('Cosmos 0.12 - Rebirth of Quetzacoatl's Virtual Machina\n')
+//write('> ')
+
+functor(Cons,Functor)
+functor(F,Functor)
+/*
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+*/
+
+rel pr(i)
+	//c::print(i)
+	true
+
+require('io5.bc', io)
+//require('table5.bc', table)
+require('list.bc', list)
+require('string5.bc', string)
+
+//require('ws4.bc', whitespacer)
+rel each2(l,p)
+	case
+		l=[]
+	case
+		l=[e,e2|l2]
+		p(e,e2)
+		each2(l2,p)
+
+functor(Var,Functor)
+
+libs=['print','require','table', '_table']
+
+rel in_lib(x)
+	x=Var(name,_,_)
+	list.has(libs,name)
+
+rel not_lib(e)
+	e=Var(name,i,_)
+	//print([name,i])
+	name!='print' and name!='table' and name!='_table'
+	//list.every(libs,neq,name,
+	
+rel unique(l,l2,dup)
+	case
+		l=[]
+		l2=l
+	case
+		l=[e|tail]
+		e=Var(name,i,_)
+		if(list.has(dup,name) or string.slice(name,0,2,'::'))
+			//print('dup')
+			l2=tail2
+			unique(tail,tail2,dup) //skip
+		else
+			dup1=[name|dup]
+			//print(dup1)
+			l2=[e|tail2]
+			unique(tail,tail2,dup1)
+
+rel filter(vars,l)
+	//list.filter(vars,not_lib,l3)
+	list.removeAll(vars,in_lib,l3)
+	unique(l3,l,[])
+	
+rel print_vars(l)
+	case
+		l=[]
+	case
+		l=[e|l2]
+		e=Var(name,i,_)
+		//print([name,i])
+		io.write(name)
+		io.write(' = ')
+		//c::reg(i,i2)
+		c::loc(o,i)
+		io.write(o)
+		if(l2=[])
+			io.write('\n')
+		else
+			io.write(' and ')
+		print_vars(l2)
+
+each2(['lexer9.bc', lexer, 'parser9.bc', parser,'gen9.bc', gen,'env7.bc', env,'serialize9.bc', sel], require)
+
+//require('bytecode', bytecode)
+//require('bc', bytecode)
+
+
+rel exec(s)
+	c::exec(s)
+	
+rel new_env(e)
+	table.new(t)
+	env.new(e, [], t)
+
+//libs="functor(Cons, Functor) and c::require('table6.bc', _table) and c::require('table5.bc', table)\n"
+
+rel parse(s1,e2,fc1)
+	//s0="rel print(i) c::print(i); and rel require(i,i2) c::require(i, i2); and functor(Cons, Functor) and c::require('table9.bc', _table) and c::require('table5.bc', table) and functor(Cons, Functor) and functor(Tuple, Functor)\n"
+	s0="c::cut() and rel print(i) c::print(i); and rel require(i,i2) c::require(i, i2); and functor(Cons, Functor) and c::require('table9.bc', _table) and c::require('table.bc', table) and functor(Cons, Functor) and functor(Tuple, Functor)\n"
+	s=s0+s1
+	//io.writeln('Parsing...')
+	lexer.run(s,f1)
+	//parser.run(fc1,fc)
+	parser.run_parser(f1,fc)
+	c::cut()
+	pr(fc)
+	//io.writeln('Generating code...')
+	new_env(e)
+	gen.generate_body(e, e2, fc, fc1)
+	
+rel write(f, s1, e2)
+	c::cut()
+	sel.serialize(f, s1, e2)
+	//print(fc) and print('Generated:') and print(s1)
+	io.close(f)
+	
+rel run_bytecode(s)
+	//print('run bc')
+	if(c::eval(s,i))
+		true
+	else
+		io.writeln('| false')/*
+	print(i)
+	if(i=0)
+		throw('failed eval')
+	else
+		true*/
+	
+rel run_bytecode2(s)
+	//c::eval(s)
+	exec('./p2 '+s)
+	
+rel run_query(s,e2)
+	//print('run query')
+	s1='temp'
+	parse(s,e2,fc2)//+' and c::cur() and c::locs()'
+	//print('Generated:') and print(fc2)
+	io.openBinary(s1, 'write', f)
+	write(f, fc2, e2)
+	//c::locs()
+	//exec('./p2 cosmos.bc -b temp')
+	//cut
+	//print('Program:')
+	//run_bytecode(s1)
+	
+rel compile(s, fname) //parse and write to bytecode
+	parse(s,e2,l1)
+	io.openBinary(fname, 'write', f)
+	write(f, l1, e2)
+	io.close(f)
+
+rel compile_to_file(module)
+	name1=module+'.'+'co'
+	name2=module+'.bc'
+	io.readFile(name1, s)
+	compile(s, name2)
+
+//finds boolean flag e.g. 'cosmos --verbose'
+rel interpreter()
+	module = 'temp'
+	io.write('> ')
+	io.read(input)
+	//print(input)
+	//parse and get env
+	s=input
+	run_query(s,e) 
+	//eval
+	run_bytecode('temp')
+	cut
+	//print('run') and print(e)
+	io.write('| ')
+	filter(e.vars,l)
+	if(l=[])
+		io.writeln('true')
+	else
+		print_vars(l)/*
+	filter(e.vars,l)
+	print(l)
+	print_vars(l)*/
+	interpreter()
+
+rel find_flag0(args, flag)
+	if(args = Cons(a,b))
+		if(a = flag)
+			true
+		else
+			find_flag0(b, flag)
+	else
+		false
+
+//finds 1-argument flag e.g. 'cosmos --module name'
+rel find_flag1(args, flag, name)
+	if(args = Cons(a,b))
+		b = Cons(c, d)
+		if(a = flag)
+			c = name
+		else
+			find_flag1(b, flag, name)
+	else
+		false
+
+rel main2(s)
+	compile(s,s2)
+	compile_to_file(module)
+
+c::args(args)
+
+//print(args)
+
+	
+rel main(args)
+	cut
+	version = "Cosmos 0.12 alpha - Rebirth of Quetzacoatl's Virtual Machina"
+	if(find_flag0(args, '-i'))
+		print(version)
+		interpreter()
+	elseif(find_flag1(args, '-c', name))
+		compile_to_file(name)
+	elseif(find_flag1(args, '-b', name))
+		run_bytecode(name+'.bc')
+	elseif(find_flag0(args, '-h'))
+		io.writeln(version)
+		io.writeln('\n-h\t\t\tGet help.\n'+'-i\t\t\tOpen interpreter.\n'+'-q [str]\t\tMake query.\n'+'-l [name]\t\tCompile name.co to name.bc, run name.bc.\n'+"--no-std-libs\t\tDon't load stdlibs.\n"+'\n  e.g. cosmos -l test -q main(x)   //compile test.co and run `main(x)`')
+	elseif(find_flag1(args, '-l', name))
+		s1=name+'.bc'
+		compile_to_file(name)
+		c::cut()
+		run_bytecode(s1)
+		//print('\n== end of bytecode ===\n')
+		//exec('./p cosmos.bc -b '+name)
+	elseif(find_flag1(args, '-q', s))
+		c::cut()
+		run_query(s,e)//run_query(s+'\nc::cur() and c::print("info:") and c::locs()\n',e)
+		cut
+		run_bytecode('temp')
+		//print('=')
+		//c::locs()
+		table.get(e,'vars',vars)
+		//print(vars)
+		filter(vars,l)
+		//print(l)
+		io.write('| ')
+		print_vars(l)
+	elseif(find_flag0(args, '-t'))
+		exec('./q.exe')
+	elseif(find_flag0(args, '-v'))
+		print(version)
+	else
+		print('No argument given.')
+
+main(args)
+//interpreter()
+//find_flag0(args, '-i')
+//parse('true',e,i)

@@ -1,0 +1,141 @@
+functor(Cons, Functor)
+functor(Token, Functor)
+
+require('lexer', lexer)
+
+rel find_last_char2(s,c,i,pos)
+	i!=-1
+	if(string.at(s, i, ci))
+		ci=c
+		pos=i
+	else
+		this.find_last_char2(s,c,i-1,pos)
+
+rel find_last_char(s,c,pos)
+	s!=''
+	this.find_last_char2(s, c, string.size(s)-1, pos)
+
+rel remove_from_start(s1,s2,s3)
+	once string.find(s1,s2,pos)
+	string.slice(s1, string.size(s2)+pos, string.size(s1), s3)
+	
+rel remove_prev_inds(s1,ind,s2)
+	list.fold(ind, this.remove_from_start, s1, s2)
+
+rel remove_cur_inds(ind, sgoal, n)
+	list.fold(ind, string.concat, '', s)
+	s=sgoal
+	n=0 or
+	
+	ind=Cons(h,tail)
+	this.remove_cur_inds(tail, sgoal, i)
+	n=i+1
+
+rel after_nl(a, a2)
+	string.slice(a, find_last_char(a,'\n')+1, string.size(a), a2)
+
+rel push_semicolon(l,l2)
+	l2=Cons(Token(';', ';',_), l)
+
+rel do_semicolons(Integer i, Integer n,t2,tks2)
+	if(i<n)
+		tks2=t2
+	else
+		push_semicolon(t2,l)
+		do_semicolons(i+1,n,l,tks2)
+
+rel ws(tks, ind, tk_prev, tks2)
+	tks=Cons(Token(_,'EOF',_),Cons)
+	if(ind!=Cons /*and tk_prev!=Token(_,';',_)*/)
+		tks2=Cons(Token(';',';',_),tks)
+	else
+		tks2=tks
+	true or
+	
+	//not a whitespace
+	tks=Cons(h1, t1)
+	h1=Token(a, tk_type,_)
+	tk_type!='whitespace'
+	this.ws(t1, ind, h1, t2)
+	tks2=Cons(h1,t2) or
+	
+	//two whitespace tokens found, ignore the first
+	tks=Cons(_, t1)
+	t1=Cons(h2, t2)
+	h2=Token(_, 'whitespace',_)
+	this.ws(t1, ind, tk_prev, t3)
+	tks2=t3 or
+	
+	tks=Cons(h1, t1)
+	h1=Token(a, 'whitespace',_)
+	once after_nl(a, a2)
+	tks=Cons(_, Cons(Token(_, type_next,_), _))
+	if(type_next='EOF') //end of file, do not add 'and's, add ';'s for the remaining indents
+		n=list.size(ind)
+		t2=t1
+		logic.iterate(this.push_semicolon, n, t2, tks2)
+		//do_semicolons(0,n,t2,tks2)
+	elseif(this.remove_prev_inds(a2,ind,snew))
+		//snew is the string of the new indent (if old indent is '\t' and indent is '\t  ', snew is '  ')
+		//if the indent is the same, snew is ''
+		if(snew='')
+			//same indent
+			ind2=ind
+			tk_prev=Token(_, type_prev,_)
+			type_next!=';'
+			type_next!='connective'
+			type_next!='else'
+			type_next!='elseif'
+			type_next!='case'
+			type_prev!=';'
+			type_prev!='connective'
+			type_prev!='else'
+			type_prev!='elseif'
+			type_prev!='case'
+			this.ws(t1, ind2, h1, t2)
+			tks2=Cons(Token('and','connective',_), t2)
+		else
+			//more indent
+			snew!=''
+			ind2=Cons(snew, ind)
+			this.ws(t1, ind2, h1, t2)
+			tks2=t2
+	else
+		//unindent
+		this.remove_cur_inds(ind,a2,n)
+		logic.iterate(list.rest, n, ind, ind2)
+		tk_prev=Token(_, type_prev,_)
+		type_next!=';'
+		type_next!='connective'
+		type_prev!='connective'
+		type_prev!='else'
+		type_prev!='elseif'
+		type_prev!='case'
+		if (type_prev!=';')
+			type_next!='else'
+			type_next!='elseif'
+			type_next!='case'
+			logic.iterate(this.push_semicolon, n, Cons(Token('and','connective',_), t2), tks2)
+			this.ws(t1, ind2, h1, t2)
+		elseif(type_prev=';')
+			tks2=Cons(Token('and','connective',_), t2)
+			this.ws(t1, ind2, h1, t2)
+		else
+			math.sub(n, 1, n2)
+			logic.iterate(this.push_semicolon, n2, t2, tks2)
+			this.ws(t1, ind2, h1, t2)
+	true or
+	
+	tks=Cons(h1, t1)
+	this.ws(t1, ind, h1, t2)
+	tks2=t2
+
+rel run(tks1,tks2)
+	if(tks1=Cons(Token(_,'whitespace',_), tks_tail)) //remove whitespace at the beginning
+		this.run(tks_tail, tks2)
+	else
+		this.ws(tks1, Cons, Token('','SOF',_), tks2)
+
+rel main(x)
+	this.remove_prev_inds('\t  \t',Cons('\t',Cons('  ',Cons)),snew)
+	this.remove_cur_inds(Cons,'',n)

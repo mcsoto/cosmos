@@ -1,0 +1,12 @@
+
+functor(Cons, Functor)
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+/*
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+*/

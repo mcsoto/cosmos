@@ -1,0 +1,25 @@
+
+functor(Info, Functor)
+
+/* misc */
+
+require('list5.bc', list)
+
+require('string5.bc', string)
+
+require('io5.bc', io)
+
+rel custom_throw(String msg, Functor info)
+	//info=Info(line, col)
+	//logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+	print(info)
+	c::throw(msg)
+	//c::throw('(line '+line+', col '+col+') '+msg)
+
+t={
+	'generate_body'=generate_body
+	'generate_world'=generate_world
+	'run'=generate_world
+}
+export(t)
+print(t)

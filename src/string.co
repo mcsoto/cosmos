@@ -1,0 +1,52 @@
+
+rel slice(String s, Integer n, Integer n2, String s2)
+	c::slice(s,n,n2,s2)
+
+substr=slice
+
+//gets code of char (string must have size 1)
+rel code(String s, Integer n)
+	c::code(s,n)
+	
+rel get(String s,Integer x,String c)
+	c::at()
+
+rel size(s,i)
+	c::size()
+	
+rel lessOrEqual(String S1, String S2)
+	c::s_le(S1,S2)
+/*
+rel findIndex(String s1, String s2, Integer i, Integer pos)
+	//if(get(s1, i, s2))
+	if(slice(s1, i, i+size(s2), s2))
+		i=pos
+	else
+		i<size(s1)
+		findIndex(s1, s2, i+1, pos)
+	*/
+	
+rel concat(String s,String s2,String s3)
+	c::concat(s,s2,s3)
+	
+rel findIndex_(String s1, String s2, Integer i, Integer pos)
+	c::findIndex(s1, s2, i, pos)
+	
+rel findIndex(String s1, String s2, Integer pos)
+	c::findIndex(s1, s2, 0, pos)
+	
+//c::require('table5.bc', table)
+		
+t= {
+	'get'=get
+	'findIndex'=findIndex
+	'size'=size
+	'slice'=slice
+	'at'=get
+	'lessOrEqual'=lessOrEqual
+	'code'=code
+	'concat'=concat
+}
+//export(t1)
+//exports=t3
+export(t)

@@ -1,0 +1,125 @@
+functor(T, Functor)
+
+/*
+
+functor(Red, Functor)
+functor(Black, Functor)
+
+functor(Tree, Functor)
+functor(E, Functor) //empty
+functor(Tuple, Functor)
+functor(Pair, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+	
+rel balance(f,f2)
+	case
+		f=Tuple(Black, Tree(Red, Tree(Red, a,x,b), y, c), z, d) //B (T R (T R a x b) y c) z d
+		f2=Tree(Red, Tree(Black, a,x,b), y, Tree(Black,c,z,d)) //T R (T B a x b) y (T B c z d)
+	case
+		f=Tuple(color,a,x,b)
+		f2=Tree(color,a,x,b) //color a x b = T color a x b
+
+rel ins(f,f2,x)
+	case
+		f=E
+		f2=Tree(Red, E, x, E) //E = T R E x E
+	case
+		//(T color a y b) | x < y = balance color (ins a) y b | x == y = T color a y b | x > y = balance color a y (ins b)
+		f=Tree(color, a, y, b)
+		if(x<y)
+			ins(a, a2, x)
+			balance(Tuple(color, a2, y, b), f2)
+		elseif(x=y)
+			f2=Tree(color, a, y, b)
+		else
+			ins(b, b2, x)
+			balance(Tuple(color, a, y, b2), f2)
+
+rel insert(f,f3,x)
+	ins(f, f2, x)
+	f2=Tree(_, a, y, b)
+	f3=Tree(Black, a, y, b)
+	
+rel member(f,x)
+	f=Tree(color, a, y, b)
+	if(x<y)
+		member(a,x)
+	elseif(x=y)
+		true
+	else
+		member(b,x)
+
+rel find(Functor l, Any e, Integer i)
+	l=Cons(x,tail)
+	if(e=x)
+		i=0
+		c::cut()
+	else
+		find(tail,e,j)
+		i=j+1
+		c::cut()
+*/	
+rel new(t)
+	t=T
+
+rel get(t,o,o2)
+	case
+		t=T(o,o2,_)
+		cut
+	case
+		t=T(_,_,t2)
+		//c::rec(t2,o,o2)
+		get(t2,o,o2)
+	/*
+rel set(t,o,o2,t2)
+	t2=T(o,o2,t)
+	*/
+	
+rel set(t,o,o2,t2)
+	case
+		t=T(e,v,tail)
+		if(e=o)
+			t2=T(o,o2,tail)
+		else
+			set(tail,o,o2,t3)
+			t2=T(e,v,t3)
+	case
+		t2=T(o,o2,t)
+	
+rel set2(t,t2,o,o2)
+	set(t,o,o2,t2)
+	throw('set2')
+
+rel require(i,i2) c::require(i, i2);
+//require('table6.bc', table)
+	/*
+t={
+	'new'=new
+	'get'=get
+	'set'=set
+}
+*/
+new(t0)
+set(t0,'new',new,t1)
+set(t1,'get',get,t2)
+set(t2,'set',set,t)
+//set(t3,'set2',set2,t)
+//export(t1)
+//exports=t3
+export(t)
+/*
+insert(E, f, 2)
+insert(f, f2, 1)
+insert(f2, f3, 3)
+insert(f3, f4, 4)
+print(f4)
+member(f4,1)
+*/

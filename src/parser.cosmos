@@ -34,6 +34,8 @@ functor(RelOp, Functor)
 functor(Host, Functor)
 functor(Once, Functor)
 functor(Declaration, Functor)
+functor(Exclamation, Functor)
+functor(Size, Functor)
 
 //'world'
 functor(Rel, Functor)
@@ -164,6 +166,13 @@ rel exp_to_functor(l,tail,f)
 	l=Cons(Token(_,'-',_), Cons(Token(a,'number',_), tail)) and f=Num('-'+a) or
 	l=Cons(Token(a,'number',_), tail) and f=Num(a)
 
+rel parse_length(l,tail,code)
+	//l=Cons(Token(_,'#',_), Cons(Token(a,'id',_), tail))
+	l=Cons(Token(_,'#',_), l2)
+	this.parse_exp(l2,tail,a)
+	code=Size(a,get_info(l))
+	//io.writeln(code)
+
 //parses atomic expression
 rel parse_exp2(l,tail,f)
 	parse_exp_obj_call(l,tail,f) or
@@ -173,6 +182,7 @@ rel parse_exp2(l,tail,f)
 	parse_table(l,tail,f) or
 	parse_name(l,tail,type,name) and f=Id(name,type) or
 	parse_lambda(l,tail,f) or
+	parse_length(l,tail,f) or
 	exp_to_functor(l, tail,f)
 	
 Relation parse_math0
@@ -307,12 +317,38 @@ rel parse_if(l,tail,f)
 	this.parse_body(l4,l5,fbody2)
 	this.parse_elseifs(l5,l11,cond)
 	l11=Cons(Token(_,';',_), tail)
+
+rel parse_case1(l,tail,f)	
+	l = Cons(Token(_,'case',_), l1)
+	this.parse_body(l1,l2,f1)
+	pl::writeln(f1)
+	this.parse_case1(l2,tail,cond)
+	f=Cons(f1,cond) or
 	
+	f=Cons
+	tail=l
+	
+rel parse_case(l,tail,f)	
+	l = Cons(Token(_,'case',_), l1)
+	this.parse_body(l1,l2,f1)
+	pl::writeln(f1)
+	this.parse_case1(l2,l3,cond)
+	l3=Cons(Token(_,';',_), tail)
+	f=Cond(And(True,f1),cond) or
+	
+	cond=Cons
+	tail=l
+	
+rel parse_excl(l,tail,code)
+	l = Cons(Token(_,'!',_), Cons(Token(a,'id',_), tail))
+	code=Exclamation(a,get_info(l))
+
 Relation parse_definition
 	
 rel parse_call(l,tail,code)
 	parse_true(l,tail,code) or
 	parse_false(l,tail,code) or
+	parse_case(l,tail,code) or
 	parse_if(l,tail,code) or
 	parse_pred(l,tail,code) or
 	parse_eq(l,tail,code) or
@@ -321,6 +357,7 @@ rel parse_call(l,tail,code)
 	this.parse_definition(l,tail,code) or
 	parse_host(l,tail,code) or
 	this.parse_declaration(l,tail,code) or
+	this.parse_excl(l,tail,code) or
 	
 	l=Cons(Token(_,'once',_),l2)
 	this.parse_call(l2,tail,s1)

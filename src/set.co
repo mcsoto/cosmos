@@ -1,0 +1,44 @@
+
+rel new(t)
+	t={}
+
+
+
+//require('logic5.co',logic)//todo
+require('logic5',logic)
+
+t={
+	'new'=new
+	
+	rel has(Functor t, Any e)
+		table.get(t,e,x)
+
+	rel push(t, e, Functor l2)
+		table.set(t,e,1,l2)
+		
+	rel set(t,e,l2)
+		//push(t, e, Functor l2)
+		true
+
+}
+export(t)
+/*
+new(o1)
+set(o1,1,o2)
+print(o2)
+set(o2,1,o3)
+set(o3,11,o)
+print(o)
+
+//set(t3,'set2',set2,t)
+//export(t1)
+//exports=t3
+//export(t)
+
+insert(E, f, 2)
+insert(f, f2, 1)
+insert(f2, f3, 3)
+insert(f3, f4, 4)
+print(f4)
+member(f4,1)
+*/

@@ -1,68 +1,63 @@
-.PHONY: stdlib cosmos
 
-COSMOS?=./cosmos
-SWIPL?=swipl
+YACC=yacc
+YFLAGS= -d
+LEX=flex
+CC=g++
+CFLAGS= -g -std=c++0x -fpermissive -w
 
-cosmos_OPTS=--main
-STDLIB_OPTS=--no-std-libs
-list_OPTS=$(STDLIB_OPTS)
-string_OPTS=$(STDLIB_OPTS)
-math_OPTS=$(STDLIB_OPTS)
-io_OPTS=$(STDLIB_OPTS)
-logic_OPTS=$(STDLIB_OPTS)
-table_OPTS=$(STDLIB_OPTS)
+all:
+	$(CC) $(CFLAGS) main2.cpp -o p
+	./p nil
+	$(CC) $(CFLAGS) -DDEBUG=1 main2.cpp -o p2
+	#./p2
+	$(CC) $(CFLAGS) main.cpp -o cosmos
+	
+test:
+	$(CC) $(CFLAGS) main2.cpp -o p
+	./p nil
+	$(CC) $(CFLAGS) -DDEBUG=1 main2.cpp -o p2
+	./p2 nil
+	$(CC) $(CFLAGS) main.cpp -o cosmos
+	$(CC) $(CFLAGS) -DDEBUG=1 main.cpp -o cosmos2
 
-%.pl: %.cosmos
-	$(COSMOS) $($*_OPTS) --module $(patsubst %.cosmos,%,$<)
-
-# stdlib
-math.pl:
-
-string.pl: math.pl
-
-list.pl: string.pl
-
-logic.pl: list.pl string.pl math.pl
-
-io.pl: logic.pl
-
-stdlib-clean:
-	touch list.cosmos string.cosmos math.cosmos io.cosmos logic.cosmos table.cosmos
-
-stdlib: list.pl string.pl math.pl io.pl logic.pl table.pl
-
-# compiler
-types.pl:
-
-whitespacer.pl: lexer.pl
-
-parser.pl: lexer.pl whitespacer.pl
-
-gen.pl: lexer.pl parser.pl whitespacer.pl types.pl
-
-cosmos.pl: lexer.pl parser.pl whitespacer.pl gen.pl
-
-compiler-clean:
-	-rm cosmos.pl gen.pl lexer.pl parser.pl whitespacer.pl types.pl
-
-compiler: cosmos.pl types.pl
-
-# frontend
+parser:
+	./p c10 cosmos
+	
 cosmos:
-	$(SWIPL) -t halt -o cosmos -g main -c $@.pl
+	$(CC) $(CFLAGS) main.cpp -o cosmos
 
-# tests
-test0.pl: test1.pl
+main:
+	$(CC) $(CFLAGS) main.cpp -o cosmos
+old:
+	$(CC) $(CFLAGS) cosmos0.cpp -o p3
+	./p3
+	$(CC) $(CFLAGS) -DDEBUG=1 cosmos0.cpp -o p4
+	./p4
+	
+install:
+	$(CC) $(CFLAGS) cosmos.cpp -o p
+	
+debug: 
+	$(CC) $(CFLAGS) -DDEBUG=1 main2.cpp -o p2
+	$(CC) $(CFLAGS) -DDEBUG=1 main.cpp -o cosmos2
+	
+5: gen4
+	./p3 c3.bc c5
+6:
+	./p3 c3.bc c6
+8:
+	./gen7 gen8
+c:
+	./p c0 c10
 
-test: test0.pl test1.pl
-	$(COSMOS) --module test0
-	$(COSMOS) --module test1
-
-# rebuild
-rebuild:
-	# build frontend with current compiler and stdlib modules
-	$(MAKE) cosmos
-	$(MAKE) compiler-clean
-	$(MAKE) compiler cosmos
-	$(MAKE) stdlib-clean
-	$(MAKE) stdlib compiler-clean compiler cosmos test-clean test
+clean:
+	rm cosmos cosmos2 test*.bc p p2 temp* log
+	rm *exe*
+	
+gen4: p
+	./p c3 gen4
+	
+gen3:
+	sh update.sh gen3
+	
+	

@@ -1,0 +1,226 @@
+
+//write('Cosmos 0.12 - Rebirth of Quetzacoatl's Virtual Machina\n')
+//write('> ')
+
+functor(Cons, Functor)
+functor(Info, Functor)
+functor(Token, Functor)
+
+//bc
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+functor(F1, Functor)
+
+functor(Bind, Functor)
+
+functor(Nil, Functor)
+functor(Call, Functor)
+functor(Val, Functor)
+functor(Const, Functor)
+functor(Upvalue, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+	true
+
+rel pause()
+	c::read(x)
+
+rel s_concat(String s,String s2,String s3)
+	c::concat(s,s2,s3)
+	
+//require('string.bc', string)
+require('env7.bc', env14)
+
+require('table5.bc', table)
+
+require('list5.bc', list)
+	
+//require('string.bc', string)
+	
+//parser
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Exclamation, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+
+functor(Error, Functor)
+functor(None, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Put, Functor)
+
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor Functor)
+functor(TTable, Functor Functor)
+	
+/* ... */
+get_args=2
+
+//helpers
+	
+rel list_to_cons(l, t)
+	if(l=Cons(a,l2))
+		t=Func('Cons', [a, t2], _)
+		list_to_cons(l2, t2)
+	else
+		l=Cons
+		t=Id('Cons', [])
+
+//misc
+
+rel set(t,o,o2,t2)
+	//c::table_set(t,o,o2,t2)
+	table.set(t,o,o2,t2)
+	c::cut()
+	
+rel get(t,o,o2)
+	//c::table_get(t,o,o2)
+	table.get(t,o,o2)
+	c::cut()
+	
+rel set_push_top(env, f, env2)
+	c::undef(env2)
+	get(env, 'top', l)
+	set(env, 'top', Cons(f, l), env2)
+	
+rel make_upval(env, env2, n, x)
+	env14.push_on(env,'upvals',n,env2)
+	get(env,'upvals',upvals)
+	env14.size(upvals,n2)
+	x=Upvalue(n2)
+	
+rel setup_const(env,env2, b, f)
+	get(env,'consts',consts)
+	list.size(consts,n)
+	//print(n)
+	env14.push_on(env, 'consts', b, env2)
+	f=Const(n)
+	
+//bindings
+	
+//already knows it's an Id?
+rel setup_term(env, env2, name, y)
+	env14.vars(env, vars)
+	list.size(vars,n_vars)
+	env14.functors(env, fcs)
+	f=Var(name, n, _)
+	print(Pair('term', name))
+	//print(fcs)
+	if(list.find(fcs, f, z1)) //functor
+		print(Pair('fcs', name))
+		setup_const(env,env2,Str('"'+name+'"'),Const(n3))
+		y=Func(n3,[])
+		print(y)
+	elseif(list.find(vars, f, z2))
+		y=Val(n)
+		env2=env
+	else
+		//c::throw('-')
+		env2=env
+		y=Var(n_vars)
+	
+rel setup_void(name, n, x)
+	if(name='_')
+		x=Void(n)
+	else
+		x=Val(n)
+
+rel setup_void2(name, n, x)
+	if(name='_')
+		x=Void(n)
+	else
+		x=Var(n)
+	
+rel setup_set_var(env, name, x, n)
+	env14.vars(env, vars)
+	fc=Var(name,n,tc)
+	list.find(vars, fc, _a2)
+	print(fc)
+	setup_void2(name, n, x)
+
+rel setup_new_var(env, env2, name, x, n)
+	c::undef(env2)
+	get(env,'branch',branch)
+	fc=Var(name,n,tc)
+	//print(['new',name,branch,n])
+	if(branch=0)
+		env14.push(env, fc, env2)		
+		setup_void2(name, n, x)
+	else //re-occurs in branch
+		//print(['new', name, get(env,'branch')])
+		c::def(n)
+		env14.push(env, fc, env1)
+		set_push_top(env1, n, env2)
+		x=Val(n)
+
+rel setup_var(env, env2, name, x)
+	//print(env14.vars)
+	c::def(name)
+	env14.vars(env, vars)
+	list.size(vars,n_vars)
+	//print(Tuple(name,vars,n))
+	fc=Var(name, n, tc)
+	if(list.find(vars, fc, _a)) //variable in env
+		env2=env
+		setup_void(name,n,x)
+	elseif(env14.prevs(env, name, fc)) //upvalue
+		print(['prev-var',name,n])
+		make_upval(env,env2, n, x)
+		//c::throw()
+	else //new variable
+		n=n_vars
+		//print(['branch-var', get(env,'branch'), n])
+		setup_new_var(env, env2, name, x, n)
+	
+Relation generate_body
+		
+t={
+	'setup_var'=setup_var
+	'setup_const'=setup_const
+	'setup_term'=setup_term
+	'size'=size
+	'prevs'=env_prevs
+	'set_push_top'=set_push_top
+	'make_upval'=make_upval
+	'set_var'=setup_set_var
+	'list_to_cons'=list_to_cons
+}
+//c::table_set(t5,'code',code,t)
+export(t)

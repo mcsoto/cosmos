@@ -1,0 +1,112 @@
+
+functor(Info, Functor)
+
+//rel print(i) c::print(i);
+
+t={true and 1=2 and x=1 and y=i}
+t1={
+	true
+	1=2
+	x=1
+	y=print
+}
+print(t)
+b=t[1]
+print(t[1])
+print(t['y'])
+print(t.y)
+
+rel p(y)
+	case
+		y=1
+	case
+		y=2
+		a=6
+	z=4
+
+//x=p()
+p(p())
+c::print(x)
+
+/*
+x='s'
+
+rel q(info, info2)
+	info=Info(line, col)
+	j=3
+	i=1
+	info2=Info(line, col+j-i)
+	i!=j
+	//2!=2
+	
+f=Info(0,0)
+q(f, f2)
+
+print(f2)
+
+
+print('string.bc')
+
+print('z')
+
+a=''
+
+rel letter(c)
+	string.lessOrEqual(c,'z') and string.lessOrEqual('a',c) or
+	string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+
+string.lessOrEqual(c,'z')
+
+false
+
+rel p(c)
+	letter(c)
+
+
+rel p(c)
+	print(c)
+	
+rel p(c)
+	if(false)
+		j=i+1
+	elseif(letter(c))
+		//a=1
+		case
+			false
+		case
+			false
+	else
+		a=2
+	
+p('a')
+p('S')*/
+/*
+rel eq(i,i2)
+	i=2
+
+rel p(x)
+	print(x)
+	p(x+1)
+	
+p(1)
+
+letter('a')
+
+c::coll()
+
+string.at('\t',0,c)
+string.size('a\tb',n)
+print(n)
+string.size('a\nb',n2)
+print(n2)
+
+c::coll()
+
+c::concat('a','bc',s)
+
+
+s='a\tb'*/
+print('-')
+//print('end')
+print(t)
+print(t1)

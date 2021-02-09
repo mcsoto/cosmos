@@ -1,0 +1,239 @@
+//true
+/*
+rel print(i) c::print(i);
+
+rel require(i,i2) c::require(i, i2);
+
+rel halt()
+	c::halt()
+*/
+require('logic.bc', logic)
+require('string.bc', string)
+//require('table5.bc', table)
+require('list.bc', list)
+
+functor(F, Functor)
+functor(Cons, Functor)
+
+//require('test9.bc', lexer)
+//require('lexer5.bc', lexer)
+//c::cut()
+//lexer.run('rel=a',0, l2)
+//lexer.run('rel=a',0,l)
+//lexer.run('a=b',0,l)
+//s='q.p(a,1,2)'
+//s='x=-1'
+//s='rel p() x=1+a;'
+//s='1+2'
+//print(l)
+/*
+
+rel new_env(e)
+	table.new(t1)
+	nil=Cons
+	env.new(e, nil, t1)
+	print(e)
+
+rel each(l,p)
+	case
+		l=[]
+	case
+		l=[e|l2]
+		p(e)
+		each(l2,p)
+
+rel run0(s,l)
+	//parser.run('x=1',f)
+	parser.run(s,f)
+	print(f)
+	
+cut
+
+//io.readFile('test0.co',s)
+//parser.run('rel p() true;',f)//lexer.run(s, l2)
+//s='true'
+//s='x=1'
+//s='x=1 and true'
+//s='rel p() true; and x=1'
+//s='rel p() true; and x=1 and p()'
+//s='rel p(x) x=2; and p(x)\n'
+//require('table9.bc', t)
+//s='c::print(1)'
+//s='rel p() true; and p()'
+//s='rel p(x) x=1; and p(x)'
+//s="c::require('table5.bc', table) and t={}"
+//s='functor(Cons, Functor) and x=Cons'
+//s='functor(C, Functor) and x=C(1,2)'
+s='functor(Cons, Functor) and x=Cons(1,Cons)'
+//s0="c::require('table6.bc', _table)\n"
+s0=''
+print(F(t))
+run(s,f,s0)
+//print(f)
+
+//each([1,2],print)
+
+rel p2(l,p)
+	true
+
+print(list.map)
+list.map(vars, rel(x,s) s='_'+x;, v2)
+print(rel() true;)
+//x=(rel() true;,v)
+x=rel() true;
+x=1
+print(v2)
+
+o={x=1 and y=1}
+
+rel new(o)
+	table.set(o,'x',x,o13)
+	true
+	
+rel walk(o,x,y,o2)
+	table.set(o,'x',x,o13)
+	table.set(o13,'x',y,o2)
+
+walk(o,2,3,o2)
+print(o2)
+cut
+//walk(o,!x,o2)
+require('parser9.bc', parser)
+
+//require('lexer9.bc', lexer)
+c::cut()
+//lexer.run('rel=a',0, l2)
+//lexer.run('rel=a',0,l)
+//lexer.run('a=b',0,l)
+//s='q.p(a,1,2)'
+//s='x=-1'
+//s='x={y=rel()true;}'
+//s='rel p() x=1+a;'
+//s='1+2'
+//s='x=1'
+s='x={y=rel()\ntrue\n}'
+//print(l)
+//require('lexer9.bc', lexer)
+require('io5.bc', io)
+//s='x=1 and a=2'
+//io.readFile('test0.co',s)
+//s="p(a,1,2,'a')"
+cut
+c::clock(t)
+//lexer.run(s,l)
+//parser.lexer(s,l)
+parser.run(s,l)
+cut
+c::clock(t1)
+print(['l',l,t1-t])
+rel new_env(e)
+	table.new(t1)
+	nil=Cons
+	env.new(e, [], t1)
+	print(e)
+	
+require('gen9.bc', gen)
+require('env8.bc', env)
+gen.generate_body(new_env(), e2, l, l2)
+print(l2)
+c::time(x)
+print(x)
+
+c::clock(t)
+print(t)
+print(t-1)
+print(t/2)
+y=o.x
+print(t1-t)
+//print([t,t1])
+//x={y=rel()x=2;}
+//x={y=rel()x1=2;}
+x={
+	y=rel()
+		true
+}
+print(x.y)
+x.y()
+io.readFile('test8',s)
+print(s)
+
+c::get_fname()
+c::get_local(4,o1)
+print(o1)
+*/
+l=['a','b']
+//list.map(x, toString, l2)
+list.join(l, ', ', s)
+print(s)
+string.findIndex(s,',',0,x)
+print(x)
+//cut
+if(x>2)
+	true
+else
+	true
+/*
+cond
+	x=1
+cond
+	x=2
+
+//x=2
+rel p()
+	true
+
+io.readFile('logic5.co',s)
+run(s,0,l2)
+debug(l)
+//run_ws(l2,l3)
+debug(l2)
+debug(l3)
+//navigate_comment(s,0,i2,info,info2)
+string.size(s,i)
+//debug(i2)
+//pr(l3)
+debug(string.at(s,i-1))
+debug(i)
+
+//require('logic5',logic)
+rel require(i,i2)
+	c::require(i, i2)
+
+*/
+rel neq(x,y)
+	x!=y
+
+rel neq2(x)
+	x!=2
+cut
+y=2
+//list.forall([1,2],rel(x) x!=y;)
+	
+print('test')
+
+print(y)
+c::print(y)
+//c::overwrite(y,1)
+print(y)
+y<3
+
+rel range(i, j, x)
+	if(i<j)
+		x=i
+	else
+		range(i+1,j,x)
+
+logic.listOf(x,range,[0,4,x],l)
+//list.listOf(x,range,[0,4,x],l)
+//forall(x,range,[0,4,x],rel(x) x!=y;)
+//list.forall([1,2],rel(x) x!=y;)
+
+rel p(x)
+	x=1 or x=2
+
+//logic.apply(print,[1])
+//lonce(print,[1])
+//t.lonce(p,[yz])
+logic.applyOnce(p,[yz])
+print(yz)
+yz=2

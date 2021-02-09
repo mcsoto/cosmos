@@ -1,0 +1,74 @@
+
+functor(Info, Functor)
+functor(Token, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Put, Functor)
+
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor Functor)
+functor(TTable, Functor Functor)
+	
+rel require(i,i2)
+	c::require(i, i2)
+
+//bc
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+
+functor(Bind, Functor)
+
+functor(Nil, Functor)
+functor(Call, Functor)
+functor(Val, Functor)
+functor(Const, Functor)
+functor(Upvalue, Functor)
+
+/*
+	env methods
+*/
+
+require('table.bc', table)
+
+rel set(t,o,o2,t2)
+	//c::table_set(t,o,o2,t2)
+	table.set(t,o,o2,t2)
+	c::cut()
+	
+rel get(t,o,o2)
+	//c::table_get(t,o,o2)
+	table.get(t,o,o2)
+	c::cut()
+	
+rel env_init(env, vars, fcs, consts, prev)
+	//c::table_new(t)
+	table.new(t)
+	set(t,'vars',vars,t1)
+	set(t1,'fcs',fcs,t4)
+	set(t4,'prev',prev, env)
+	c::cut()
+
+rel env_new(env, fcs, prev)
+	table.new(t)
+	env_init(env, [], fcs, [], prev)
+	
+//require('list.bc', list)
+
+//first([1,2], x)
+		
+c::table_new(t0)
+c::table_set(t0,'new',env_new,t)
+export(t)

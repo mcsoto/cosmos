@@ -1,0 +1,99 @@
+
+
+functor(Cons, Functor)
+
+//c::require('serialize.bc', serialize)
+
+//serialize._serialize(1,2,3)
+/*
+rel concat(Functor l, Functor l2, Functor l3)
+	true
+
+rel reverse(Functor l, Functor l2)
+	concat(ltemp, Cons(a,Cons), l2)
+*/
+rel require(i,i2)
+	c::require(i, i2)
+
+require('test15.bc', env)
+require('table.bc', table)
+
+rel run()
+	c::coll()
+	c::print('gen')
+	c::coll()
+	nil=[]
+	env.new(e, nil, nil)
+
+nil=[]
+env.new(e, nil, nil)
+
+run()
+
+/*
+
+FunctorObject Info //Info(line,column)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+require('string.bc', string)
+
+rel p(y)
+	//info=Info(line,col)
+	info=1
+	x=2
+	if(x=1)
+		true
+	else
+		if(x=1)
+			y=2
+		else
+			y=3
+		
+rel whitespace(c) 
+	c=' ' or c='\t' or c='\n'
+		
+p(x)
+		
+//l1=Cons('a',Cons('b',Cons))
+//l1=Cons('a',Cons)
+l=['=',';']
+print(l)
+
+*/
+
+	/*
+rel p(x)
+	if(x=1)
+		true
+	elseif(x=2)
+		true
+	elseif(x=3)
+		true
+	else
+		true
+rel p(c)
+	if(c='\n')
+		true
+	else
+		c=' '
+rel q(c)
+	c='\n' or c=' '
+
+
+y=1
+
+x!=2
+
+s='a'
+
+s!='c'
+//s!='a'
+
+c::concat('a','as',s2)
+string.at(s2, 0, x1)
+*/

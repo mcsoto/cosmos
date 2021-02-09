@@ -1,0 +1,3 @@
+#usr/bin/sh
+#echo "Running $1.."
+if ./p c$1.bc $2 ; then (./p $2.bc;) fi

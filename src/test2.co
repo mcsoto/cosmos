@@ -1,0 +1,173 @@
+
+functor(F, Functor)
+functor(Cons, Functor)
+
+//a='asd'
+
+//a=1
+
+//parse any simple statement
+/*
+rel parse_call(x)
+	case
+		x=1
+	case
+		a=2
+	case
+		a=2
+	case
+		a=2
+		true
+
+if(y=1)
+	true
+else
+	x=3
+
+c::coll()
+
+rel s_slice(String s, Integer n, Integer n2, String s2)
+	c::slice(s,n,n2,s2)
+c::table_new(t0)
+c::table_set(t0,'p',p,t)
+//export(t)
+
+
+c::coll()
+
+
+rel p2(Integer x)
+	x=1
+
+parse_call(2)
+
+
+x=2
+	
+
+functor(Info, Functor)
+f=Info(2,1)
+
+rel p()
+	print('hook')
+
+c::print(2)
+*/
+debug={
+	getnargs=rel(c)
+		c::getnargs(c)
+	sethook=rel(p)
+		c::sethook(p)
+		//print('set hook')
+		
+	rel getlocal(i,x)
+		c::getlocal(0,x)
+	rel getfname(name)
+		c::getfname(name)
+}
+
+rel q()
+	true
+
+rel p()
+	print('hook')
+	debug.getfname(s)
+	print(s)
+
+rel callbacks()
+	i=2
+	c::getfname(name)
+	print(name)
+	c::getlocal(0,x)
+	c::getlocal(1,x1)
+	debug.getlocal(2,x2)
+	c::getnargs(c)
+	//c::getnlocals(c)
+	print([c,x,x1,x2])
+	debug.sethook(p)
+	
+callbacks()
+/*
+rel p(x)
+	x=1//+2
+	
+rel callbacks()
+	debug.sethook(1)
+	
+//p(3)
+p(x)
+//c::print(x)
+x='s'
+//2
+rel p(Integer x)
+	x=1+2
+	
+test
+2-4 case
+5 str, '\n'
+6 table
+
+x=1 and y=2
+z=3
+//x=1
+rel p(i)
+	i=1
+	
+rel q(i)
+	i2=2
+
+a!=2
+c::print(2)
+
+rel q(i)
+	if(i=1)
+		true
+	else
+		i2=2
+//
+functor(Info, Functor)
+//f=Info(2,1)
+f=Info(2,1)
+c::coll()
+c::print(f)
+
+require('io2.bc', io)
+require('lexer4.bc', lexer)
+
+io.readFile('test0.co', s)
+lexer.run(s, 0, z)
+
+
+a!=2
+
+rel require(i,i2)
+	c::require(i, i2)
+
+c::size('\n',x)
+c::print(x)
+
+
+i=2+1
+rel p(c) 
+	c=2
+rel q(c,n)
+	c=1
+
+q(1,p())
+
+functor(Cons, Functor)
+c::require('list.bc', list)
+//table.get(t3,1,x)
+
+c::require('table.bc', table)
+//c::require('env.bc', env)
+//fcs=env['fcs']
+//fcs=env.fcs
+table.new(t)
+table.set(t,'fcs',2,env)
+//table.get(env,'fcs',fcs)
+fcs=env.fcs
+c::print(fcs)
+*/
+//print('hook')
+q()

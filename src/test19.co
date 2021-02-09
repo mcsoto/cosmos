@@ -1,0 +1,313 @@
+
+functor(Info, Functor)
+functor(Token, Functor)
+functor(Cons, Functor)
+
+//bc
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+
+functor(Bind, Functor)
+
+functor(Nil, Functor)
+functor(Call, Functor)
+functor(Val, Functor)
+functor(Const, Functor)
+functor(Upvalue, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+
+functor(Nil, Functor)
+functor(Call, Functor)
+functor(Val, Functor)
+functor(Const, Functor)
+functor(Upvalue, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+
+functor(Put, Functor)
+
+require('serialize4.bc', sel)
+
+require('table.bc', table)
+require('string.bc', string)
+
+/*
+	serializing helpers
+*/
+	
+/*
+	bit
+*/
+
+
+rel byte(f, x)
+	//pl::put_byte(f, x)
+	c::write8(f, x)
+
+rel word(f, n)
+	//pl::writeInt32(f, n)
+	c::write32(f, n)
+	
+rel integerToBytes(n, l)
+	//pl::getInt32(n, l)
+	c::bit_and(n, 255, b1)
+	c::bit_shr(b1, 8, n1)
+	c::bit_and(n1, 255, b2)
+	c::bit_shr(b2, 16, n2)
+	c::bit_and(n2, 255, b3)
+	c::bit_shr(b3, 24, n3)
+	c::bit_and(n3, 255, b4)
+	l=[b1,b2,b3,b4]
+
+/*
+	serializing
+*/
+	
+rel concat(Functor l, Functor l2, Functor l3)
+	case
+		l=[]
+		l3=l2
+	case
+		l=Cons(e, t1)
+		concat(t1, l2, l0)
+		l3=Cons(e, l0)
+
+rel size(Functor l, Integer n)
+	if(l=[])
+		n=0
+	else
+		l=Cons(_, tail)
+		size(tail,j)
+		n=j+1
+
+rel reverse(Functor l, Functor l2)
+	if(l=Cons(a,tail))
+		reverse(tail, ltemp)
+		concat(ltemp, Cons(a,Cons), l2)
+	else
+		l=Cons
+		l2=Cons
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+
+/*
+	serializing
+*/
+
+rel cond2(elif, first)
+	case
+		elif=0
+		first=12
+	case
+		first=13
+
+rel byte_array(f,l)
+	if(l=Cons(a,t1))
+		byte(f, a)
+		byte_array(f, t1)
+	else
+		l=Cons
+
+rel s_size(s,i)
+	c::size()
+	
+rel code(s,i)
+	c::code(s,i)
+	
+rel slash(c) 
+	string.code(c, 92)
+
+rel rest(s,s1)
+	s_size(s,w)
+	c::slice(s,1,w,s1)
+	
+rel char2(c,c2)
+	if(c=110)//nl
+		c2=10
+	elseif(c=116)//tab
+		c2=9
+	elseif(c=114)
+		c2=13
+	elseif(c=92)//slash
+		c2=c
+	else
+		c2=c
+	
+Relation write_rel
+		
+rel string_to_array(s,l)
+	case
+		s=''
+		l=Cons
+	case
+		c::code(s,c)
+		c=92
+		rest(s,s1)
+		c::code(s1,c1)
+		char2(c1,c2)
+		l=Cons(c2,l1)
+		rest(s1,s2)
+		string_to_array(s2,l1)
+	case
+		c::code(s,c)
+		l=Cons(c,l1)
+		rest(s,s2)
+		string_to_array(s2,l1)
+		
+rel write_string2(f, sa)
+	s_size(sa, n1)
+	c::sub(n1,1,x)
+	c::slice(sa,1,x,s)
+	string_to_array(s,l)
+	size(l, n2)
+	c::add(n2,1,a)
+	word(f, a)
+	byte_array(f,l)
+	byte(f, 0)
+	
+rel serialize_string(f,s)
+	if(s='')
+		true
+	else
+		c::code(s,c1)
+		byte(f, c1)
+		s_size(s,w)
+		c::slice(s,1,w,s2)
+		serialize_string(f,s2)
+
+rel write_consts(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(fc,b)
+		//print(fc)
+		if(fc=Num(a))
+			byte(f, 2)
+			c::stringToNumber(a,c)
+			word(f, c)
+		elseif(fc=Str(a))
+			byte(f, 3)
+			write_string2(f, a)
+		elseif(fc=TList(a))
+			byte(f, 0)
+		elseif(fc=Rel(t, env))
+			//print(fc)
+			byte(f, 4)
+			write_rel(f, t, env)
+		else
+			print(fc)
+			c::throw('not a recognized const')
+		write_consts(f, b)
+
+rel write_upvals(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(x,b)
+		//c::write('upval:')
+		word(f,x)
+		write_upvals(f, b)
+	
+debug=2
+
+rel serialize_rel(f, l2)
+	//c::write('rel ') print(f)
+	f=[name, l0, f1, size1]
+	//l2=list.concat(list.concat(l0, _serialize(f1, #l0, size, 0, 0)), [16])
+	size(l0, n0)
+	print(F(name,f1))
+	sel._serialize(f1, n0, size1, 0, 0, t1)
+	concat(l0, t1, t2)
+	concat(t2, [16], l2)
+	//print('')
+
+rel write_dname(f, name, args)
+	if(name='')
+		byte(f, 1)
+		byte(f, 0)
+	else
+		s_size(name,w)
+		word(f,w)
+		serialize_string(f, name)
+	word(f, args)
+
+rel write_rel(f, t, env)
+	table.get(env,'vars',vars)
+	table.get(env,'consts',consts)
+	table.get(env,'upvals',upvals)
+	size(vars,n1)
+	size(consts,n2)
+	//print(n2)
+	//c::throw()
+	size(upvals,n3)
+	reverse(consts,c2)
+	reverse(upvals,u2)
+	reverse(vars,v2)
+	//consts, vars, upvals
+	word(f, n2)
+	write_consts(f, c2)
+	word(f, n1)
+	byte(f, n3)
+	//print(env.upvals)
+	write_upvals(f, u2)
+	serialize_rel(t, l2)
+	c::cut()
+	//print(F2(l2))
+	size(l2,bc)
+	word(f, bc)
+	byte_array(f, l2)
+	//debug
+	byte(f, debug)
+	//size(name), name, n_args
+	t=[Pair(name,args), _, _, size1]
+	print(F2(name,n2,n1,n3,l2))
+	print(consts)
+	print('')
+	if(debug=1)
+		write_dname(f,name,args)
+	elseif(debug=0)
+		word(f, args)
+	else
+		word(f, args)
+	
+rel serialize(f, a, env) //file, code, env
+	table.get(env, 'vars', vars)
+	c::cut()
+	size(vars,n_vars)
+	write_rel(f, [Pair('::main',0), [], a, n_vars], env)
+
+//c::random(x) and print(x)
+//run(s)
+
+c::table_new(t0)
+c::table_set(t0,'serialize',serialize,t11)
+export(t11)
+

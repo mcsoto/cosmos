@@ -1,0 +1,753 @@
+
+functor(Info, Functor)
+functor(Token, Functor)
+
+//bc
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+functor(Cons, Functor)
+
+functor(Bind, Functor)
+
+functor(Nil, Functor)
+functor(Call, Functor)
+functor(Val, Functor)
+functor(Const, Functor)
+functor(Upvalue, Functor)
+
+rel print_if(i)
+	//c::print(i)
+	true
+
+rel pause()
+	c::read(x)
+
+require('io5.bc', io)
+//require('table5.bc', table)
+require('string5.bc', string)
+require('list5.bc', list)
+
+
+//gen
+functor(Var, Functor)
+functor(Void, Functor)
+functor(Local, Functor)
+
+functor(Put, Functor)
+	
+rel throw(n)
+	c::throw(n)
+
+/*
+	bit
+*/
+
+rel repeat(n,d,l)
+	if(n=0)
+		l=[]
+	else
+		if(c::lt(n,0))
+			throw(23)
+		else
+			true
+		l=[d|l2]
+		repeat(n-1,d,l2)
+
+rel byte(f, x)
+	//pl::put_byte(f, x)
+	c::check(x)
+	c::write8(f, x)
+
+rel u16(f, n)
+	c::check(n)
+	c::write16(f, n)
+	
+rel word(f, n)
+	//pl::writeInt32(f, n)
+	c::check(n)
+	c::write32(f, n)
+	
+rel num(f, n)
+	//pl::writeInt32(f, n)
+	//c::check(n)
+	c::write32(f, n)
+	
+rel integerToBytes2(n, l)
+	c::def(n)
+	c::bit_and(n, 255, b1)
+	c::bit_shr(n, 8, n2)
+	c::bit_and(n2, 255, b2)
+	c::bit_shr(n, 16, n3)
+	c::bit_and(n3, 255, b3)
+	c::bit_shr(n, 16, n4)
+	c::bit_and(n4, 255, b4)
+	l=[b1,b2,b3,b4]
+	
+rel integerToBytes(n, l)
+	//pl::getInt32(n, l)
+	c::def(n)
+	c::bit_and(n, 255, b1)
+	c::bit_shr(n, 8, n2)
+	c::bit_and(n2, 255, b2)
+	c::bit_shr(n, 16, n3)
+	c::bit_and(n3, 255, b3)
+	c::bit_shr(n, 16, n4)
+	c::bit_and(n4, 255, b4)
+	l=[b1,b2,b3,b4]
+
+rel i16(n, l)
+	//pl::getInt32(n, l)
+	c::def(n)
+	c::bit_and(n, 255, b1)
+	c::bit_shr(n, 8, n2)
+	c::bit_and(n2, 255, b2)
+	l=[b1,b2]
+
+/*
+	serializing helpers
+*/
+	
+rel concat2(Functor l, Functor l2, Functor l3)
+	case
+		l=[]
+		l3=l2
+	case
+		l=Cons(e, t1)
+		concat2(t1, l2, l0)
+		l3=Cons(e, l0)
+		
+rel concat(Functor l, Functor l2, Functor l3)
+	//c::def(l2)
+	concat2(l,l2,l3)
+		
+rel s_size(s,i)
+	c::size()
+		
+rel i32(x,l)
+	//l=[0,0,0,x]
+	integerToBytes(x,l)
+	//print(F2('32',x,l))
+	
+rel bytes(l,x,l0,l2)
+	if(x=Cons(_,_))
+		list.concat(l,x,l1)
+		list.concat(l1,l0,l2)
+	else
+		list.concat(l,[x],l1)
+		list.concat(l1,l0,l2)
+
+rel put_get(b,y,l,size)
+	if(b=Val(y2))
+		y=29
+	elseif(b=Var(y2))
+		y=30
+	elseif(b=Const(y2))
+		y=20
+	elseif(b=Upvalue(i))
+		y=29
+		y2=i+size
+	else
+		print(b)
+		throw(21)
+	i16(y2,l)
+	
+rel put(a,x,l,size)
+	if(a=Val(x2))
+		x=25
+	elseif(a=Var(x2))
+		x=26
+	elseif(a=Void(x2))
+		x=56
+	elseif(a=Const(x2))
+		x=17
+	elseif(a=Upvalue(i))
+		x=25
+		x2=i+size
+	else
+		io.write(a)
+		c::throw('not done')
+	
+	i16(x2,l)
+		
+rel put_fc(a,x,l)
+	if(a=Val(x2))
+		x=34
+	elseif(a=Var(x2))
+		x=35
+	elseif(a=Void(x2))
+		x=58
+	elseif(a=Const(x2))
+		x=33
+	else
+		io.write(a)
+		c::throw('not done')
+
+	i16(x2,l)
+		
+rel put_vars2(l,x,l2)
+	case
+		l=Cons(n,t1)
+		i16(n,l3)
+		concat([x],l3,l4)
+		concat(l4,[0],l5)
+		concat(l5,t2,l2)
+		//l2=Cons(x,Cons(n,Cons(0,t2)))
+		put_vars2(t1, x, t2)
+	case
+		l=Cons
+		l2=Cons
+
+rel put_vars(l,l2)
+	case
+		l=Cons(n,t1)
+		l2=Cons(26,Cons(n,Cons(0,t2)))
+		put_vars(t1, t2)
+	case
+		l=Cons
+		l2=Cons
+
+rel push_pred(l,l2,n,w)
+	case
+		l=Cons(a,t1)
+		put(a,x,x2,w)
+		//l2=Cons(x,Cons(x2,Cons(n,t2)))
+		//put(a,x,x2,size1)
+		bytes([x],x2,[n|t2],l2)
+		push_pred(t1, t2, n+1, w)
+	case
+		l=Cons
+		l2=Cons
+	
+rel push_fc(l,l2)
+	case
+		l=Cons(a,t1)
+		put_fc(a,x,x2)
+		//l2=Cons(x,Cons(x2,t2))
+		bytes([x],x2,t2,l2)
+		push_fc(t1, t2)
+	case
+		l=Cons
+		l2=Cons
+
+//parser
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Exclamation, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+	
+/*
+	serializing
+*/
+
+rel size2(Functor l, Number n)
+	if(l=[])
+		n=0
+	else
+		l=Cons(_, tail)
+		size2(tail,j)
+		n=j+1
+
+rel size(Functor l, Number n)
+	//c::lsize(l, n)
+	size2(l,n)
+
+rel reverse(Functor l, Functor l2)
+	if(l=Cons(a,tail))
+		reverse(tail, ltemp)
+		concat(ltemp, Cons(a,Cons), l2)
+	else
+		l=Cons
+		l2=Cons
+
+/*
+	serializing
+*/
+
+rel cond2(elif, first)
+	case
+		elif=0
+		first=12
+	case
+		first=13
+		
+Relation _serialize
+			
+rel _serialize_cond(f, n, size1, l0, l, last_clause, branch, elif)
+	if(f=Cons(b, tail))
+		size(l0,n0)
+		size(last_clause,temp)
+		//jmp to prev+#body1+(halt or jmp)+#[12,x]
+		cond2(elif,h1)
+		integerToBytes(n+n0+temp+5,x)
+		concat([h1], x, x1)
+		concat(l0, last_clause, x2)
+		concat(x1, x2, l1)
+		//n=prev+prev_puts...
+		//n1=body1
+		size(l1,n1)
+		//print(F(l1, '#'+n1, '#'+n))
+		print_if(['-else', branch])
+		print_if(l1)
+		//print(b)
+		//+5?
+		
+		if(tail=Cons(c, _)) //add elseif
+			_serialize(b, n1+n+5, size1, 0, branch, l2,d) //send current+prev... to get new l2
+			_serialize_cond(tail, n1+n, size1, l2, l3, last_clause, branch, 1) //send l2 as prev to merge into l3
+			concat(l1, l3, l)
+		else //add else
+			_serialize(b, n1+n+1, size1, 0, branch, l2,d) //send current+prev... to get new l2
+			print_if(l2)
+			concat(l1, [14], y1)
+			concat(l2, last_clause, y2)
+			concat(y1, y2, l)
+			print_if(l)
+			//concat([14], y2, temp2)
+			//print(F2(temp2, '#'+#temp2))
+						
+	elseif(f=Cons(b,Cons))
+		c::throw('???')
+	else
+		f=Cons(b,Cons)
+		
+Relation _serialize2
+	/*		
+rel lines(f, l)
+	if(f=And(a, b,Tuple(line,_)))
+		lines(a,l1)
+		_serialize(a, n, size1, 1, branch, l0) //set 1 if there's a following stm
+		size(l0,n0)
+		repeat(n0,0,d1)
+	else
+		l=[]
+*/
+rel lines(da, l0, n, d)
+	size(l0,n0)
+	size(da,na)
+	i=n0-na
+	print_if([n0,na,i,n])
+	repeat(i,n,d)
+	c::cut()
+		
+rel _serialize(f, n, size1, next, branch, l, d)
+	if(f!=And(_,_))
+		//c::write('- ') and print(f)
+		true
+	else
+		true
+	c::undef(d)
+	c::cut()
+	c::def(f)
+	if(f=And(a, b,Tuple(line,line2)))
+		_serialize(a, n, size1, 1, branch, l0, da) //set 1 if there's a following stm
+		size(l0,n0)
+		//print(['-l1'])
+		lines(da, l0, line, d01)
+		_serialize(b, n+n0, size1, 0, branch, l1,db) //last stm
+		lines(db, l1, line2, d02)
+		//repeat(size(l1),1,d2)
+		concat(l0, l1, l)
+		concat(da,d01,d1)
+		concat(db,d02,d2)
+		concat(d1, d2, d)
+		print_if([d1,n0,d2,size(l1)])
+		print_if(['-and2',d,size(d),size(l),l])
+		//c::break()
+		//d=[]
+	else
+		_serialize2(f, n, size1, next, branch, l)
+		d=[]
+		c::cut()
+		
+rel _serialize2(f, n, size1, next, branch, l)
+	//c::write('-')
+	//print(f)
+	if(f=And(a, b))
+		_serialize(a, n, size1, 1, branch, l0, _) //set 1 if there's a following stm
+		size(l0,n0)
+		_serialize(b, n+n0, size1, 0, branch, l1, _) //last stm
+		concat(l0, l1, l)
+	
+	elseif(f=Cond(a, lc, t))
+		print_if(['-if', branch+1, t])
+		put_vars2(t, 26, l1)
+		size(l1,n1)
+		//print_if(Prev('#'+n,'#'+n1))
+		print_if([lc,next,branch])
+		if(next=1 or c::ge(branch, 1))
+			//last=[46,n3]
+			concat([46],l3,last_clause) //jmp last
+			size2(l3, 4)
+		else
+			print_if('-')
+			last_clause=[16]
+		//add 5 for branching
+		_serialize(a, n+n1+5, size1, 0, branch+1, l0, _)
+		_serialize_cond(lc, n+n1, size1, l0, l2, last_clause, branch+1, 0)
+		size(l2,n2)
+		integerToBytes(n2+n1+n, l3)
+		n4=n2+n1+n
+		print_if(F('jmp',[n2,n1,n],n4,l3))
+		concat(l1,l2,l)/*
+		//debug-only
+		//print_if(HeaderTop(l1,'#'+n1, l2,'#'+n2, Tuple('#'+n0)))
+		*/
+	elseif(f=Eq(a,b))
+		put(a,x,x2,size1)
+		//l=[99]
+		if(b=Func(args))
+			y=31
+			size(args,n_args)
+			//l0=[x,x2,0,y,251,0, n_args]
+			bytes([x],x2,[0,y,251,0,n_args],l0)
+			push_fc(args,l1)
+			concat(l0,l1,l)
+			throw(5)
+		elseif(b=Func(name,args))
+			y=31
+			size(args,n_args)
+			//l0=[x,x2,0,y,name,0, n_args]
+			bytes([x],x2,[0,y,name,0, n_args],l0)
+			push_fc(args,l1)
+			concat(l0,l1,l)
+			
+		else
+			put_get(b,y,y2,size1)
+				
+			//using 'eq x,y' instruction
+			if(x=26 and y=20)
+				bytes([51],x2,y2,l) //sets var
+			elseif(x=25 and y=20)
+				//sets val
+				bytes([52],x2,y2,l)
+			else
+				//l=[x,x2,0,y,y2,0]
+				bytes([x],x2,[0],l1)
+				bytes([y],y2,[0],l2)
+				concat(l1,l2,l)
+				//print(F2(l))
+				//throw(1)
+				
+		
+	elseif(f=Put(a))
+		put(a,x,x2,size1)
+		//l=[x,x2,0]
+		bytes([x],x2,[0],l)
+		//throw(2)
+		
+	elseif(f=Put(a,b))
+		put(a,x,x2,size1)
+		bytes([x],x2,[b],l)
+		
+	elseif(f=Pred(l1, a))
+		//print('#'+size1)
+		push_pred(l1,l2,0,size1)
+		//print(a)
+		if(a=Upvalue(i))
+			concat(l2, [11,i+size1], l)
+			//print(['up',a,l])
+		else
+			concat(l2, [11,a], l)
+	elseif(f=ObjPred(l1, obj, a))
+		push_pred(l1,l2,0,size1)
+		size(l1,n1)
+		if(obj=Upvalue(i))
+			x=i+size1
+			//concat(l2, [17,a,251, 40,x,n1, 42,n1], l)
+			i16(x,obj2)
+			i16(a,a2)
+			concat([17],a2,l0)
+			concat(l0,[251, 40],l4)
+			bytes(l4,obj2,[n1, 42,n1],l3)
+			concat(l2,l3,l)
+			//throw(41)
+		else
+			//concat(l2, [17,a,251, 40,obj,n1, 42,n1],l)//[11,a], l) //put_const(a, 11), obj_get, call_reg
+			//print(['obj-pred',obj])
+			i16(obj,obj2)
+			i16(a,a2)
+			concat([17],a2,l0)
+			concat(l0,[251, 40],l4)
+			bytes(l4,obj2,[n1, 42,n1],l3)
+			concat(l2,l3,l)
+	elseif(f=ObjGet(obj, a, reg))
+		if(obj=Upvalue(i))
+			x=i+size1
+			concat(l2, [53,x,a,reg], l)
+		else
+			concat(l2, [53,obj,a,reg], l)
+		throw(4)
+	elseif(f=ObjGet(obj, a))
+		if(obj=Upvalue(i))
+			x=i+size1
+			concat(l2, [17,a,251, 40,x,a], l)
+		else
+			concat(l2, [17,a,251, 40,obj,a],l)//[11,a], l) //put_const(a, 11), obj_get, call_reg*/
+		throw('get2')
+	elseif(f=Host(l1, a))
+		push_pred(l1,l2,0,size1)
+		concat(l2, [24, a], l)
+	elseif(f=False)
+		l=[44]
+	elseif(f=True)//todo error
+		l=[]
+	elseif(f=Call(a))
+		l=[42,a]
+	else
+		print(f)
+		c::throw('sel')
+		l=[]
+	
+//test.bc
+
+/*
+	serializing
+*/
+
+rel byte_array(f,l)
+	if(l=Cons(a,t1))
+		byte(f, a)
+		byte_array(f, t1)
+	else
+		l=Cons
+
+rel slash(c) 
+	string.code(c, 92)
+
+rel rest(s,s1)
+	s_size(s,w)
+	c::slice(s,1,w,s1)
+	
+rel char2(c,c2)
+	if(c=110)//nl
+		c2=10
+	elseif(c=116)//tab
+		c2=9
+	elseif(c=114)
+		c2=13
+	elseif(c=92)//slash
+		c2=c
+	else
+		c2=c
+	
+Relation write_rel
+		
+rel string_to_array(s,l)
+	case
+		s=''
+		l=Cons
+	case
+		c::code(s,c)
+		c=92
+		rest(s,s1)
+		c::code(s1,c1)
+		char2(c1,c2)
+		l=Cons(c2,l1)
+		rest(s1,s2)
+		string_to_array(s2,l1)
+	case
+		c::code(s,c)
+		l=Cons(c,l1)
+		rest(s,s2)
+		string_to_array(s2,l1)
+		
+rel write_string2(f, sa)
+	s_size(sa, n1)
+	c::sub(n1,1,x)
+	c::slice(sa,1,x,s)
+	string_to_array(s,l)
+	size(l, n2)
+	c::add(n2,1,a)
+	word(f, a)
+	byte_array(f,l)
+	byte(f, 0)
+	
+rel serialize_string(f,s)
+	if(s='')
+		true
+	else
+		c::code(s,c1)
+		byte(f, c1)
+		s_size(s,w)
+		c::slice(s,1,w,s2)
+		serialize_string(f,s2)
+
+rel write_consts(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(fc,b)
+		//print(fc)
+		if(fc=Num(a))
+			byte(f, 2)
+			c::stringToNumber(a,c)
+			num(f, c)
+		elseif(fc=Str(a))
+			byte(f, 3)
+			write_string2(f, a)
+		elseif(fc=TList(a))
+			byte(f, 0)
+		elseif(fc=Rel(t, env))
+			byte(f, 4)
+			write_rel(f, t, env)
+		else
+			io.writeln(fc)
+			c::throw('not a recognized const')
+		write_consts(f, b)
+
+rel write_upvals(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(x,b)
+		//c::write('upval:')
+		word(f,x)
+		write_upvals(f, b)
+	
+debug=2
+
+rel put_args(n,nargs,l2)
+	case
+		//l=[]
+		n=nargs
+		l2=[]
+	case
+		//l=[n|t1]
+		i16(n,l3)
+		concat([30],l3,l4)
+		concat(l4,[n],l5)
+		//l2=[l5|t2]
+		concat(l5,t2,l2)
+		put_args(n+1,nargs, t2)
+	
+rel serialize_rel(t, l2, d3)
+	//print(t)
+	t=[name, l0, f1, size1]
+	name=Pair(_,nargs)
+	put_args(0,nargs,t0)
+	size(t0, n0)
+	//print(F(t0,n0))
+	//io.write('- ') and print(F(name,l0,f1,n0)) //debug
+	_serialize(f1, n0, size1, 0, 0, t1,d)
+	//concat(l0, t1, t2)
+	concat(t0, t1, t2)
+	concat(t2, [16], l2)
+	//print(['n',n0])
+	repeat(n0,0,d0)
+	//print(['d',d0])
+	size(d, n)
+	if(n=0)
+		size(t2, n2)
+		repeat(n2,0,d2)
+		//concat(d0, d1, d2)
+	else
+		concat(d0, d, d2)
+	concat(d2, [0], d3)
+	//print(Pair(l0,t1))
+	//print(Pair(l2,d3))
+	//print('')
+
+rel write_dname(f, name, args)
+	if(name='')
+		byte(f, 1)
+		byte(f, 0)
+	else
+		s_size(name,w)
+		word(f,w)
+		serialize_string(f, name)
+	print_if(Pair(name,'args',args))
+	word(f, args)
+
+rel write_rel(f, t, env)
+	table.get(env,'vars',vars)
+	table.get(env,'consts',consts)
+	table.get(env,'upvals',upvals)
+	size(vars,n1)
+	size(consts,n2)
+	size(upvals,n3)
+	reverse(consts,c2)
+	reverse(upvals,u2)
+	reverse(vars,v2)
+	//print(F(c2,u2,v2))
+	//consts, vars, upvals
+	word(f, n2)
+	write_consts(f, c2)
+	word(f, n1)
+	byte(f, n3)
+	write_upvals(f, u2)
+	serialize_rel(t, l2, d)
+	size(l2,nl)
+	size(d,nd)
+	if(nl=nd)
+		true
+	else
+		//print(l2)
+		//print(d)
+		c::throw(123)
+	c::cut()
+	size(l2,bc)
+	word(f, bc)
+	//print(['array',l2]) //debug
+	byte_array(f, l2)
+	//debug
+	byte(f, debug)
+	//size(name), name, n_args
+	t=[Pair(name,args), _, _, size1]
+	//print(F2(name,'c',n2,'y',n1,'u',n3,l2))
+	//print(F('upvals',u2)) //upvals
+	//print('')
+	/*
+	if(debug=1)
+		write_dname(f,name,args)
+	elseif(debug=0)
+		word(f, args)
+	else*/
+	write_dname(f,name,args)
+	byte_array(f, d)
+	
+rel serialize(f, a, env) //file, code, env
+	table.get(env, 'vars', vars)
+	c::cut()
+	size(vars,n_vars)
+	write_rel(f, [Pair('::main',0), [], a, n_vars], env)
+
+t={
+	'_serialize'=_serialize
+	'serialize'=serialize
+}
+export(t)

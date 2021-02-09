@@ -1,0 +1,1416 @@
+
+functor(Cons, Functor)
+functor(Info, Functor)
+functor(Token, Functor)
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+functor(F, Functor)
+functor(F1, Functor)
+functor(F2, Functor)
+	
+//parser
+
+functor(Eq, Functor Any Any Any)
+functor(Neq, Functor Any Any)
+functor(Mut, Functor)
+//functor(And, Functor Any Any Any)
+functor(Or, Functor Any Any)
+functor(True, Functor Null)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(ObjData, Functor)
+functor(Cond, Functor)
+functor(Op, Functor)
+functor(Inequality, Functor)
+functor(Host, Functor)
+
+functor(SoftCut, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Exclamation, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor Number)
+functor(Str, Functor String)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(ObjGet2, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+
+//gen
+functor(Var, Functor String Number Functor) //Var(name, object|local|args, type)
+functor(Var, Functor)
+functor(Val, Functor Number)
+functor(Const, Functor Number)
+functor(Upvalue, Functor Number)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Call, Functor)
+functor(Put, Functor)
+//functor(And, Functor Any Any)
+functor(And, CWam)
+functor(Eq, CWam)
+
+/* misc */
+
+require('logic5.bc', logic)
+require('io5.bc', io)
+
+if(true)
+//if(false)
+	rel debug(x)
+		print(x)
+
+	rel debug_write(x)
+		io.write(x)
+else
+	rel debug(x)
+		true
+
+	rel debug_write(x)
+		true
+
+rel halt()
+	c::halt()
+
+require('env9.bc', Env)
+
+require('list5.bc', list)
+
+require('string5.bc', string)
+
+require('types7.bc', types)
+
+rel custom_throw(msg, Functor info)
+	//info=Info(line, col)
+	//logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+	print(info)
+	c::throw(msg)
+	//c::throw('(line '+line+', col '+col+') '+msg)
+
+rel throw(String msg)
+	c::throw(msg)
+	
+//helpers
+	
+rel put_args(l,l2)
+	case
+		l=[n|t1]
+		l2=[30,n,n|t2]
+		put_args(t1, t2)
+	case
+		l=[]
+		l2=[]
+	
+rel get_prefix(f, l, c)
+	if(l=[])
+		c=f
+	else
+		l=[a|tail]
+		get_prefix(f,tail,c1)
+		c=And(a, c1)
+		
+//helpers
+rel list_to_and(l, t)
+	if(l=[a])
+		t=a
+	elseif(l=[a|b])
+		list_to_and(b,t1)
+		t=And(a,t1)
+	
+rel make_temp(x)
+	c::random(n)
+	c::toString(n,s1)
+	string.concat('::',s1,s)
+	//s_concat('::',s1,s)
+	x=Id(s, [])
+
+rel make_temp_str(x)
+	c::random(n)
+	c::toString(n,s1)
+	string.concat('~',s1,s)
+	x=s
+	
+rel set(t,o,o2,t2)
+	table.set(t,o,o2,t2)
+	cut
+	
+rel get(t,o,o2)
+	table.get(t,o,o2)
+	cut
+	
+rel size2(t,o2)
+	list.size(t,o2)
+	cut
+	
+rel valid(e)
+	e!=True
+	
+rel str(s,s1)
+	s1=Str('"'+s+'"')
+
+//setup library
+
+rel setup_const(env,env2, b, f)
+	list.size(get(env,'consts'),n)
+	//debug(n)
+	Env.push_on(env, 'consts', b, env2)
+	f=Const(n)
+
+//set library
+	
+rel push_top(env, f, env2)
+	c::undef(env2)
+	set(env, 'top', Cons(f, env['top']), env2)
+//
+
+rel findid(env, name, n)
+	list.has(Env.vars(env), Var(name,n,_))
+
+rel push_var(env, env2, name, type, x2)
+	Env.size(env,x2)
+	Env.push(env, Var(name,x2,type),env2)
+	
+rel push_name(env, env2, name, x2)
+	Env.size(env,x2)
+	Env.push(env, Var(name,x2,['Any']),env2)
+	
+//already knows it's an Id?
+rel setup_term(env, env2, name, y)
+	Env.vars(env, vars)
+	list.size(vars,n_vars)
+	Env.functors(env, fcs)
+	f=Var(name, n, _)
+	debug(Pair('term', name))
+	//debug(fcs)
+	if(list.find(fcs, f, z1)) //functor
+		debug(Pair('fcs', name))
+		setup_const(env,env2,Str('"'+name+'"'),Const(n3))
+		y=Func(n3,[])
+	elseif(list.find(vars, f, z2))
+		y=Val(n)
+		env2=env
+	else
+		//c::throw('-')
+		env2=env
+		y=Var(list.size(vars))
+
+rel setup_void(name, n, x)
+	if(name='_')
+		x=Void(n)
+	else
+		x=Val(n)
+
+rel setup_void2(name, n, x)
+	if(name='_')
+		x=Void(n)
+	else
+		x=Var(n)
+	
+rel setup_new_var(env, env2, name, x, n)
+	c::undef(env2)
+	get(env,'branch',branch)
+	fc=Var(name,n,['Any'])
+	if(branch=0)
+		Env.push(env, fc, env2)		
+		setup_void2(name, n, x)
+	else //re-occurs in branch
+		//debug(['new', name, get(env,'branch')])
+		c::def(n)
+		Env.push(env, fc, env1)
+		push_top(env1, n, env2)
+		x=Val(n)
+
+rel setup_new_var2(env, env2, name, CVal x, tc)
+	c::undef(env2)
+	Env.vars(env, vars)
+	list.size(vars,n)
+	get(env,'branch',branch)
+	fc=Var(name,n,tc)
+	if(branch=0)
+		Env.push(env, fc, env2)
+		setup_void2(name, n, x)
+	else //re-occurs in branch
+		//debug(['new', name, get(env,'branch')])
+		c::def(n)
+		Env.push(env, fc, env1)
+		push_top(env1, n, env2)
+		x=Val(n)
+	
+rel reverse(Functor l, Functor l2)
+	if(l=Cons(a,tail))
+		reverse(tail, ltemp)
+		list.concat(ltemp, Cons(a,Cons), l2)
+	else
+		l=Cons
+		l2=Cons
+	
+rel make_upval(env, env2, n, x)
+	get(env,'upvals',upvals)
+	reverse(upvals,upvals2)
+	if(list.find(upvals2, n, n2))
+		debug(['up',upvals, n])
+		env2=env
+		x=Upvalue(n2)
+	else
+		Env.push_on(env,'upvals',n,env2)
+		cut
+		debug(['up-add',upvals,n])
+		size2(upvals,n2)
+		x=Upvalue(n2)
+		
+rel setup_var(env, env2, name, x)
+	//debug(Env.vars)
+	Env.vars(env, vars)
+	list.size(vars,n_vars)
+	fc=Var(name, n, tc)
+	debug([name,n])
+	c::def(name)
+	debug(Tuple(name,n))
+	//c::def(n)
+	if(list.find(vars, fc, _a)) //variable in env
+		//debug(['var',vars])
+		env2=env
+		setup_void(name,n,x)
+	elseif(Env.prevs(env, name, fc)) //upvalue
+		debug(['prev-var',name,n,tc])
+		//tc!=[]
+		//tc!=['Any']//not upvalue
+		make_upval(env,env2, n, x)
+		//debug(x)
+		//c::throw()
+	else //new variable
+		n=n_vars
+		debug(['branch-var', get(env,'branch'), n])
+		setup_new_var(env, env2, name, x, n)
+	c::def(n)
+//
+
+Relation extract_type_args
+Relation extract_types
+
+has = list.has
+
+rel extract_type_id(env,f,type,info)
+	f=Id(name, type_id)
+	f1=Var(name,_,type2)
+	debug(['type',f,f1,type_id])
+	if(has(Env.vars(env),f1))
+		true
+		debug(['get-type',f1,type_id,type2])
+		c::def(type2)
+		debug([type_id,type2])
+		if(type_id=[])
+			type1=['Any']
+		else
+			type1=type_id
+		if(type2=['Any'])
+			type=type1
+		elseif(type1=['Any'])
+			type=type2
+		elseif(type2=type1)
+			type=type2
+		else
+			debug([type2,type_id])
+			custom_throw('Variable defined with different types',info)
+	else
+		c::def(type_id)
+		if(type_id=[])
+			type=['Any']
+		else
+			type=type_id
+			
+rel extract_type(env,f,type)
+	if(f=Num(s))
+		type=['Number']
+	elseif(f=Str(_))
+		type=['String']
+	elseif(f=Id(name, type_id))
+		extract_type_id(env,f,type,info)
+	elseif(f=TTable(_))
+		type=['Table']
+	elseif(f=TTable(_,_))
+		type=['Table']
+	elseif(f=Rel(_,_,_))
+		type=['Relation']
+	elseif(f=Rel(args,_))
+		debug(f)
+		//halt()
+		extract_types(env,args,t)
+		type=['Relation'|t]
+	else
+		type=['Any']
+		
+rel send(a,type)
+	if(a=['Number'] or a=['Integer'])
+		type='math'
+	elseif(a=['String'])
+		type='string'
+	elseif(a=['Any'])
+		type='any'
+	else
+		type='any'
+	
+rel extract_types(env,l,ts)
+	case
+		l=[f1|tail] //check variables
+		ts=[t1|t2] //check types
+		extract_type(env,f1,t1)
+		debug(Tuple(f1,t1))
+		extract_types(env,tail,t2)
+	case
+		l=[]
+		ts=[]
+
+rel push_types(env,env2,l,ts,n,ns)
+	case
+		l=[f1|tail] //check variables
+		ts=[t1|t2] //check types
+		ns=[n|ns2] //type id
+		extract_type(env,f1,t1)
+		push_types(env,env_1,tail,t2,n+1,ns2)
+		f1=Id(name,_)
+		Env.push(env_1, Var(name,n,t1), env2)
+	case
+		l=[]
+		ts=[]
+		ns=[]
+		env2=env
+		
+rel bind_const(env,env2,f,n)
+	//bind an atomic const like str or num
+	//outputs its position
+	if(f=Op(_,_,_,_))
+		throw('const')
+	else
+		true
+	table.get(env,'consts',c)
+	size2(c,n) //n=#Env.consts
+	Env.push_on(env, 'consts', f, env2)
+
+rel list_to_cons2(l, t)
+	if(l=Cons(a,Cons(Tuple(l2),Cons)))
+		t=Func('Cons', [a, l2],_)
+	elseif(l=Cons(a,l2))
+		t=Func('Cons', [a, t2],_)
+		list_to_cons2(l2, t2)
+	else
+		l=[]
+		t=Id('Cons', [])
+		
+rel table_to(env, l, t0, t, f, attr,attr2)
+	//debug(['dict',l, t0, t, f, attr,attr2])
+	if(l=And(a,b))
+		make_temp(t1)
+		table_to(env, a, t0,t1,f1, attr,attr1)
+		table_to(env, b, t1,t,f2, attr1,attr2)
+		f=And(f1,f2)
+		//attr2=attr
+		debug(f)
+	elseif(l=And(a,b,_))
+		table_to(env,And(a,b), t0, t, f, attr,attr2)
+	elseif(l=Eq(a,b,info))
+		debug(['eq',a,b, attr,attr2])
+		if(a=Id(name,_))
+			f=ObjPred('_table','set2',[t0,t,str(name),b],_)
+		else
+			f=ObjPred('_table','set2',[t0,t,a,b],_)
+		//attr2=attr
+		list.push(attr,Pair(a,b),attr2)
+	elseif(l=True)
+		//f=True
+		//f1=Eq(t0,t,info)
+		f=Eq(t0,t,info)
+		//generate_body(env,_,f1,f)
+		//f=Eq(t0,t)
+		//t0=t
+		attr2=attr
+	elseif(l=Rel(name,args,f1))
+		//set.push(attr,attr2,'name')
+		//term(env,env2,prefix,a,CWam f)
+		//generate_body(env,_,f,prefix)
+		//table_to(env, Rel(args,f1), t0, t, f)
+		print(['rel',t0,attr])
+		//throw(22)
+		//list.push(args,Id('this',['None'|Pair(t0,attr)]),args2)
+		cut
+		//Env.push(env,Id('this',['None'|Pair(t0,attr)]),env1)
+		//push_var(env,env1,'this',['None'|Pair(t0,attr)],type)
+		push_var(env,env1,'this',['None'|Pair(t0,attr)],_)
+		print(env1)
+		cut
+		table_to(env1, Eq(Id(name,[]),Rel(args,f1),info), t0, t, f, attr,attr2)
+	else
+		debug(l)
+		throw('cannot convert to table')
+	
+Relation generate_body
+	
+rel atom_const(b)
+	b=Num(_) or b=Str(_) or b=Rel(_,_)
+	
+rel get_name(env,x,CWam f)
+	x=Id(name,_)
+	list.find(Env.vars(env), Var(name,n,_), _)
+	f=Val(n)
+
+//updates a change of type, etc.		
+rel env_update(env, name, tc, env2)
+	f = Var(name, n , tc)
+	//print(logic)
+	print(f)
+	logic.instantiated(name)
+	
+	if(list.has(Env.vars(env), Var(name, n, t1)))
+		//env2=env
+		if(tc=t1)
+			env2=env
+		//elseif(t1=['void'|_])
+			//env2=env
+		else
+			//Env.push(env, f,env2)
+			Env.remove(env, n,env1)
+			Env.push(env1, f,env2)
+			//debug(Env.vars(env2))
+			//halt()
+			//Env.update(env, Var(name, n, t1), f,env2)
+			/*
+	elseif(Env.prevs(env, name, Var(name, n, t1))) //upvalue
+		env2=env
+		tc=t1
+		throw(222)*/
+	else
+		debug(['-',f])
+		Env.push(env, f,env2) //todo upval? or local
+		//Env.push_on(env, 'vars',f,env2)
+		//env2=env
+			
+	/*
+	gen -> push_args? -> term
+	
+	gen: eq, pred, objpred
+	term: func, objpred, ...
+	*/
+		
+//generates temp() for a stm
+rel tempify(env,env2,f1,f,temp,prefix)
+	make_temp(temp)
+	temp=Id(name2,_)
+	generate_body(env,env2,f1,prefix)
+	list.find(Env.vars(env2), Var(name2,n3,_), _)
+	f=Val(n3)
+	
+rel pause()
+	c::read(x)
+	
+rel term(env,env2,prefix,a,CWam f)
+	Env.vars(env, vars)
+	//debug_write('; ') and debug(a)
+	Env.functors(env, fcs)
+	fc1=Var(name,n,_)
+	//debug(a)
+	cut
+	if(a=Id(name,_))
+		if(list.find(fcs, fc1, _a)) //0-arguments functor
+			f1=Func(name,[],_)
+			term(env,env2,prefix,f1,f)
+			debug(['fc',name,f])
+		else
+			setup_var(env, env2, name, f)
+			prefix=True
+	elseif(a=Func(name,args,_))
+		f2=Var(name,n2,_)
+		if(list.find(fcs, f2, _a)) //term is a functor
+			debug(['func',a])
+			make_temp(temp)
+			generate_body(env,env2,Eq(temp, a, _),prefix)
+			get_name(env2,temp,f)			
+			//debug(['prefix',prefix,temp,f,targs])
+		else //term is a relation in function syntax
+			debug('function')
+			make_temp(temp)
+			l0=[temp]
+			list.concat(args,l0,l1)
+			debug(l1)
+			generate_body(env,env2, Pred(name,l1,_),prefix)
+			get_name(env2,temp,f)
+	elseif(a=Op(a1,b1,op,info))
+		//throw(2)
+		debug(a)
+		temp=make_temp()
+		if(op='+')
+			s='add'
+		else
+			s='sub'
+		extract_type(env,a1,a2)
+		send(a2,lib)
+		debug(['op',op, a1,lib])
+		if(lib='any')
+			f3=Host('c', s,[a1,b1,temp])
+		elseif(lib='math')
+			f3=Host('c', s,[a1,b1,temp])
+		elseif(lib='string')
+			make_temp(temp2)
+			f3=And(Host('c', 'toString',[b1,temp2]), Host('c', s,[a1,temp2,temp]))
+		else
+			custom_throw('no library found for type',info)//throw(1)
+		generate_body(env,env2, f3,prefix)
+		get_name(env2,temp,f)
+		debug(prefix)
+		//throw(1)
+	elseif(a=ObjPred(obj,name,args,info))
+		debug(Pair('obj',a))
+		debug(b)
+		//throw(1)
+		make_temp(temp)
+		f3=ObjPred(obj,name,list.concat(args,[temp]),info) //p(temp)
+		debug(f3)
+		generate_body(env,env2, f3,prefix)
+		temp=Id(name2,_)
+		list.find(Env.vars(env2), Var(name2,n3,_), _)
+		f=Val(n3)
+	elseif(a=TList(args))//!
+		list_to_cons2(args, a1)
+		debug(['term;list',a1])
+		term(env,env2, prefix, a1, f)
+		//tempify(env,env2,f1,f,temp,prefix)
+	elseif(a=TTable(args))
+		//print(['bind',b])
+		make_temp(temp)
+		make_temp(temp2)
+		temp2=Id(name2,_)
+		f1=ObjPred('_table','new',[temp],_)
+		debug(Tuple(f1,args))
+		//debug(a)
+		//push_name(env,env1,'this',x)
+		print(x)
+		table_to(env, args, temp, Id(name2,_), f2, [],attr2)
+		cut
+		//print(attr2)
+		push_var(env,env1,'this',['Object'|attr2],x)
+		//env_update(env,'this',['Object'|attr2],env1)
+		//print(env3.vars)
+		//pause()
+		print(And(f1,f2))
+		generate_body(env1,env2,And(f1,f2),prefix)
+		cut
+		//custom_throw(31,info)
+		list.find(Env.vars(env2), Var(name2,n3,_), _)
+		f=Val(n3)
+		debug(F1(f,n3,env2))
+		//custom_throw(31,info)
+	elseif(a=Size(a1, _))
+		debug(Pair('#',a))
+		f1=ObjPred('list','size',[a1,temp],_)
+		tempify(env,env2,f1,f,temp,prefix)
+	elseif(a=ObjGet(a1, b1))
+		debug('term')
+		f1=ObjPred('_table','get',[Id(a1,_),Str('"'+b1+'"'),t0],_)
+		tempify(env,env2,f1,f,t0,prefix)
+	elseif(a=ObjGet2(a1, b1))
+		make_temp(temp)
+		temp=Id(name2,_)
+		//throw(1) //check
+		f1=ObjPred('_table','get',[Id(a1,_),b1,temp],_)
+		generate_body(env,env2,f1,prefix)
+		list.find(Env.vars(env2), Var(name2,n3,_), _)
+		f=Val(n3)
+	elseif(a=Rel(args, c))
+		cut
+		make_temp(temp)
+		temp=Id(name2,_)
+		f1=Rel(name2,args,c)
+		generate_body(env,env2,f1,prefix)
+		list.find(Env.vars(env2), Var(name2,n3,_), _)
+		f=Val(n3)
+	elseif(atom_const(a)) //Num, Rel, Str, ...
+		setup_const(env,env2, a, f)
+		//debug(['const',a,f])
+		prefix=True
+	else
+		print(Tuple(a))
+		custom_throw('not a recognized expression',_)
+
+rel comp_arg(env,env2,prefix,name,n1,n2)
+	debug(['comp',name,n1,n2])
+	if(findid(env,name,x1))
+		true
+	else
+		debug(name)
+		throw('no variable')
+	//throw(1)
+	n1=Val(x1)
+	push_name(env, env2, name, x2)
+	//debug(['comp4',x2])
+	//findid(env,name,x2)
+	n2=Var(x2)
+	//term(env,env1,prefix,a,n2)
+	prefix=True
+	
+rel push_args(env,env2,l,l2,n,p)
+	if(l=[a|t1])
+		debug(['=',a])
+		if(a=Mut(x))
+			comp_arg(env,env1,prefix,x,n1,n2)
+			//debug(['comp',n1,n2])
+			l2=[n1,n2|t2]
+			//debug(l2)
+		else
+			term(env,env1,prefix,a,n2)
+			l2=[n2|t2]
+		p=[prefix|p2]
+		//debug(F('push args',l2,n2))
+		c::def(n2)
+		l2=[y|_]
+		c::def(y)
+		if(y=Mut(_))
+			throw(1)
+		else
+			true
+		push_args(env1,env2,t1, t2, n+1,p2)
+	else
+		l=[]
+		l2=[]
+		env2=env
+		p=[]
+	
+	
+rel extract_type_args(l,ts,env)
+	case
+		l=Cons(Mut(f1),Cons)
+		ts=Cons(['Any'],Cons(['Any'],Cons))
+	case
+		l=Cons(f1,Cons)
+		ts=Cons(t,Cons)
+		extract_type(env,f1,t)
+	case
+		l=Cons(f1,tail)
+		ts=Cons(t1,t2)
+		extract_type(env,f1,t1)
+		extract_type_args(tail,t2,env)
+	case
+		l=Cons
+		ts=Cons
+	
+//require('io5',io)
+//cut
+
+Relation bind_type_
+	
+rel specialize_type(env, a, ta, tb, env2)
+	if(a=Id(name,_))
+		debug([ta,tb])
+		if(types.strict_type(ta,tb,tc))
+			debug(['update',name,tc])
+			//debug(env)
+			cut
+			//bind_type_(env, name, tc, env2)
+			env_update(env, name, tc, env2)
+			//debug(['update',Env.vars(env2)])
+		else
+			//io.writeln([ta,tb])
+			//logic.throw("no strict") //todo: ???
+			throw("no strict")
+	else
+		env2=env
+
+rel bind_type(env,env2,a,b,ta,tb,info)
+	if(types.compare_types(ta, tb))
+		debug(['type',ta,tb])
+		specialize_type(env, a, ta, tb, env2)
+	else
+		print(['type',ta,tb])
+		//custom_throw('cannot unify type "'+types.type_to_string(ta)+'" with type "'+types.type_to_string(tb)+'"', info)
+		custom_throw('cannot unify types',info)
+	
+rel bind_type_(env,env2,a,ta,tb,info)
+	//env=env2
+	if(types.compare_types(ta, tb))
+		debug(['bind',a,ta,tb])
+		specialize_type(env, a, ta, tb, env2)
+		//pl::writeln(['consts',env2.consts])
+	else
+		print(['type',ta,tb])
+		//custom_throw('cannot unify type "',info)//+types.type_to_string(ta)+'" with type "'+types.type_to_string(tb)+'"', info)
+		custom_throw('cannot unify types2',info)
+	
+rel compare_types(env,env2,a,b,info)
+	extract_type(env,a,ta)
+	extract_type(env,b,tb)
+	if(types.compare_types(ta, tb))
+		//debug(['code',a,b,code])
+		debug(['type',ta,tb])
+		//c::halt()
+		specialize_type(env, a, ta, tb, env2)
+		//pl::writeln(['consts',env2.consts])
+	else
+		print(['type',ta,tb])
+		//custom_throw('cannot unify type "',info)//+types.type_to_string(ta)+'" with type "'+types.type_to_string(tb)+'"', info)
+		custom_throw('cannot unify types',info)
+	
+rel is_type(env,name,type)
+	list.find(env.vars, Var(name,_,type), _)
+
+rel update_types(env,env2,l,ts) //update without checking
+	case
+		l=[f|tail] //check variables
+		ts=[type|t2] //check types
+		debug(F(f,t))
+		//env_update(env, name, type, env_a)
+		env_a=env
+		//debug(F(env_a.vars))
+		update_types(env_a,env2,tail,t2)
+	case
+		l=[]
+		ts=[]
+		env2=env
+		
+rel specialize_args(l,ts,env,env2)
+	if(l=Cons)
+		env2=env
+	else
+		l=Cons(a,l2)
+		ts=Cons(tb,ts2)
+		extract_type(a,ta,env)
+		specialize_type(env, a, ta, tb, env_a)
+		specialize_args(l2,ts2,env_a,env2)
+		
+rel compare_args(f, t1, t2, env, env2, info)
+	cut
+	f=Id(name,t1)
+	debug(args)
+	extract_type_args(args,targs,env)
+	//list.filter(args, is_id, ids)
+	//list.fold(ids, env_push, env, env_a)
+	specialize_args(args,targs,env,env2)
+	//env=env2
+	t2=Cons('Relation',targs)
+	//io.writeln(t1)
+	//io.writeln(t2)
+	debug([t1,t2])
+	if(types.compare_types(t1,t2))
+		true
+	else
+		//msg='calling relation "'+name+'" of type "'+types.type_to_string(t1)+'" as "'+types.type_to_string(t2)+'"'
+		print([t1,t2])
+		msg='calling relation '+name
+		custom_throw(msg,info)
+	
+rel eq3(n1,n2)
+	case
+		n1=n2
+	case
+		n1=1
+		
+rel eq2(t1,t2)
+	n1=#t1
+	n2=#t2
+	debug([n1,n2])
+	eq3(n1,n2)/*
+	case
+		n1=n2
+	case
+		n1=0*/
+			
+rel compare_relation(f, args, env, env2, info)
+	cut
+	f=Pair(name,t1)
+	debug(['frel',f,args])
+	extract_type_args(args,targs,env)
+	//list.filter(args, is_id, ids)
+	//list.fold(ids, env_push, env, env_a)
+	//specialize_args(args,targs,env,env2)
+	env=env2
+	t2=Cons('Relation',targs)
+	if(t1=['void'|_])
+		//list.size(t1)=list.size(t2) //todo all of this
+		//n1=#(t1)
+		print(['true1',t1,t2])
+		eq2(t1,t2)
+		true
+	elseif(types.compare_types(t1,t2))
+		print(['true',t1])
+		t1!=['void'|_]
+		print(['true','-'])
+	else
+		//msg='calling relation "'+name+'" of type "'+types.type_to_string(t1)+'" as "'+types.type_to_string(t2)+'"'
+		//debug(['types',t1,t2])
+		print('types')
+		print(args)
+		print(t1)
+		print(t2)
+		msg='calling relation '+name+' with wrong type'
+		custom_throw(msg,info)
+	
+rel compare_functor1(f1, args, t2, info)
+	f1=[t1|tail1]
+	f2=[t2|tail2]
+	
+rel compare_functor(env, args, t2, info)
+	extract_type_args(args,targs,env)
+	type = Cons('Functor', targs)
+	t2 = Cons(_, targs2)
+	type2=Cons('Functor', targs2)
+	//Env.functors(env, Var(name2,n2,t2))
+	if(types.compare_types(type, type2))
+		true
+	else
+		print(F(type, type2))//t2,targs,targs2
+		msg='functor of different type'
+		//msg='using functor '//+name+' of type "'+types.type_to_string(t1)+'" as "'+types.type_to_string(t2)+'"'
+		custom_throw(msg, info)
+	
+//bind id name to any term
+rel bind_term(env,env2, name, b, t)
+	setup_var(env,env1,name,x)
+	cut
+	term(env1, env2, prefix, b, y)
+	//comp_var(env3, env2, x, y)
+	t=And(prefix, Eq(x, y))
+	debug(Tuple(x,y,t))
+
+//bind id
+rel bind_void(env1,env2, b, CVal y)
+	//debug([a,b])
+	if(b=Id(name2,_)) //var case, x = y
+		setup_term(env1,env2,name2,y)
+	else //const case, x = c
+		//debug('bind const')
+		bind_const(env1,env2,b,c)
+		y=Const(c)
+	
+//first check cases where b is composite (usually syntax sugar for simple cases, do not type check)
+//only if b is, 1 a functor, 2 id, 3 const, it needs type check
+rel bind(env,env2, a, b, t, info)
+	get(env, 'fcs', fcs)
+	if(a=Id(name,_)) //assign a := b
+		if(b=Func(name2,args,_))
+			if(list.find(fcs, Var(name2,n2,t2), _)) //functor
+				debug(['eq-functor',b])
+				setup_var(env,env1,name,x)
+				setup_const(env1,env3,Str('"'+name2+'"'),Const(n3))
+				push_args(env3, env2, args, l, 0, ps)
+				y=Func(n3,l)
+				list.filter(ps, valid, ps2)
+				list.concat(ps2, [Eq(x, y)], t1)
+				list_to_and(t1, t)
+				//debug(fcs)
+				debug(['fcs',a,b])
+				debug(Pair('args',args,'fc-type',t2))
+				compare_functor(env,args,t2,info)
+			else //relation
+				debug('eq-rel')
+				list.push(args,a,l)
+				generate_body(env,env2,Pred(name2,l,_),t)
+				debug(t)
+		elseif(atom_const(b))
+			debug(['bind',a,b,t])
+			l=Rel(_,_)
+			cut
+			if(b!=l)
+				debug(['bind-type'])
+				//debug(['-',env])
+				//bind_type(env,env0,a,b,info)
+				extract_type_id(env,a,t1,info)
+				if(t1=[])
+					ta=['Any']
+				else
+					ta=t1
+				extract_type(env,b,tb)
+			else
+				true //don't check type
+			//debug([t,env2])
+			//extract_type(env,b,tb)
+			setup_var(env,env1,name,x)
+			bind_void(env1,env3, b, y)
+			debug([a,b,x,y])
+			bind_type(env3,env2,a,b,ta,tb,info)
+			t=Eq(x, y)
+		else
+			debug(['bind-term',a,b])
+			bind_term(env,env1, name, b, t)
+			compare_types(env1,env2,a,b,info)
+			//debug(t)
+	elseif(b=Id(name,_)) //assign b := a
+		bind_const(env,env2,a,c)
+	else
+		custom_throw('comparing consts is redundant',info) //todo warning
+	
+rel generate_cond(l, code, env, env2)
+	if(l=Cons(c, l2)) //elseif(c) d
+		generate_body(env,env_a,c,t1)
+		debug(['-up',table.get(env_a,'upvals'),c])
+		generate_cond(l2, code1, env_a, env2)
+		code=Cons(t1, code1)
+	elseif(l=[])
+		code=[]
+		env2=env
+		
+
+//ObjGet and ObjPred are converted in serialize4 to 'table.bc' / c::table (old bindings)
+
+		
+rel gen_get(env1,env3,n)
+	if(Env.get_var(env1,obj,Var(_,n,_)))
+		env3=env1
+	else
+		if(Env.prevs(env1,obj,Var(obj,obj_n,_)))
+			make_upval(env1, env3, obj_n, n)
+		else
+			custom_throw('cannot find relation '+name, info)
+		
+/*
+	and, or, eq, cond, => (obj)p, decl, def
+	
+	The latter have analogous constants (terms) to them
+*/
+	
+rel set_var(env, name, x, n)
+	Env.vars(env, vars)
+	fc=Var(name,n,tc)
+	list.find(vars, fc, _a2)
+	setup_void2(name, n, x)
+
+rel temp2(Functor l, i, Functor l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		l2=Cons(h2, tail2)
+		h2=Put(head,i)
+		temp2(tail, i+1, tail2)
+
+rel var_name(x,y)
+	x=Var(y,_,_)
+
+
+rel gen4(env, env2, Functor f, Functor code)
+	if(f=Declaration(name, type))
+		debug('declaration')/*
+		if(type=['Relation'|t])
+			t0=['void'|t]
+		else
+			t0=type*/
+		t0=type
+		setup_new_var2(env, env2, name, x, t0)
+		code=Put(x)
+		debug(Env.vars(env2)) //todo too many variables/elseifs in a rel
+		
+	elseif(f=True)
+		env2=env
+		code=True
+	
+	elseif(f=False)
+		env2=env
+		code=False
+	elseif(f=Inequality(a,b,op,info))
+		l=[a,b]
+		if(op='!=')
+			fn='neq'
+		elseif(op='<')
+			fn='lt'
+		elseif(op='<=')
+			fn='le'
+		elseif(op='>')
+			fn='gt'
+		else
+			op='>='
+			fn='ge'
+		f1=Host('c',fn,l)
+		generate_body(env, env2, f1, code)
+	
+	else
+		debug(f)
+		c::throw('cannot compile code')
+		
+rel gen3(env, env2, Functor f, Functor code)
+	get(env, 'vars', vars)
+	n_vars=#vars
+	get(env, 'fcs', fcs)
+	f=Pred(name, args, info)
+	//debug(['f',vars,fcs])
+	if(Env.get_var(env,name,Var(_,n,type)))
+		debug(['f',args,type])
+		compare_relation(Pair(name,type), args, env, env1, info)
+		//get_prefix(Pred(l, n), list.filter(push_args(env1,env2,args, l, 0), valid), code)
+		list.filter(push_args(env1,env3,args, l, 0), valid, l2)
+		get_prefix(Pred(l, n), l2, code)
+		debug(['predicate-call',name,code,l2])
+		//update arg types
+		is_type(env,name, t)
+		if(t=['Any']) //nothing to update?
+			env2=env3
+		else
+			t=[_|args2]
+			extract_types(env3, args2, type2)
+			t2=Cons('Relation',type2)
+			debug('-')
+			debug([name,t])
+			debug(F2('args',args,args2,type2))
+			debug(env3.vars)
+			update_types(env3,env2,args,args2)
+			debug(env2.vars)
+		
+	elseif(name='export')
+		args=Cons(Id(name2, _), _)
+		debug([name,args])
+		if(list.find(vars, Var(name2, n, _), _))
+			true
+		else
+			throw('exporting unknown (unbound) value')
+		generate_body(env, env1, Host('c','cut',Cons), c1) //backtracing around files doesn't work
+		generate_body(env1, env2, Host('c','halt',Cons), c2)
+		//print(['code',c1,c2])
+		code=And(c1,And(Put(Val(n), 252), c2))
+		//print(['code',code])
+		//env=env2
+	elseif(name='call')
+		//debug(['call',f])
+		//call_(args,args2,name2)
+		args=[Id(name2,_)|a2]
+		args=[a1|a2]
+		debug(['call',name2,a2])
+		if(list.find(vars, Var(name2, n, _), _))
+			y=n
+		else
+			throw('call')
+		f1=And(Host('c','apply1',[a1]),Host('c','apply2',a2))
+		generate_body(env, env2, f1, c1)
+		//code=And(ps,c1)
+		code=And(c1,Call(251))
+		debug(Pair(a1,code))
+		//code=l2
+		//throw(2)
+	else
+		//f=Pred(name, args, info)
+		a=Var(name,n1,type)
+		debug('upval')
+		if(list.find(fcs, a, _)) //using functor as relation
+			print('error: found '+name)
+			custom_throw('cannot find relation '+name, info)
+		elseif(Env.prevs(env,name,a)) //upvalue
+			cut
+			//c1=Var(_,_,type)
+			push_args(env,env0,args, l, 0, ps)
+			make_upval(env0, env2, n1, n)
+			//gen_pred(env, n, code)
+			compare_relation(Pair(name,type), args, env, _, info)
+			get_prefix(Pred(l, n), list.filter(ps, valid), code)
+			cut
+			n=Upvalue(i)/*
+			if(c::ge(i,180))//todo check in other cases
+				debug(Pair('n',i))
+				debug(f)
+				debug(env)
+				c::throw('too many upvalues in function')
+			elseif(c::ge(n_vars,180))
+				debug(f)
+				debug(vars)
+				debug(Pair('n',i,n_vars))
+				c::throw('too many variables in function')
+			else
+				true*/
+		else
+			//debug(Env.vars)
+			debug(f)
+			print('cannot find relation '+name)
+			custom_throw('cannot find relation '+name, info)
+		
+rel is_relation(name, env)
+	if(list.find(Env.vars(env), Var(name,_,type), _) and type=['Relation'|_])
+		true
+	else
+		false
+		
+rel check_relation(name, env, env2,info)
+	debug('--')
+	debug(name)
+	debug(env.vars)
+	if(is_relation(name, env))
+		debug('check')
+		custom_throw(name+' is already defined',info)
+	elseif(list.find(Env.vars(env), Var(name,n,type), _))
+		type=['void'|t]
+		cut
+		//env2=env
+		t0=['Relation'|t]
+		env_update(env,name, Var(name,n,t0), env2)
+		//env_update(env,name, Var(name,_,['Relation'|t]), env2)
+		debug(env2.vars)
+		//throw(2)
+	else
+		env2=env
+		true
+	//is_type(a, 'Relation', env)
+
+rel generate_body(env, env2, Functor f, code)
+	get(env, 'vars', vars)
+	n_vars=#vars
+	get(env, 'fcs', fcs)
+	c::def(f)
+	cut
+	//io.write('-') and debug(Env.vars)
+	//debug(env)
+	if(f!=And(_,_) and f!=And(_,_,_))
+		//debug(['gen',Pair(f, n_vars)])
+		debug_write('- ') and debug(f)
+		//io.write('- ') and print(f)
+		true
+	else
+		true
+	if(f=And(a,b,line))
+		generate_body(env,temp,a,s1)
+		c::def(s1)
+		generate_body(temp,env2,b,s2)
+		code=And(s1,s2,line)
+		
+	elseif(f=And(a,b))
+		generate_body(env,temp,a,s1)
+		c::def(s1)
+		generate_body(temp,env2,b,s2)
+		code=And(s1,s2)
+
+	elseif(f=Cond(a,b,l)) //if(a) b [l]
+		generate_body(env, env2, Cond(And(a,b), l), code)
+		debug(F1(code))
+		
+	elseif(f=Cond(a,l)) //if(a) true [l]
+		get(env,'branch',branch)
+		debug(['-cond',branch])
+		//debug(l)
+		if(branch=1)
+			set(env,'branch',2, env1)
+		else
+			set(env,'branch',1, env1)
+		//debug([2,env_a])
+		generate_body(env1, env_a, a, t1)
+		debug([3,l])//debug(['up',table.get(env_a,'upvals')])
+		generate_cond(l, scond, env_a, env3) //generate else clause//debug(['up2',table.get(env3,'upvals')])
+		if(branch=0) //first cond
+			//debug(Pair(t1, scond))
+			set(env3,'top',[],env_b)
+			set(env_b,'branch',0,env2) //reset it to 0
+			get(env3,'top',t) //env3.top=t //declare vars for branch
+		else
+			env3=env2
+			t=[]
+		code=Cond(t1, scond, t)
+		//debug(['up2',table.get(env2,'upvals')])
+		debug([4,scond])
+		debug(F1(code))
+		//throw(2)
+		
+	elseif(f=Or(a,b))
+		code1=Cond(a,Cons(b,Cons))
+		generate_body(env,env2,code1,code)
+		
+	elseif(f=Rel(name,args,f1))
+		//f2=Id(name,t1) //todo?env1.fcs1
+		//check_relation(name, env,env0, info)
+		bind(env,env1,Id(name,[]),Rel(code1, env3),code, info)
+		Env.new(env_b, env1.fcs, env1)
+		//c::break()
+		push_types(env_b,env_fn,args,type,0,ns)
+		t1=Cons('Relation',type)
+		env_update(env1, name, t1, env5)
+		
+		//calling body
+		generate_body(env_fn,env3,f1,body)
+		put_args(ns,largs)
+		cut
+		//get current type of args within function
+		//push into initial env
+		extract_types(env3, args, type2)
+		t2=Cons('Relation',type2)
+		//debug('-')
+		//debug(F('args',args,type2))
+		//update_types(env4,env5,args,type2)
+		//compare with initial type of function
+		//debug('--')
+		bind_type_(env5,env2,Id(name,[]),t1,t2, info)
+		get(env3, 'vars', vars3)
+		//
+		//debug(env4.vars)
+		//debug(['rel',env2.vars])
+		//halt()
+		
+		size2(vars3,n3)
+		size2(args,n_args)
+		if(body=Cond(a,b))
+			code1=[Pair(name, n_args), [], Cond(a,b,largs), n3]
+		else
+			code1=[Pair(name, n_args), largs, body, n3]
+		true
+		cut
+		//debug(body)
+		//debug('\n\nrel '+name)
+		debug(['->', name, code1, t2])//, env3.consts, env3.vars])
+		//halt()
+		//debug(table.get(env3,'vars'))
+		//debug(table.get(env3,'upvals'))
+		//env2=env1
+	
+	elseif(f=Fact(name, args, info))
+		if(name='functor')
+			code=True
+			c=Var(name2,0,type)
+			args=[Id(name2,_), Id(arg1, arg2)]
+			//args=[h|t]
+			debug(F(arg1,arg2))
+			if(arg2=[])
+				type=[arg1]
+			else
+				list.concat(arg2, [[arg1]], type) //add last name (arg1) to the end of type
+				debug(type)
+			type=Cons(first_type, _)
+			debug(['-',first_type,arg1,arg2,type])
+			//debug(c)
+			Env.push_on(env, 'fcs', c, env1)
+			if(first_type!='Functor')
+				Env.get(env,'types',o)
+				//debug(o)
+				table.set(o,first_type,'Functor',o2)
+				//debug(o2)
+				Env.set(env1, 'types', o2, env2)
+			else
+				env1=env2
+			//env1=env2
+		elseif(list.has(['cut'],name))
+			f1=Host('c',name,args)
+			generate_body(env, env2, f1, code)
+		elseif(name='throw')
+			f1=Host('c','throw',args)
+			generate_body(env, env2, f1, code)
+			args=[c|_]
+			//c::throw(c)
+		else
+			c::throw('fc')
+			
+	elseif(f=Eq(a,b,info))
+		debug(['code',code])
+		bind(env,env_b,a,b,code,info)
+		//bind_type(env_b,env2,a,b)
+		//code=Eq
+		env2=env_b
+		
+	elseif(f=Host('c', name, args))
+		push_args(env,env1,args, l, 0, ps)
+		setup_const(env1,env2,Str('"'+name+'"'),Const(n))
+		c1=Host(l, n)
+		get_prefix(c1, ps, code) //code=Host(l, n)
+		
+	elseif(f=Neq(a,b))
+		l=[a,b]
+		f1=Host('c','neg',l) //volatile?
+		generate_body(env, env2, f1, code)
+	
+	elseif(f=ObjData(obj, name, args, info)) //equivalent to ObjGet(obj, name, l, o), Pred(o, l)
+		debug('-')
+		setup_const(env,env1,Str('"'+name+'"'),Const(n1))
+		if(Env.get_var(env1,obj,Var(_,n,_)))
+			debug(F('push',args,l))
+			push_args(env1,env2,args, l, 0, ps)
+			get_prefix(ObjPred(l, n, n1), list.filter(ps, valid), code)
+			debug(Tuple(code))
+			//env2=env
+		else
+			debug(F('push2',args,l))
+			push_args(env1,env0,args, l, 0, ps)
+			//debug(F2('push2',args,l))
+			cut
+			if(Env.prevs(env,obj,Var(obj,obj_n,_)))
+				make_upval(env0, env2, obj_n, x) //obj is _table
+				code1=ObjPred(l, x, n1) //ObjPred(args,obj:up, name)
+				debug(F(x))
+				get_prefix(code1, list.filter(ps, valid), code)
+			else
+				//debug(Env.vars)
+				//custom_throw('cannot find relation '+name, info)
+				custom_throw('cannot find object '+obj, info)
+	elseif(f=Pred(name, args, info))
+		gen3(env, env2, Functor f, Functor code)	
+
+	elseif(f=ObjGet(obj, name, o))
+		term(env,env1,prefix,o, code2)
+		//term(env,env2,prefix,o, code)
+		//prefix=True
+		//code=True
+		bind(env1,env2,o,o,code, info)
+		print([prefix,code])
+		throw(231)
+	elseif(f=ObjPred(obj, name, args, info)) //equivalent to ObjGet(obj, name, l, o), Pred(o, l)
+		debug('-')
+		cut
+		make_temp(temp)
+		temp=Id(name2,_)
+		s1=Str('"'+name+'"')
+		s=Str('"'+obj+'"')
+		//f1=And(Host('c','get',[s,s1,temp]), Pred(name2,args,info))
+		if(obj='this')
+			//f1=And(ObjData('_table','get',[Id(obj,['Any']),s1,temp],info), Pred(name2,args,info))
+			debug(f1)
+			//debug(env.vars)
+			debug(env)
+			throw(23)
+		elseif(Env.get_var(env,obj,Var(_,_,_)) or Env.prevs(env,obj,Var(obj,_,_)))			
+			//f1=And(ObjData('_table','get',[Id(obj,['Any']),s1,temp],info), Pred(name2,args,info))
+			debug('-')
+			f1=And(Eq(temp,ObjGet(obj,name),info), Pred(name2,args,info))
+			debug(f1)
+			generate_body(env, env2, f1, code)
+			print([prefix,code,env2.vars])
+			//throw(23)
+		else
+			//custom_throw('cannot find relation '+name, info)
+			custom_throw('cannot find object '+obj, info)
+	else
+		gen4(env, env2, f, code)
+
+
+t={
+	'generate_body'=generate_body
+	'generate_world'=generate_world
+	'run'=generate_world
+}
+debug(t)
+export(t)
+t1=['Any']
+debug(t1)
+
+//c::table_set(t5,'code',code,t)
+table.new(nil)
+Env.new(e, [], nil)
+debug(e)
+cut
+f1=Eq(Id('a',t1),Id('b',t1),_)
+//f1=Num(1)
+//f1=Fact('functor',[Id('Cons',t1),Id('Functor',t1)],info)
+generate_body(e,e2,f1,f)
+//f1=Id('a',_)
+//term(e,e2,prefix,f1,f)
+//bind(e,_, Id('a',_), Id('b',_), t)
+//bind_void(e,_, Id('a',_), t)
+debug('')
+debug(e2)
+debug(f)/*
+//debug(t)
+//debug('end')
+//[Put(Val(11), 251), Put(Val(14), 0)]
+
+types.compare_types(t1,['Integer'])*/

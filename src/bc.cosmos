@@ -1,0 +1,1539 @@
+
+require('io',io)
+
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Put, Functor)
+
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+//functor(Size, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+functor(Op, Functor)
+
+functor(Pair, Functor)
+functor(Tuple, Functor)
+functor(Header, Functor)
+functor(HeaderTop, Functor)
+functor(Prev, Functor)
+functor(F, Functor)
+functor(F2, Functor)
+
+functor(Bind, Functor)
+
+functor(Nil, Functor)
+functor(Call, Functor)
+functor(Val, Functor)
+functor(Const, Functor)
+functor(Upvalue, Functor)
+
+functor(Info, Functor Integer Integer)
+
+require('lexer', lexer)
+require('parser2', parser)
+require('whitespacer', whitespacer)
+require('types', types)
+
+rel print(s)
+	if(s=Rel(t,_))
+		io.writeln(Rel(t,'#env'))
+	else
+		io.writeln(s)
+
+rel byte(f, x)
+	pl::put_byte(f, x)
+
+rel integerToBytes(n, l)
+	pl::getInt32(n, l)
+	
+rel custom_throw(msg, info)
+	print(info)
+	info=Info(line, col)
+	logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+
+rel gensym(prefix,s)
+	pl::gensym(prefix,x)
+	pl::atom_string(x,s)
+	
+rel extract(s,x)
+	once string.find(s, ' ', j)
+	string.slice(s, 0, j, name)
+	string.slice(s, j+1, string.size(s), stype)
+	types.string_to_type(stype, type)
+	x=Var(name, 'object', type)
+
+rel extract_type_information(String fname, Functor x)
+	io.open(fname, 'read', f)
+	io.fileReadChar(f, c)
+	if(c!='%')
+		io.writeln('Warning: no type information on file '+fname)
+		x=[]
+	else
+		io.fileReadLine(f, line)
+		if(line='')
+			io.writeln('Warning: blank type information on file '+fname)
+			x=[]
+		else
+			io.close(f)
+			once string.split(line, ';', l)
+			list.map(l, extract, l2)
+			x=l2
+
+/*
+	env methods
+*/
+
+rel env_init(env, vars, fcs, consts, prev)
+	t={}
+	table.set(t,'vars',vars,t1)
+	table.set(t1,'fcs',fcs,t2) //functors
+	table.set(t2,'consts',consts,t3)
+	table.set(t3,'upvals',[],t4)
+	table.set(t4,'branch',0,t5)
+	table.set(t5,'top',[],t6)
+	table.set(t6,'prev',prev, env)
+
+rel env_new(env, fcs, prev)
+	env_init(env, [], fcs, [], prev)
+	
+rel env_size(env, n)
+	table.get(env, 'vars', x)
+	list.size(x, n)
+	
+rel env_vars(env, x)
+	table.get(env, 'vars', x)
+
+rel env_functors(env, x)
+	table.get(env, 'fcs', x)
+	
+rel env_lambdas(env, x)
+	table.get(env, 'consts', x)
+	
+rel env_modules(env, x)
+	table.get(env, 'modules', x)
+	
+rel has(Functor l, Any e)
+	if(l=Cons(e, _))
+		true
+	else
+		l=Cons(_, tail)
+		has(tail,e)
+	
+rel env_push(env, f, env2)
+	table.set(env, 'vars', Cons(f, env.vars), env2)
+	
+rel env_push_on(env, String str, f, env2)
+	table.get(env, str, l)
+	table.set(env, str, Cons(f, l), env2)
+	
+rel set_push_top(env, f, env2)
+	table.get(env, 'top', l)
+	table.set(env, 'top', Cons(f, l), env2)
+	
+rel env_push_if_not_found(env, f, env2)
+	vars = env.vars
+	f = Var(name, _ , _)
+	if(list.has(vars, Var(name, _, _)))
+		env2=env
+	else
+		table.set(env,'vars', Cons(f, vars), env2)
+	/*
+rel env_set_lambdas(env, lambdas, env2)
+	env =Cur( [vars, fcs, _, mods], prev)
+	env2 =Cur( [vars, fcs, lambdas, mods], prev)
+*/
+rel env_push_module(env, mod, type_info, env2)
+	/*env = Cur( [vars, fcs, lambda, mods], prev)
+	env2 =Cur( [vars, fcs, lambda, Cons([mod, type_info], mods)], prev)*/
+	env2=env
+	
+/* 
+	env searching
+*/
+
+rel _env_get(env, f)
+	env=Cons(head, _)
+	head=f or
+	env=Cons(_, tail)
+	_env_get(tail, f)
+
+rel _env_get_var(l, a, f)
+	l=Cons(head, _)
+	head=Var(a,_,_)
+	f=head or
+	
+	l=Cons(_, tail)
+	_env_get_var(tail, a, f)
+	
+rel _env_get_mod(env, a, b)
+	env=Cons(head, _)
+	head=[a, b] or
+	
+	env=Cons(_, tail)
+	_env_get_mod(tail, a, b)
+	
+rel env_get_var(env, a, f)
+	_env_get_var(env.vars, a, f)
+	
+rel env_prevs(env, a, f)
+	prev=env.prev
+	_env_get_var(prev.vars, a, f)
+	
+rel env_get_on(	env, str, f)
+	table.get(env, str, l)
+	list.has(l, f)
+	
+rel env_has_var(env, f)
+	env_vars(env, vars)
+	list.has(vars, f)
+	
+rel env_get_types(env, obj, types)
+	env_modules(env, mods)
+	_env_get_mod(mods, obj, types)
+	
+rel env_get_functor(env, a, f)
+	env_functors(env, fcs)
+	_env_get_var(fcs, a, f)
+	
+rel env_get(env, f)
+	env_vars(env, vars)
+	_env_get(vars, f)
+	
+rel find_lib(env, obj_name)
+	list.find(env_vars(env), Lib(_, obj_name), _)
+	
+/* ... */
+
+rel extract_module(name, ts)
+	extract_type_information(name+'.pl', ts)
+	
+rel extract_modules(env, l, env2)
+	if(l=Cons(name, l2))
+		extract_module(name, ts)
+		env_push_module(env, name, ts, env_a)
+		extract_modules(env_a, l2, env2)
+	else
+		env2=env
+		
+Relation extract_type_args
+Relation extract_type
+Relation extract_args
+Relation Any Any Any Any specialize_args
+
+rel is_id(x)
+	x=Id(_,_)
+	
+rel id_var(x, y)
+	x=Id(name, t)
+	y=Var(name, 'local', t)
+	
+rel compare_relation(fvar, args, env, env2, info)
+	fvar=Var(name,_,t1)
+	extract_type_args(args,targs,env)
+	//list.filter(args, is_id, ids)
+	//list.fold(ids, env_push, env, env_a)
+	specialize_args(args,targs,env,env2)
+	t2=Cons('Relation',targs)
+	//io.writeln(t1)
+	//io.writeln(t2)
+	if(types.compare_types(t1,t2))
+		true
+	else
+		msg='calling relation "'+name+'" of type "'+types.type_to_string(t1)+'" as "'+types.type_to_string(t2)+'"'
+		custom_throw(msg,info)
+	
+rel compare_functor(var_fc, args, env, info)
+	var_fc = Var(name, _, t1)
+	extract_type_args(args,targs,env)
+	t2 = Cons('Functor', targs)
+	if(types.compare_types(t1, t2))
+		true
+	else
+		msg='using functor '+name+' of type "'+types.type_to_string(t1)+'" as "'+types.type_to_string(t2)+'"'
+		custom_throw(msg, info)
+
+rel is_type2(a, type, env)
+	env=Cons(head, _)
+	head=Var(a,_,Cons(type, _)) or
+	env=Cons(_, tail)
+	is_type2(a, type, tail)
+	
+rel is_type(a, type, env)
+	is_type2(a, type, env_vars(env))
+
+rel is_functor(a, env)
+	is_type(a, 'FunctorObject', env)
+
+rel is_relation(a, env)
+	is_type(a, 'Relation', env)
+
+rel escape_double_quotes(s1, c_prev, s2)
+	s1=''
+	s2=s1 or
+	
+	string.at(s1, 0, c)
+	c='\"'
+	c_prev!='\\'
+	string.rest(s1, tail)
+	escape_double_quotes(tail, c, s_next)
+	string.concat('\\','\"',ctemp)
+	string.concat(ctemp,s_next,s2) or
+	
+	string.rest(s1, tail)
+	string.at(s1, 0, c)
+	escape_double_quotes(tail, c, s_next)
+	string.concat(c, s_next, s2)
+	
+rel extract_type_args(l,ts,env)
+	l=Cons(f1,Cons)
+	ts=Cons(t,Cons)
+	extract_type(env,f1,t) or
+	
+	l=Cons(f1,tail)
+	ts=Cons(t1,t2)
+	extract_type(env,f1,t1)
+	extract_type_args(tail,t2,env) or
+	
+	l=Cons
+	ts=Cons
+
+rel get_args(l,l2,n)
+	l=Cons(_,t1)
+	l2=Cons(n,Cons(n,t2))
+	get_args(t1, t2, n+1) or
+	
+	l=Cons
+	l2=Cons
+	
+rel bind_args(l,l2,n)
+	if(l=Cons(a,t1))
+		if(a=Id(a,_))
+			if(env_get_var(env,name,Var(name,n,ta)))
+				if(loc='object')
+					t=[]
+				else
+					t=[30, n]
+			elseif(env_has_var(env,Lib(_, name))) //name of module
+				gensym('T',c)
+				prefix='Module('+name+','+c+')'
+				s2=c
+		else
+			t=[17, n]
+		l2=Cons(n,Cons(n,t2))
+		get_args(t1, t2, n+1)
+	else
+		l=Cons
+		l2=Cons
+	
+rel byte_array(f,l)
+	if(l=Cons(a,t1))
+		byte(f, a)
+		byte_array(f, t1)
+	else
+		l=Cons
+	
+rel put_args(l,l2)
+	l=Cons(n,t1)
+	l2=Cons(30,Cons(n,Cons(n,t2)))
+	put_args(t1, t2) or
+	
+	l=Cons
+	l2=Cons
+	
+rel put_vars(l,l2)
+	l=Cons(n,t1)
+	l2=Cons(26,Cons(n,Cons(0,t2)))
+	put_vars(t1, t2) or
+	
+	l=Cons
+	l2=Cons
+	
+rel extract_type(env,f,type)
+	if(f=Num(s))
+		if(string.has(s,'.')) //real
+			type=['Real']
+		else //integer
+			type=['Integer']
+	elseif(f=Str(_))
+		type=['String']
+	elseif(f=Id(name, type_id))
+		//print(f)
+		if(type_id!=[]) //type annotation is not empty, this is a declaration
+			type_id=Cons(type_name, _)
+			if(list.has(['Any','Number','Integer','Real','Functor','Relation','String','Table','File'], type_name))
+				type=type_id
+			else
+				logic.throw('"'+type_name+'" is not a type')
+		elseif(env_get(env,fvar)) //variable is already defined
+			fvar=Var(name,_,type_var)
+			//print(fvar)
+			if(type_var=[])
+				type=['Any']
+			elseif(type_var=['FunctorObject'])
+				env_get_functor(env, name, fc_var)
+				fc_var=Var(_,_,type)
+				//type=['Functor']
+			else
+				type=type_var
+			//logic.throw('-')
+		elseif(env_has_var(env,Lib(_, name))) //name of module
+			type=['Table']
+		else //empty type annotation, use Any
+			type=['Any']
+	elseif(f=Func(name, args, info))
+		is_type(name, ftype, env)
+		if(ftype = 'FunctorObject')
+			extract_type_args(args,targs,env)
+			type = Cons('Functor', targs)
+			//check against FunctorObject type
+			env_get_functor(env, name, var_fc) //functor confirmed to be in env
+			compare_functor(var_fc, args, env, info)
+		else
+			type=['Any']
+			/*ftype='Relation'
+			env_get_var(env,name,fvar)
+			fvar=Var(_,_,t1)
+			list.last(t1,type)*/ //gets type of last parameter
+	elseif(f=Func(obj, name, args, info))
+		//is_type(name, ftype, env)
+		if(env_get_types(env, obj, ts) and ts!=[])
+			_env_get_var(ts,name,fvar)
+			fvar=Var(_,_,t1)
+			list.concat(args,['Any'],args2)
+			list.last(t1,type) //gets type of last parameter
+		else
+			type=['Any']
+	elseif(f=Rel(args, _))
+		extract_type_args(args,targs,env)
+		type=Cons('Relation',targs)
+	elseif(f=Op(a,b,op,info))
+		type=['Any']
+	elseif(f=TList(args))
+		extract_type_args(args,targs,env)
+		type = Cons('Functor', targs)
+	elseif(f=TTable(_))
+		type=['Table']
+	else
+		type=['Any']
+	
+rel extract_type_args_and_push_into_env(l,ts,env,env2,n,ns)
+	l=Cons(f1,tail) //check variables
+	ts=Cons(t1,t2) //check types
+	f1=Id(name,_)
+	ns=Cons(n, ns2)
+	extract_type(env,f1,t1)
+	extract_type_args_and_push_into_env(tail,t2,env,env_1,n+1,ns2)
+	env_push(env_1, Var(name,n,t1), env2) or
+	
+	l=Cons
+	ts=Cons
+	ns=Cons
+	env2=env
+
+Relation generate_body
+Relation generate_table
+	
+rel generate_cond2(l, code, env, env2)
+	if(l=Cons(c, l2)) //elseif(c) d
+		generate_body(c,t1,env,env_a)
+		generate_cond2(l2, code1, env_a, env2)
+		code=Cons(t1, code1)
+	elseif(l=Cons)
+		code=[]
+		env2=env
+	
+rel generate_cond(l, code, env, env2)
+	if(l=Cons(c,Cons(d, l2))) //elseif(c) d
+		generate_body(c,t1,env,env_a)
+		generate_body(d,t2,env_a,env_b)
+		s2=And(t1, t2)
+		generate_cond(l2, code1, env_b, env2)
+		code=Cons(s2, code1)
+		/*if(l2=Cons)
+			code=s2
+			env2=env_b
+		else
+			generate_cond(l2, code1, env_b, env2)
+			code=s2+';'+code1*/
+	elseif(l=Cons(c,Cons)) //else c
+		//print('-b')
+		generate_body(c,sc,env,env2)
+		code=[sc]
+	elseif(l=Cons)
+		code=[True]
+		env2=env
+		
+rel specialize_type(env, a, ta, tb, env2)
+	
+	if(a=Id(name,_))
+		if(types.strict_type(ta,tb,tc))
+			env_push_if_not_found(env, Var(name,_,tc), env2)
+		else
+			io.writeln([ta,tb])
+			logic.throw("no strict") //todo: ???
+	else
+		env2=env
+		
+rel specialize_args(l,ts,env,env2)
+	if(l=Cons)
+		env2=env
+	else
+		l=Cons(a,l2)
+		ts=Cons(tb,ts2)
+		extract_type(env,a,ta)
+		specialize_type(env, a, ta, tb, env_a)
+		specialize_args(l2,ts2,env_a,env2)
+	
+//helpers
+	
+rel list_to_and(l, t)
+	if(l=Cons(a,Cons))
+		//print(F(a,t))
+		t=a
+	elseif(l=Cons(a,b))
+		list_to_and(b,t1)
+		t=And(a,t1)
+		
+rel list_to_cons(l, t)
+	if(l=Cons(a,l2))
+		t=Func('Cons', [a, t2], _)
+		list_to_cons(l2, t2)
+	else
+		l=Cons
+		t=Id('Cons', [])
+
+rel get_prefix(f, l, c)
+	if(l=Cons)
+		c=f
+	else
+		l=Cons(a,tail)
+		get_prefix(f,tail,c1)
+		c=And(a, c1)
+		
+rel make_temp(x)
+	math.random(n)
+	string.concat('~',math.realToString(n),s)
+	x=Id(s, [])
+	
+rel make_upval(env, env2, n, x)
+	env_push_on(env,'upvals',n,env2)
+	x=Upvalue(#env.upvals)
+		
+rel setup_const(env,env2, b, f)
+	env_push_on(env, 'consts', b, env2)
+	f=Const(#env.consts)
+		
+//bindings
+	/*
+rel setup_var3(env, env2, name, n)
+	if(list.find(env.vars, Var(name, n, _), _))
+		env2=env
+	else
+		env_size(env, n)
+		env_push(env, Var(name,n,tc), env2)
+	*/
+	
+rel setup_term(env, env2, name, y)
+	//print(Pair('term', name))
+	if(list.find(env.fcs, Var(name,n,_), _)) //functor
+		setup_const(env,env2,Str('"'+name+'"'),Const(n3))
+		y=Func(n3,[])
+		print(y)
+	elseif(list.find(env.vars, Var(name, n, _), _))
+		y=Val(n)
+		env2=env
+	else
+		env2=env
+		y=Var(#env.vars)
+		
+rel setup_var(env, env2, name, x)
+	if(list.find(env.vars, Var(name, n, tc), _)) //variable in env
+		env2=env
+		if(name='_')
+			x=Void(n)
+		else
+			x=Val(n)
+	elseif(env_prevs(env, name, Var(name,n,_))) //upvalue
+		//print(['prev-var',a,n])
+		make_upval(env,env2, n, x)
+	elseif(name='exports')
+		print(name)
+		n=252
+		x=Var(n)
+		env=env2
+	else //new variable
+		n=#env.vars
+		//print(['branch-var', table.get(env,'branch'), n])
+		if(env.branch=0)
+			env_push(env, Var(name,n,tc), env2)		
+			if(name='_')
+				x=Void(n)
+			else
+				x=Var(n)
+		else //re-occurs in branch
+			//print(['new', name, table.get(env,'branch')])
+			env_push(env, Var(name,n,tc), env1)
+			set_push_top(env1, n, env2)
+			x=Val(n)
+	
+rel term(env,env2,prefix,a,f)
+	if(a=Id(name,_))
+		//print(Pair(name, env.vars))
+		if(list.find(env.fcs, Var(name,n,_), _)) //0-arguments functor
+			term(env,env2,prefix,Func(name,[],_),f)
+			//print(['fc',name,f])
+		else
+			setup_var(env, env2, name, f)
+			prefix=True
+	elseif(a=Op(a1,b1,op,info))
+		//print(['op',op])
+		temp=make_temp()
+		temp=Id(name,_)
+		//generate_body(Host('c','add',[a1,b1,temp]),prefix,env,env2)
+		term(env, env1, ps1, a1, x)
+		term(env1, env_a, ps2, b1, y)
+		n1=#env_a.vars
+		env_push(env_a, Var(name, n1, _), env_b)
+		if(op='+')
+			s='add'
+		else
+			s='sub'
+		setup_const(env_b,env2,Str('"'+s+'"'),Const(n))
+		l=[x,y,Var(n1)]
+		t2=And(ps1, And(ps2, Host(l, n)))
+		//list.find(env2.vars, Var(name,n,_), _)
+		prefix=t2
+		f=Val(n1)
+		//print(['vars',l,env2.vars])
+		//print(['consts',env_b.consts,env2.consts])
+	elseif(a=Func(name,args,_))
+		if(list.find(env.fcs, Var(name,n2,_), _)) //term is a functor
+			temp=make_temp()
+			generate_body(Eq(temp, a, _),prefix,env,env2)
+			temp=Id(name2,_)
+			list.find(env2.vars, Var(name2,n,_), _)
+			f=Val(n)
+			//print(['prefix',prefix,temp,f])
+		else //term is a relation in function syntax
+			temp=make_temp()
+			generate_body(And(Pred(name,list.push(args,temp),_), Eq(a, temp, _)),t,env,env2)
+	/*elseif(a=Size(x))
+		temp=make_temp()
+		print(a)
+		list.find(env2.vars, Var('size',n,_), _)
+		generate_body(Pred(n,[x,temp],_),prefix,env,env2)
+		temp=Id(name2,_)
+		list.find(env2.vars, Var(name2,n,_), _)
+		f=Val(n)*/
+		//generate_body(ObjGet(obj,name,temp),prefix,env,env2)
+		//c=Str('"'+name+'"')
+	elseif(a=ObjGet(obj,name))
+		temp=make_temp()
+		print(a)
+		//generate_body(ObjGet(obj,name,temp),prefix,env,env2)
+		//c=Str('"'+name+'"')
+		c=name
+		d=Id(obj,[])
+		print([d,c])
+		/*l=Cons(d,Cons(c,Cons(temp,Cons)))
+		print(l)
+		generate_body(Host('c','table_get',l),prefix,env,env2)
+		temp=make_temp()
+		generate_body(Host('c','table_new',[temp]),prefix,env,env2)
+		temp=Id(name2,_)
+		list.find(env2.vars, Var(name2,n3,_), _)
+		f=Val(n3)*/
+		//print(n3)
+		//print(prefix)
+	elseif(a=TList(args))
+		list_to_cons(args, a1)
+		//print(['list',a1,f])
+		term(env,env2, prefix, a1, f)
+	elseif(a=TTable(args))
+		//list_to_cons(args, a1)
+		temp=make_temp()
+		generate_body(Host('c','table_new',[temp]),prefix,env,env2)
+		temp=Id(name2,_)
+		list.find(env2.vars, Var(name2,n,_), _)
+		f=Val(n)
+		print(['table',temp,f])
+	else
+		setup_const(env,env2, a, f)
+		//print(['const',a,f])
+		prefix=True
+	
+rel bind_const(env,env2,f,t)
+	//bind an atomic const like str or num
+	//outputs its position
+	if(f=Id(name,_))
+		env=env2
+		logic.throw("not a constant")
+	else
+		//print(f)
+		env_push_on(env, 'consts', f, env2)
+		t=#env.consts
+
+rel push_args(env,env2,l,l2,n,p)
+	if(l=Cons(a,t1))
+		term(env,env1,prefix,a,n2)
+		p=Cons(prefix,p2)
+		l2=Cons(n2,t2)
+		push_args(env1,env2,t1, t2, n+1,p2)
+	else
+		l=Cons
+		l2=Cons
+		env2=env
+		p=Cons
+		
+//bind id name to any term
+rel bind_t_term(env,env2, name, b, t)
+	//assign t['a'] : b
+	setup_var(env,env1,name,x)
+	term(env1, env2, prefix, b, y)
+	c=Str('"'+name+'"')
+	t=And(prefix, Bind(c, y))
+	print(['term',t])
+	//print(Pair('consts',env1.consts,env2.consts))
+	
+//bind id name to any term
+rel bind_term(env,env2, name, b, t)
+	setup_var(env,env1,name,x)
+	term(env1, env2, prefix, b, y)
+	//list.push(prefix, Eq(x, y), t1)
+	//list_to_and(t1, t)
+	t=And(prefix, Eq(x, y))
+	print(['term',t,y])
+	print(Pair('consts',env1.consts,env2.consts))
+	
+rel bind(a,b, env,env2,t)
+	if(a=Id(name,_)) //assign a := b
+		//print(['bind',a,b])
+		//first check cases where b is composite
+		if(b=Func(name2,args,_))
+			if(list.find(env.fcs, Var(name2,n2,_), _)) //functor
+				//pl::writeln(env)
+				//print(env.vars)
+				setup_var(env,env1,name,x)
+				setup_const(env1,env3,Str('"'+name2+'"'),Const(n3))
+				push_args(env3, env2, args, l, 0, ps)
+				y=Func(n3,l)
+				list.filter(ps, rel(e) e!=True;, ps2)
+				list.concat(ps2, [Eq(x, y)], t1)
+				list_to_and(t1, t)
+				//print(['fcs',x,l,ps2])
+				//print('')
+			else //relation
+				temp=make_temp()
+				generate_body(And(Pred(name2,list.push(args,temp),_), Eq(a, temp, _)),t,env,env2)
+		elseif(b=Host('c', name, args)) //todo pass it to term
+			push_args(env,env1,args, l, 0, ps)
+			setup_const(env1,env2,Str('"'+name+'"'),Const(n))
+			code=Host(l, n)
+			list.push(ps, code, t1)
+			list_to_and(ps, t)
+		elseif(b=TList(args))
+			//print('list')
+			list_to_cons(args, b1)
+			bind(a, b1, env, env2, t)
+		elseif(b=Op(a1,b1,op,info))
+			bind_term(env,env2, name, b, t)
+			//logic.throw('-')
+		elseif(b=TTable(body))
+			print(a)
+			//setup_const(env,env2, Num('1'), f)
+			setup_var(env,env1,name,x)
+			//generate_table(env1,env2,body,prefix)
+			//print(prefix)
+			//table.get(env,'consts', t)
+			//t=#env.consts
+			//f=Const(n)
+			//Num(2)
+			//Const(0)
+			term(env1,env2,prefix,b,b1) //no prefix needed
+			print([prefix,b1])
+			t=And(prefix, Eq(x, b1))
+		elseif(b=ObjGet(_, _))
+			print(a)
+			setup_var(env,env1,name,x)
+			term(env1,env2,prefix,b,b1) //no prefix needed
+			print([prefix,b1])
+			t=And(prefix, Eq(x, b1))
+		else
+			//setup_var3(env,env1,name,n)
+			setup_var(env,env1,name,x)
+			if(b=Id(name2,_)) //var case, x = y
+				setup_term(env1,env2,name2,y)
+			else //const case, x = c
+				//print('bind const')
+				bind_const(env1,env2,b,code)
+				y=Const(code)
+				
+			t=Eq(x, y)
+			//logic.throw('-')
+	elseif(b=Id(name,_)) //assign b := a
+		bind_const(env,env2,a,code)
+		print('end2')
+
+	/*
+rel bind2(a,b, env,env2,t)
+	put(a, env,env1,t)
+	get(b, env1,env2,t)
+	
+rel generate_table(env, env2, Functor f, Functor code)
+	print('-')
+	print(f)
+	if(f=And(a,b))
+		generate_body(a,s1,env,temp)
+		generate_body(b,s2,temp,env2)
+		code=And(s1,s2)
+			
+	elseif(f=Bracket(f1))
+		generate_body(f1,code0,env,env2)
+		code=code0
+			
+	elseif(f=Eq(a,b,info))
+		//bind(a,b,env,env_b,code)
+		//if(a=Id(name,_))
+		bind_t_term(env,env_b, name, b, code)
+		extract_type(env,a,ta)
+		extract_type(env,b,tb)
+		if(types.compare_types(ta, tb))
+			print(['code',code,ta,tb])
+			specialize_type(env_b, a, ta, tb, env_c)
+			specialize_type(env_c, b, tb, ta, env2)
+			//pl::writeln(['consts',env2.consts])
+		else
+			custom_throw('cannot unify type "',info)//+types.type_to_string(ta)+'" with type "'+types.type_to_string(tb)+'"', info)
+	
+	elseif(f=Rel(name,args,f1))
+		//print('')
+		//print(f)
+		bind(Id(name,[]),Rel(code1, env3),env,env1,code)
+		env_new(env_b, env1.fcs, env1)
+		extract_type_args_and_push_into_env(args,type,env_b,env_fn,0,ns)
+		
+		//calling body
+		generate_body(f1,body,env_fn,env3)
+		put_args(ns,largs)
+		if(body=Cond(a,b))
+			code1=[Pair(name, #args), [], Cond(a,b,largs), #env3.vars]
+		else
+			code1=[Pair(name, #args), largs, body, #env3.vars]
+		
+		io.write('\nrel ') and io.writeln(code1)
+		//print(['->', name, code, env3.consts])//, env3.consts, env3.vars])
+		env2=env1
+		//env_push_on(temp, 'consts', code, env2)
+		
+	elseif(f=True)
+		env2=env
+		code=True
+		
+	else
+		generate_body(env, env2, f, code)
+		*/
+rel generate_body(Functor f, Functor code, env, env2)
+	//print('-') and print(f)
+	//io.write('-') and print(env.vars)
+	if(f=And(a,b))
+		generate_body(a,s1,env,temp)
+		generate_body(b,s2,temp,env2)
+		code=And(s1,s2)
+	
+	elseif(f=Or(a,b))
+		code1=Cond(a,Cons(b,Cons))
+		generate_body(code1,code,env,env2)
+		
+	elseif(f=Cond(a,b,l)) //if(a) b [l]
+		//print(f)
+		generate_body(Cond(And(a,b), l), code, env, env2)
+		
+	elseif(f=Cond(a,l)) //if(a) true [l]
+		//print(['-cond',env.branch])
+		if(env.branch=1)
+			table.set(env,'branch',2, env1)
+		else
+			table.set(env,'branch',1, env1)
+		generate_body(a, t1, env1, env_a)
+		//print('--')
+		generate_cond2(l, scond, env_a, env3) //generate else clause
+		if(env.branch=0) //first cond
+			//print(Pair(t1, scond))
+			table.set(env3,'top',[],env_b)
+			table.set(env_b,'branch',0,env2) //reset it to 0
+			env3.top=t //declare vars for branch
+		else
+			env3=env2
+			t=[]
+		code=Cond(t1, scond, t)
+		//print(code)
+			
+	elseif(f=Bracket(f1))
+		generate_body(f1,code0,env,env2)
+		code=code0
+	
+	elseif(f=Rel(name,args,f1))
+		/*if(is_relation(name, env1))
+			msg='relation "'+name+'" is already defined'
+			logic.throw(msg)*/
+		bind(Id(name,[]),Rel(code1, env3),env,env1,code)
+		env_new(env_b, env1.fcs, env1)
+		extract_type_args_and_push_into_env(args,type,env_b,env_fn,0,ns)
+		
+		//calling body
+		generate_body(f1,body,env_fn,env3)
+		put_args(ns,largs)
+		if(body=Cond(a,b))
+			code1=[Pair(name, #args), [], Cond(a,b,largs), #env3.vars]
+		else
+			code1=[Pair(name, #args), largs, body, #env3.vars]
+		
+		//io.write('\nrun ') and io.writeln(code1)
+		env2=env1
+		//env_push_on(temp, 'consts', code, env2)
+		
+	elseif(f=Pred(name, args, info))
+		if(env_get_var(env,name,Var(_,n,_)))
+			push_args(env,env2,args, l, 0, ps)
+			get_prefix(Pred(l, n), list.filter(ps, rel(e) e!=True;), code)
+		else
+			if(list.find(env.fcs, Var(name,n,_), _)) //using functor as relation
+				print('error: found '+name)
+				custom_throw('cannot find relation '+name, info)
+			elseif(name='export')
+				print(name)
+				args=Cons(Id(name2, _), _)
+				list.find(env.vars, Var(name2, n, _), _)
+				code=Put(Val(n), 252)
+				env=env2
+			elseif(env_prevs(env,name,Var(name,n,_))) //upvalue
+				//print('prev-pred')
+				push_args(env,env0,args, l, 0, ps)
+				list.filter(ps, rel(e) e!=True;, ps2)
+				make_upval(env0, env2, n, x)
+				c1=Pred(l, x)
+				once get_prefix(c1, ps2, code)
+			else
+				//io.writeln(env.vars)
+				print('cannot find '+name)
+				custom_throw('cannot find relation '+name, info)
+				
+	elseif(f=ObjPred(obj, name, args, info)) //equivalent to ObjGet(obj, name, l, o), Pred(o, l)
+		setup_const(env,env1,Str('"'+name+'"'),Const(n1))
+		if(env_get_var(env1,obj,Var(_,n,_)))
+			push_args(env1,env2,args, l, 0, ps)
+			get_prefix(code1, list.filter(ps, rel(e) e!=True;), code)
+			code1=ObjPred(l, n, n1)
+			//env2=env
+		else
+			push_args(env1,env0,args, l, 0, ps)
+			if(env_prevs(env,obj,Var(obj,obj_n,_)))
+				make_upval(env0, env2, obj_n, x)
+				list.filter(ps, rel(e) e!=True;, ps2)
+				code=ObjPred(l, x, n1)
+			else
+				//io.writeln(env.vars)
+				custom_throw('cannot find relation '+name, info)
+	
+	elseif(f=ObjGet(obj,name,b))
+		setup_const(env,env1,Str('"'+name+'"'),Const(n1))
+		if(env_get_var(env1,obj,Var(_,n,_)))
+			env3=env1
+		else
+			if(env_prevs(env1,obj,Var(obj,obj_n,_)))
+				make_upval(env1, env3, obj_n, n)
+			else
+				//io.writeln(env.vars)
+				custom_throw('cannot find relation '+name, info)
+		n2=#env3.vars
+		b=Id(name2, _)
+		env_push(env3, Var(name2,n2,_), env2)
+		code=ObjGet(n, n1, n2)
+	
+	elseif(f=Fact(name, args, info))
+		if(name='functor')
+			code=True
+			args=Cons(Id(arg0,_), Cons(Id(arg1, arg2), Cons))
+			if(arg2=[])
+				type=[arg1]
+			else
+				list.concat(arg2, [[arg1]], type) //add last name (arg1) to the end of type
+			type=Cons(first_type, _)
+			if(first_type!='Functor')
+				custom_throw('type "'+first_type+'" is not a "Functor"', info)
+			//env_push(env, Var(arg0,'object',['FunctorObject']), env_a)
+			env_push_on(env, 'fcs', Var(arg0,0,type), env2)
+		
+	elseif(f=Host('c', name, args))
+		push_args(env,env1,args, l, 0, ps)
+		setup_const(env1,env2,Str('"'+name+'"'),Const(n))
+		code=Host(l, n)
+		
+	elseif(f=Eq(a,b,info))
+		bind(a,b,env,env_b,code)
+		if(types.compare_types(extract_type(env,a), extract_type(env,b)))
+			//print(['code',code])
+			specialize_type(env_b, a, ta, tb, env_c)
+			specialize_type(env_c, b, tb, ta, env2)
+			//pl::writeln(['consts',env2.consts])
+		else
+			custom_throw('cannot unify type "',info)//+types.type_to_string(ta)+'" with type "'+types.type_to_string(tb)+'"', info)
+	
+	elseif(f=Declaration(name, type))
+		//print(f)
+		if(type=Cons('FunctorObject',_))
+			env_push(env, Var(name,#env.vars,type), env_a)
+			env_push_on(env_a, 'fcs', Var(name,'',['Functor']), env2)
+			code=True//'{pass : true}'
+		else
+			print('declaration')
+			//logic.throw('false')
+			//env_push(env, Var(name,'local',type), env2)
+			setup_var(env, env2, name, x)
+			code=Put(x)
+			
+	elseif(f=Inequality(a,b,op,info))
+		push_args(env,env1,[a,b], l, 0, ps)
+		extract_type(env,a,ta)
+		extract_type(env,b,tb)
+		if(types.compare_types(ta, tb))
+			specialize_type(env1, a, ta, tb, env_c)
+			specialize_type(env_c, b, tb, ta, env3)
+			setup_const(env3,env2,Str('"neg"'),Const(n))
+			code=Host(l, n)
+			print(['negation',code,ta,tb])
+			//print(['types',ta,tb,code])
+			//code=Host('c','neg',[a,b]) //''+prefix1+prefix2+fn+'('+sa+','+sb+')'
+		else
+			custom_throw('cannot unify type "',info)//+types.type_to_string(ta)+'" with type "'+types.type_to_string(tb)+'"', info)
+	
+		/*logic.throw('-')
+		if(ta=['Number'] or tb=['Number'] or types.compare_types(ta, tb))
+			if(op='=')
+				code=''+prefix1+prefix2+'{eq:['+sa+','+sb+']}'
+			else
+				//check inequality operator
+				if(op='!=')
+					fn='neq'
+				elseif(op='<')
+					fn='lt'
+				elseif(op='<=')
+					fn='le'
+				elseif(op='>')
+					fn='gt'
+				elseif(op='>=')
+					fn='ge'
+				//check types being compared
+				if(ta=['Integer'] or ta=['Number'])
+					s_op='fd'
+				elseif(ta=['Real'])
+					s_op='r'
+				elseif(tb=['Integer'] or tb=['Number'])
+					s_op='fd'
+				elseif(tb=['Real'])
+					s_op='r'
+				//elseif(ta=['Any'])
+				//	s_op='fd'
+				else
+					if(op='!=')
+						s_op=''
+					else
+						if(ta=['Any'])
+							custom_throw('cannot infer type', info)
+						else
+							custom_throw('not a number', info)
+				code=Host('c','neg',[a,b]) //''+prefix1+prefix2+fn+'('+sa+','+sb+')'
+			specialize_type(env_b, a, ta, tb, env_c)
+			specialize_type(env_c, b, tb, ta, env2)
+		else
+			custom_throw('cannot compare type "'+types.type_to_string(ta)+'" with type "'+types.type_to_string(tb)+'"', info)*/
+		
+	elseif(f=SoftCut(a,b,l))
+		true
+	
+	elseif(f=True)
+		env2=env
+		code=True
+	
+	elseif(f=False)
+		env2=env
+		code=False
+	
+	elseif(f=Once(a))
+		generate_body(a,s1,env,env2)
+		code=Once(s1)
+		
+	else
+		logic.throw('this code broke the compiler')
+	
+/*
+	serializing
+*/
+	
+rel put_fc(a,x,x2)
+	if(a=Val(x2))
+		x=34
+	elseif(a=Var(x2))
+		x=35
+	elseif(a=Void(x2))
+		x=58
+	elseif(a=Const(x2))
+		x=33
+	else
+		print([a,x,x2])
+		logic.throw('not done (functor)')
+	
+rel put(a,x,x2,size)
+	if(a=Val(x2))
+		x=25
+	elseif(a=Var(x2))
+		x=26
+	elseif(a=Void(x2))
+		x=58
+	elseif(a=Const(x2))
+		x=17
+	elseif(a=Upvalue(i))
+		x=25
+		x2=i+size
+	else
+		print([a,x,x2])
+		logic.throw('not done')
+	
+rel push_pred(l,l2,n,w)
+	l=Cons(a,t1)
+	put(a,x,x2,w)
+	l2=Cons(x,Cons(x2,Cons(n,t2)))
+	push_pred(t1, t2, n+1, w) or
+	
+	l=Cons
+	l2=Cons
+	
+rel push_fc(l,l2)
+	l=Cons(a,t1)
+	put_fc(a,x,x2)
+	l2=Cons(x,Cons(x2,t2))
+	push_fc(t1, t2) or
+	
+	l=Cons
+	l2=Cons
+	
+rel write_cond(f, l)
+	if(l=[])
+		true
+	elseif(l=Cons(a,Cons))
+		true
+	else
+		l=Cons(x,b)
+		byte(f,x)
+		//print(fc)
+		write_cond(f, b)
+		
+rel read_inst3(l, i)
+	if(l=Cons(a,t))
+		io.write(a)
+		pl::mod(i,5,x)
+		io.write(', ')
+		if(x=0)
+			io.write('(')
+			io.write(i)
+			io.write(')')
+		read_inst3(t, i+1)
+	else
+		l=Cons
+		
+rel read_inst2(l, i)
+	if(l=Cons(a,t))
+		if(a=52 or a=51)
+			io.write('eq')
+			k=i+2
+			t=Cons(_, Cons(_, b))
+		elseif(a=30 or a=51)
+			io.write('get')
+			k=i+2
+			t=Cons(_, Cons(_, b))
+		elseif(a=12 or a=13)
+			t=Cons(x, Cons(_, Cons(_, Cons(_, b))))
+			io.write('try '+x)
+			k=i+4
+		elseif(a=46 or a=51)
+			t=Cons(x, Cons(_, Cons(_, Cons(_, b))))
+			io.write('jmp '+x)
+			k=i+4
+		else
+			io.write('1')
+			b=t
+		io.write(',')
+		read_inst2(b, k+1)
+	else
+		l=Cons
+		
+rel read_inst(l)
+	io.write('[')
+	read_inst3(l,1)
+	io.writeln('] #'+#l)
+		
+Relation _serialize
+			
+rel _serialize_cond(f, n, size, l0, l, last, branch, elif)
+	//print(f)
+	if(f=Cons(b, tail))
+		n0=#l0
+		temp=#last
+		//jmp to prev+#body1+(halt or jmp)+#[12,x]
+		if(elif=0)
+			first=12
+		else
+			first=13
+		list.concat(list.concat([first], integerToBytes(n+n0+temp+5)), list.concat(l0, last), l1)
+		//n=prev+prev_puts...
+		//n1=body1
+		n1=#l1
+		//print(F(l1, '#'+n1, '#'+n))
+		print(['-else', branch])
+		//print(b)
+		//+5?
+		
+		if(tail=Cons(c, _)) //add elseif
+			_serialize(b, n1+n+5, size, 0, branch, l2) //send current+prev... to get new l2
+			//print(TList(l2, '#'+#l2))
+			_serialize_cond(tail, n1+n, size, l2, l3, last, branch, 1) //send l2 as prev to merge into l3
+			list.concat(l1, l3, l)
+		else //add else
+			_serialize(b, n1+n+1, size, 0, branch, l2) //send current+prev... to get new l2
+			list.concat(list.concat(l1, [14]), list.concat(l2,last), l)
+			list.concat([14], list.concat(l2,last), temp2)
+			//print(F2(temp2, '#'+#temp2))
+			//print(F(l2, '#'+#l2))
+			
+	elseif(f=Cons(b,Cons))
+		logic.throw('???')
+	else
+		f=Cons(b,Cons)
+	
+rel _serialize(f, n, size, next, branch, l)
+	//print(f)
+	if(f=And(a, b))
+		_serialize(a, n, size, 1, branch, l0) //set 1 if there's a following stm
+		//print(Pair(l0, '#'+#l0, '#'+n))
+		_serialize(b, n+#l0, size, 0, branch, l1) //last stm
+		list.concat(l0, l1, l)
+	
+	elseif(f=Cond(a, lc, t))
+		print(['-if', branch+1, t])
+		print(f)
+		put_vars(t, l1)
+		n1=#l1
+		//print(Prev('#'+n,'#'+n1))
+		if(next=1 or branch>=1)
+			//last=[46,n3]
+			list.concat([46],l3,last) //jmp last
+			list.size(l3, 4)
+		else
+			last=[16]
+		//add 5 for branching
+		_serialize_cond(lc, n+n1, size, _serialize(a, n+n1+5, size, 0, branch+1), l2, last, branch+1, 0)
+		n2=#l2
+		integerToBytes(n2+n1+n, l3)
+		print(F('jmp',n2+n1+n,l3))
+		list.concat(l1,l2,l)
+		//debug-only
+		//print(HeaderTop(l1,'#'+n1, l2,'#'+n2, Tuple('#'+n0)))
+		
+	elseif(f=Eq(a,b))
+		put(a,x,x2,size)
+		if(b=Func(args))
+			y=31
+			l0=[x,x2,0,y,251,0, #args]
+			push_fc(args,l1)
+			list.concat(l0,l1,l)
+			//print([b,l1])
+			//print([a,x,x2,l])
+			
+		elseif(b=Func(name,args))
+			y=31
+			l0=[x,x2,0,y,name,0, #args]
+			push_fc(args,l1)
+			list.concat(l0,l1,l)
+			//print([b,l1])
+			//print([a,x,x2,l])
+			
+		else
+			if(b=Val(y2))
+				y=29
+			elseif(b=Var(y2))
+				y=30
+			elseif(b=Const(y2))
+				y=20
+				
+			//using 'eq x,y' instruction
+			if(x=26 and y=20)
+				l=[51,x2,y2] //sets var
+			elseif(x=25 and y=20)
+				l=[52,x2,y2] //sets val
+			else
+				l=[x,x2,0,y,y2,0]
+			
+	elseif(f=Put(a,b))
+		put(a,x,x2,size1)
+		l=[x,x2,b]
+		
+	elseif(f=Put(a))
+		put(a,x,x2,size)
+		l=[x,x2,0]
+		
+	elseif(f=Pred(l1, a))
+		//print('#'+size)
+		push_pred(l1,l2,0,size)
+		//11=Call
+		if(a=Upvalue(i))
+			list.concat(l2, [11,i+size], l)
+		else
+			list.concat(l2, [11,a], l)
+	elseif(f=ObjPred(l1, obj, a))
+		push_pred(l1,l2,0,size)
+		if(obj=Upvalue(i)) //place temp in register 251
+			x=i+size
+			list.concat(l2, [17,a,251, 40,x,list.size(l1), 42,list.size(l1)], l)
+		else
+			list.concat(l2, [17,a,251, 40,obj,list.size(l1), 42,list.size(l1)],l)//[11,a], l) //put_const(a, 11), obj_get, call_reg
+	elseif(f=ObjGet(obj, a, reg))
+		print(f)
+		if(obj=Upvalue(i))
+			x=i+size
+			list.concat(l2, [53,x,a,reg], l)
+		else
+			list.concat(l2, [53,obj,a,reg], l)
+		print(l)
+	elseif(f=ObjGet(obj, a))
+		print(f)
+		if(obj=Upvalue(i))
+			x=i+size
+			list.concat(l2, [17,a,251, 40,x,a], l)
+		else
+			list.concat(l2, [17,a,251, 40,obj,a],l)//[11,a], l) //put_const(a, 11), obj_get, call_reg
+	elseif(f=Host(l1, a))
+		push_pred(l1,l2,0,size)
+		list.concat(l2, [24, a], l)
+		print(l)
+	elseif(f=False)
+		l=[44]
+	else
+		//l=[-99]
+		l=[]
+		
+rel word(f, n)
+	pl::writeInt32(f, n)
+		
+rel code_slash(c)
+	c=92
+	
+rel code_tab(c)
+	c=9
+	
+rel code_nl(c)
+	c=10
+	
+rel tab(c)
+	pl::string_codes(c,[9])
+	
+rel slash(c)
+	pl::string_codes(c,[92])
+	
+rel nl(c)
+	pl::string_codes(c,[10])
+	
+rel cr(c)
+	pl::string_codes(c,[13])
+	
+rel fix_string(s, i, s2)
+	//print(Pair(s,i,#s))
+	if(string.size(s,i))
+		s2=s
+	else
+		string.at(s,i,c)
+		if(slash(c))
+			string.slice(s,0,i,sa)
+			string.at(s,i+1,c1)
+			//print([c, c1])
+			if(c1='t')
+				tab(sb)
+			elseif(c1='r')
+				cr(sb)
+			else
+				nl(sb)
+			string.slice(s,i+2,#s,sc)
+			string.concat(sb,sc,sd)
+			string.concat(sa,sd,s1)
+			fix_string(s1, i+1, s2)
+		else
+			fix_string(s, i+1, s2)
+		
+rel write_string(f, sa)
+	string.slice(sa,1,string.size(sa)-1,sb) //removes outer delimiters
+	fix_string(sb, 0, sc)
+	string.size(sc,n)
+	//print([sc,n])
+	pl::serialize_string(f, sc)
+	
+rel write_upvals(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(x,b)
+		word(f,x)
+		write_upvals(f, b)
+	
+Relation write_consts
+	
+rel serialize_rel(f, l2)
+	//io.write('rel ') and print(f)
+	f=[_, l0, f1, size]
+	//print(Header(l0, '#'+#l0))
+	l2=list.concat(list.concat(l0, _serialize(f1, #l0, size, 0, 0)), [16])
+	print(Pair(l2,'#'+#l2))
+	//read_inst(l2) //debug-only
+	print('')
+	//print(size)
+	
+rel write_rel(f, t, env)
+	//consts, vars, upvals
+	word(f, #env.consts)
+	//print([#env.vars, #env.consts, #env.upvals])
+	write_consts(f, list.reverse(env.consts))
+	//print(env.fcs)
+	word(f, #env.vars)
+	byte(f, #env.upvals)
+	//print(env.upvals)
+	write_upvals(f, list.reverse(env.upvals))
+	once serialize_rel(t, l2)
+	word(f, #l2)
+	byte_array(f, l2)
+	//debug
+	//byte(f, 1)
+	byte(f, 0)
+	//size(name), name, n_args
+	t=[Pair(name,args), _, _, size]
+	//write_string(f, name)
+	if(name='')
+		byte(f, 1)
+		byte(f, 0)
+	else
+		pl::serialize_string(f, name)
+	word(f, args)
+	
+rel write_consts(f, l)
+	if(l=[])
+		true
+	else
+		l=Cons(fc,b)
+		//print(fc)
+		if(fc=Num(a))
+			byte(f, 2)
+			math.stringToNumber(a,c)
+			word(f, c)
+		elseif(fc=Str(a))
+			byte(f, 3)
+			c=#a
+			write_string(f, a)
+		elseif(fc=TList(a))
+			byte(f, 0)
+		elseif(fc=Rel(t, env))
+			byte(f, 4)
+			write_rel(f, t, env)
+		else
+			print(fc)
+			logic.throw(f)
+		write_consts(f, b)
+	
+rel serialize(f, fc)
+	fc=Rel(a, env)
+	//byte(f, 0)	byte(f, 9)	byte(f, 0)
+	write_rel(f, [Pair('::main',0), [], a, #env.vars], env)
+		
+rel generate_chunk(Functor f, code, String module, opts)
+	stdlibs = []//[Lib('table','table'),Lib('list','list'),Lib('string','string'),Lib('math','math'),Lib('io','io'),Lib('logic','logic')]
+	stdvars = []//[Var('Cons','local',['FunctorObject']),Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])]
+	stdfcs = [Var('Cons','local',['Functor']),Var('Cons','',['Functor']), Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']])]
+	if(list.has(opts, '--no-libs'))
+		env_init(env, stdvars, [], [], [])
+	elseif(list.has(opts, '--no-std-libs'))
+		env_init(env, stdvars, stdfcs, [], [])
+	else
+		env_init(env0, list.concat(stdlibs, stdvars), stdfcs, [], [])
+		extract_modules(env0, ['list','table','string','math','io','logic'], env)
+	
+	generate_body(f, code_world, env, env2)
+	code=Rel(code_world, env2)
+	print('\nchunk')
+	//pl::writeln(env)
+	//pl::writeln(env2)
+	//logic.throw('-')
+	//print(code)
+	
+rel generate_query(Functor f, String code, String prefix, Functor query_vars)
+	env_init(env_a, [Lib('list','list'),Lib('table','table'),Lib('string','string'),Lib('math','math'),Lib('io','io'),Lib('logic','logic'),Var('Cons','local',['FunctorObject']),Var('Some','local',['FunctorObject']),Var('None','local',['FunctorObject']),Var('Left','local',['FunctorObject']),Var('Right','local',['FunctorObject'])], [Var('Cons','',['Functor']),Var('Some','',['Functor',['Any']]), Var('None','',['Functor',['Null']]),Var('Left','',['Functor']),Var('Right','',['Functor'])], [], [])
+	extract_modules(env_a, ['list','table','string','math','io','logic'], env_b)
+	if(module='temp')
+		env=env_b
+	else
+		extract_module(module,ts)
+		list.fold(ts, env_push, env_b, env)
+	generate_body(f, s1, env, env2)
+	pl::writeln(env2)
+	//get query variables
+	list.filter(env_vars(env2), rel(x) x=Var(_,'local',Cons(t0,_)) and t0!='FunctorObject';, xx1)
+	list.map(xx1, rel(x,y) x=Var(y,_,_);, xx2)
+	pl::list_to_set(xx2, query_vars)
+	
+rel main(name1)
+	io.readFile(name1, s)
+	io.writeln(s)
+	io.writeln('Running lexer...')
+	lexer.run(s,0,l1)
+	io.writeln('Removing whitespace...')
+	whitespacer.run(l1,l2)
+	pl::writeln(l2)
+	io.writeln('Bytecode... Parsing...')
+	parser.parse_body(l2, _, fc)
+	pl::writeln(fc)
+	io.writeln('Bytecode... Generating code...')
+	//gen.gen_body(fc, _, _, code)
+	//bytecode.generate_bytecode(fc, code)
+	generate_chunk(fc, code, name1, [])
+	//generate_chunk(fc, code, name1, ['--no-libs'])
+	//logic.applyCatch(generate_chunk, [fc, code, name1, []], rel(e) io.write('CosmosError: ') and io.writeln(e) and logic.exit();)
+	//io.writeln(code)
+	io.writeln('Bytecode... Serialize...')
+	//run_bytecode(s, code)
+	f = io.openBinary('out.bc', 'write')
+	//print(code)
+	serialize(f, code)
+	io.close(f)
+	

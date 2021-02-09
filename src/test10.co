@@ -1,0 +1,54 @@
+//cut
+functor(T, Functor)	/*
+rel get(t,o,o2)
+	case
+		t=T(o,o2,_)
+		cut
+	case
+		t=T(_,_,t2)
+		//c::rec(t2,o,o2)
+		get(t2,o,o2)
+
+	
+rel set(t,o,o2,t2)
+	case
+		t=T(e,v,tail)
+		if(e=o)
+			t2=T(o,o2,tail)
+		else
+			set(tail,o,o2,t3)
+			t2=T(e,v,t3)
+	case
+		t2=T(o,o2,t)
+	
+rel set2(t,t2,o,o2)
+	set(t,o,o2,t2)
+	throw('set2')
+	
+new(t)
+set(t,1,2,t2)
+set(t2,1,2,t3)
+get(t2,1,o)
+//rel require(i,i2) c::require(i, i2);
+*/
+rel new(t)
+	t=T
+t={/**/
+	'new'=new
+	
+	rel has(Functor t, Any e)
+		table.get(t,e,x)
+
+	rel push(t, e, Functor l2)
+		table.set(t,e,1,l2)
+
+	rel set(t,e,l2)
+		this.push(t, e, Functor l2)
+		//this.new(e)
+		print(this)
+		//true
+}
+new(o)
+//o=T
+t.set(o,1,o2)
+print(o2)

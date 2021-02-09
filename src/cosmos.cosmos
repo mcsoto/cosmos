@@ -5,16 +5,19 @@ require('lexer', lexer)
 require('parser', parser)
 require('whitespacer', whitespacer)
 require('gen', gen)
+//require('bytecode', bytecode)
+//require('bc', bytecode)
 
 rel run_all(s, x, module, opts)
-	//io.writeln('Running lexer...')
+	io.writeln('Running lexer...')
 	lexer.run(s,0,l)
-	//io.writeln('Removing whitespace...')
+	io.writeln('Removing whitespace...')
 	whitespacer.run(l,l2)
-	//io.writeln('Parsing...')
+	io.writeln('Parsing...')
+	//pl::writeln(l2)
 	parser.parse_world(l2, _, fc)
-	/*pl::writeln(fc)
-	io.writeln('Generating code...')*/
+	//pl::writeln(fc)
+	io.writeln('Generating code...')
 	gen.generate_chunk(fc,x, module, opts)
 
 rel run_query(s, x, prefix, module, query_vars)
@@ -32,6 +35,19 @@ rel run_query(s, x, prefix, module, query_vars)
 	gen.generate_query(fc, x, prefix, query_vars, module)
 	//io.writeln("translated query")
 
+rel run_bytecode(s, code)
+	io.writeln('Running lexer...')
+	lexer.run(s,0,l)
+	io.writeln('Removing whitespace...')
+	whitespacer.run(l,l2)
+	io.writeln('Parsing...')
+	parser.parse_world(l2, _, fc)
+	pl::writeln(fc)
+	io.writeln('Generating code...')
+	//gen.gen_body(fc, _, _, code)
+	//bytecode.generate_bytecode(fc, code)
+	io.writeln(code)
+	
 rel compile_to_file(module, fname2, code, opts)
 	String name1=''+module+'.'+'cosmos'
 	io.readFile(name1, s)
@@ -110,7 +126,7 @@ rel find_flag1(args, flag, name)
 		false
 		
 rel main(args)
-	version = 'Cosmos 0.05 (Abyss) very alpha'
+	version = 'Cosmos 0.08 (Apotheosis of Ophiuchus) ultra alpha prototype'
 	if(find_flag0(args, '-h'))
 		io.writeln(version)
 		io.writeln('\n-h\t\t\tGet help.\n'+'-i\t\t\tOpen interpreter.\n'+'-q [str]\t\tMake query.\n'+'--module [name]\t\tCompile name.cosmos to name.pl\n'+"--no-std-libs\t\tDon't load stdlibs.\n"+'\n  e.g. cosmos --module test -q main(x)   //compile test.cosmos and run `main(x)`')
@@ -122,7 +138,7 @@ rel main(args)
 		if(find_flag0(args, '--main'))
 			list.push(opts,'--main',opts2)
 			compile_module(name, code0, opts2)
-			code = code0 + '\nmain :- current_prolog_flag(argv, A), list_atom_string(A, B), '+name+'_env(T), '+name+'_main(T,B).'
+			code = code0 + '\nmain :- current_prolog_flag(argv, A), list_atom_string(A, B), '+name+'_env(T), '+name+'_main(T,B).\nmain(L) :- '+name+'_env(T), '+name+'_main(T,B).'
 		else
 			compile_module(name, code, opts)
 		//io.writeln('\ncompiled code: '+code)
@@ -140,3 +156,10 @@ rel main(args)
 		interpreter()
 	elseif(find_flag0(args, '-v'))
 		io.writeln(version)
+	elseif(find_flag1(args, '-b', name1))
+		io.writeln("-b")
+		io.readFile(name1, s)
+		io.writeln(s)
+		run_bytecode(s, code)
+
+

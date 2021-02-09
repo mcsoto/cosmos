@@ -1,0 +1,53 @@
+
+require('mutable',mutable)
+
+mutable.new(t)
+mutable.set(t,'on',1)
+
+print2=print
+
+debug={
+	sethook=rel(p)
+		//c::sethook(p)
+		x=1
+		print('-')
+		
+	rel getlocal(i,x)
+		c::getlocal(i,x)
+		
+	rel print(o)
+		if(mutable.get(t,'on',1))
+			print2(o)
+		else
+			true
+		
+	rel switch(i)
+		mutable.set(t,'on',i)
+}
+
+rel parse_call(x)
+	true
+
+rel callbacks()
+	i=2
+	c::getfname(name)
+	print(name)
+	c::getlocal(0,x)
+	c::getlocal(1,x1)
+	debug.getlocal(2,y)
+	c::getnargs(c)
+	print([c,x,x1])
+	//debug.sethook(p)
+	
+callbacks()
+/*
+rel p(x)
+	x=1//+2
+	
+rel callbacks()
+	debug.sethook(1)
+	
+//p(3)
+p(x)
+*/
+export(debug)

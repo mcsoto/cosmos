@@ -1,0 +1,83 @@
+
+
+rel pause()
+	c::read(x)
+	
+
+require('list5', list)
+require('string5', string)
+
+/*	
+rel toString(Any x, String s)
+	once if(pl::is_list(x))
+		list.map(x, toString, l2)
+		list.join(l2, ', ', s0)
+		s = '['+s0+']'
+	elseif(pl::compound(x) and pl::atom_string(atom,'closure') and pl::functor(x, atom, _))
+		s='#relation'
+	elseif(pl::var(x))
+		s = '#var'
+	elseif(pl::is_assoc(x)) //table
+		rel bindingToString(b, s)
+			pl::get_binding(b, key, value)
+			s = toString(key) + ' = ' + toString(value)
+		pl::assoc_to_list(x,l)
+		list.join(list.map(l, bindingToString), ' and ', s0)
+		s = '{'+s0+'}'
+	elseif(pl::atom(x)) 
+		pl::atom_string(x, s0)
+		if(string.slice(s0, 0, 2, 'fc')) //atomic functor
+			string.slice(s0, 2, string.size(s0), s)
+		else //relation
+			s='#relation'
+	elseif(pl::compound(x)) //functor
+		pl::functor_info(x, s0, args)
+		s = string.slice(s0, 2, string.size(s0)) + '(' + list.join(list.map(args, toString), ', ') + ')'
+	elseif(pl::number(x))
+		pl::number_string(x, s)
+	else
+		s=x
+
+rel applyCatch(Relation p, Functor l, Relation q)
+	pl::apply_catch(p,l,q)
+	
+rel listOf(x, Relation p, args, Functor l)
+	pl::list_of(x, p, args, l)
+
+rel between(i, j, x)
+	if(i<j)
+		x=i
+	else
+		between(i+1,j,x)
+rel iterate(Relation p, Integer n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+		
+*/	
+rel type(x,y)
+	c::type(x,y)
+rel instantiated(Any x)
+	c::def(x)
+	
+t={
+	type=type
+	instantiated=instantiated
+	apply=rel(Relation p, Functor l)
+		c::apply2(l)
+		p()
+	rel exit()
+		c::halt()
+	rel halt()
+		c::halt()
+	
+	rel throw(x)
+		c::throw(x)
+		
+	true
+}
+export(t)
+
+

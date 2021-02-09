@@ -22,13 +22,16 @@ rel rawWriteln(Any x)
 rel open(String name, String mode, f)
 	pl::fopen(name,mode,f)
 	
+rel openBinary(String name, String mode, f)
+	pl::fopen_binary(name,mode,f)
+	
 rel close(File f)
 	pl::close(f)
 	
 rel openWrite(String name, File f)
 	pl::fopen(name,'write',f)
 	
-rel fileWrite(File f, String x)
+rel fileWrite(File f, x)
 	pl::write(f,x)
 	
 rel fileRead(File f, String s)

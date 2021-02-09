@@ -1,0 +1,88 @@
+//require('logic', logic)
+
+rel write(Any x)
+	//c::write(logic.toString(x))
+	c::write(x)
+	
+rel writeln(Any x)
+	write(x)
+	write('\n')
+
+rel read(String x)
+	c::read(x)
+/*
+rel rawWrite(Any x)
+	pl::write(x)
+	
+rel rawWriteln(Any x)
+	rawWrite(x)
+	rawWrite('\n')
+	*/
+/* files */
+	/*
+rel open(String name, String mode, f)
+	pl::fopen(name,mode,f)
+	
+rel openBinary(String name, String mode, f)
+	pl::fopen_binary(name,mode,f)
+	
+rel close(File f)
+	pl::close(f)
+	
+rel openWrite(String name, File f)
+	pl::fopen(name,'write',f)
+	
+rel fileWrite(File f, x)
+	pl::write(f,x)
+	
+rel fileRead(File f, String s)
+	pl::fread(f,s)
+	
+rel fileReadLine(File f, String s)
+	pl::fread(f,s)
+	
+rel fileReadChar(File f, String s)
+	pl::read_string(f,1,s)
+	
+rel fileReadAll(File f, String s)
+	pl::fread_all(f,s)
+	*/
+	
+rel open(String name, String mode, f)
+	c::fopen(name,mode,f)
+	
+rel openBinary(String name, String mode, f)
+	c::fopen_binary(name,mode,f)
+	
+rel close(File f)
+	c::close(f)
+	
+/* file utilities */
+
+rel readFile(String name, String s)
+	c::readFile(name, s)
+/*
+rel writeToFile(String name, String s)
+	open(name,'write',f)
+	fileWrite(f,s)
+	close(f)
+
+rel appendToFile(String name, String s)
+	open(name,'append',f)
+	fileWrite(f,s)
+	close(f)
+	
+rel require(i,i2) c::require(i, i2);
+//require('table.bc', table)
+	*/	
+t={
+	'openBinary'=openBinary
+	'readFile'=readFile
+	'write'=write
+	'read'=read
+	'close'=close
+	'writeln'=writeln
+}
+
+//c::table_set(t5,'code',code,t)
+export(t)

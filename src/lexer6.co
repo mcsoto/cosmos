@@ -1,0 +1,251 @@
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+//require('math.bc', math)
+//require('list.bc', list)
+//require('logic.bc', logic)
+require('string.bc', string)
+
+//lexer
+functor(Cons, Functor)
+functor(Token, Functor)
+functor(Info, Functor) //Info(line,column)
+
+rel digit(c)
+	string.lessOrEqual(c,'9')
+	string.lessOrEqual('0',c)
+
+rel letter(c)
+	string.lessOrEqual(c,'z') and string.lessOrEqual('a',c) or
+	string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+
+rel single_quote(c) 
+	string.code(c, 39)
+rel slash(c) 
+	string.code(c, 92)
+rel double_quote(c) 
+	c='\"'
+rel quote(c) 
+	single_quote(c) or double_quote(c)
+rel endline(c)
+	c='\n'
+rel whitespace(c) 
+	c=' ' or c='\t' or c='\n' or c='\r'
+
+rel match_rel2(s,i,i2,f)
+	string.at(s,i,c)
+	f(c) and match_rel2(s,i+1,i2,f) or
+	i=i2
+
+rel match_some(s,i,i2,f)
+	string.at(s,i,c)
+	f(c) and match_rel2(s,i+1,i2,f)
+
+rel match_one(s,i,i2,f)
+	i2=i+1
+	string.at(s,i,c)
+	f(c)
+
+rel match_any(s,i,i2,f)
+	string.at(s,i,c)
+	f(c) and match_any(s,i+1,i2,f) or
+	i=i2
+
+rel match_until(s,i,i2,f)
+	string.at(s,i,c)
+	f(c) and i=i2 or
+	match_until(s,i+1,i2,f)
+
+rel match_string(s,i,i2,str)
+	string.size(str,size)
+	i2=i+size
+	string.slice(s,i,i2,str)
+
+rel navigate_until_asterisk(s,i,i2,info,info2)
+	info=Info(line,col)
+	string.at(s,i,c)
+	if(c='*')
+		i=i2 and info2=info
+	else
+		if(c='\n')
+			info1=Info(line+1, 1)
+		elseif(c='\t')
+			info1=Info(line, col+4)
+		else
+			info1=Info(line, col+1)
+		navigate_until_asterisk(s,i+1,i2,info1,info2)
+	
+//parses comment and updates line/column information
+rel navigate_comment(s,i,i2,info,info2)
+	if(match_string(s,i,x,'//'))
+		info2=info
+		if(string.findIndex(s,'\n',x,i2))
+			true
+		else
+			i2=string.size(s)
+	else
+		match_string(s,i,x,'/*')
+		navigate_until_asterisk(s,x,y,info,info2)
+		match_string(s,y,i2,'*/')
+
+//parses whitespace and updates line/column information
+rel navigate_ws2(String s,Integer i,Integer i2,line,col,info2)
+	if(string.at(s,i,c))
+		if(c='\n')
+			navigate_ws2(s,i+1,i2,line+1,1,info2)
+		elseif(c='\t')
+			navigate_ws2(s,i+1,i2,line,col+4,info2)
+		elseif(c='\r')
+			navigate_ws2(s,i+1,i2,line,col,info2)
+		else
+			whitespace(c)
+			navigate_ws2(s,i+1,i2,line,col+1,info2)
+	else
+		i2=i
+		info2=Info(line,col)
+	
+rel navigate_whitespace(s,i,i2,info,info2)
+	string.at(s,i,c)
+	whitespace(c)
+	info=Info(line,col)
+	if(c='\n')
+		navigate_ws2(s,i+1,i2,line+1,1,info2)
+	else
+		navigate_ws2(s,i+1,i2,line,col,info2)
+		
+//matching relations
+
+rel match_whitespace(s,i,i2)
+	match_some(s,i,i2,whitespace)
+
+rel parse_double_string(s,i,i2)
+	string.at(s,i,c)
+	if(double_quote(c))
+		i=i2
+	elseif(slash(c))
+		parse_double_string(s,i+2,i2)
+	else
+		parse_double_string(s,i+1,i2)
+		
+rel parse_string(s,i,i2)
+	j=i+1
+	string.at(s,i,c)
+	if(double_quote(c))
+		parse_double_string(s,j,j2)
+		i2=j2+1
+	else
+		single_quote(c)
+		match_until(s,j,j2,single_quote)
+		i2=j2+1
+
+rel parse_number(s,i,i2)
+	match_some(s,i,x1,digit)
+	match_string(s,x1,x2,'.')
+	match_some(s,x2,i2,digit) or
+	
+	match_some(s,i,i2,digit)
+
+rel parse_id(s,i,i2)
+	rel p(c) letter(c) or c='_';
+	match_some(s,i,x,p)
+	match_any(s,x,i2,digit)
+	
+//tries to find if word c is in list, if so set c=z
+rel match_list(l,s,z)
+	l=Cons(head, tail)
+	choose(head=s)
+		z=s
+	else
+		match_list(tail, s, z)
+
+rel step(s, Integer i, Integer j, z, info, info2)
+	string.at(s,i,c)
+	/*if(c='\r')
+		io.writeln('-r')
+	else
+		string.code(c, c1)
+		io.write('-')
+		io.write(c)
+		io.write(',')
+		io.write(c1)
+		io.write(' ')*/
+	if(navigate_whitespace(s,i,j,info,info2))
+		z='whitespace'
+	elseif(navigate_comment(s,i,j,info,info2))
+		z='comment'
+	else
+		k=i+1
+		if(match_list(['=',';','(',')','{','}','.',','], c, z))
+			j=i+1
+		elseif(letter(c))
+			match_string(s,i,j,'rel') and z='rel' or
+			match_string(s,i,j,'and') and z='connective' or
+			match_string(s,i,j,'or') and z='connective' or
+			match_string(s,i,j,'true') and z='true' or
+			match_string(s,i,j,'false') and z='false' or
+			match_string(s,i,j,'if') and z='if' or
+			match_string(s,i,j,'case') and z='case' or
+			match_string(s,i,j,'choose') and z='choose' or
+			match_string(s,i,j,'elseif') and z='elseif' or
+			match_string(s,i,j,'else') and z='else' or
+			match_string(s,i,j,'once') and z='once'
+		else
+			match_string(s,i,j,'!=') and z='!=' or
+			match_string(s,i,j,'::') and z='::' or
+			parse_id(s,i,j) and z='id' or
+			parse_number(s,i,j) and z='number' or
+			parse_string(s,i,j) and z='string' or
+			match_string(s,i,j,'<=') and z='<=' or
+			match_string(s,i,j,'>=') and z='>=' or
+			match_list(['+','-','<','>','[',']','/','*','#'], c, z) and j=k or
+			match_one(s,i,j,single_quote) and z='single_quote' or
+			match_one(s,i,j,double_quote) and z='double_quote' or
+			info=Info(line,col)
+			logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') cannot understand character')
+		info=Info(Integer line, Integer col)
+		info2=Info(line, col+j-i)
+		
+rel run2(s,start,l,info,info2)
+	if(true)
+		step(s,start,x,type,info,info1)
+		//string.at(s,start,c)
+		//io.writeln(c)
+		run2(s,x,l0,info1,info2)
+		if(type!='comment')
+			string.slice(s,start,x,lexeme)
+			tk=Token(lexeme, type,info)
+			list.push(l0,tk,l)
+		else
+			l=l0
+	else
+		l=Cons(Token('EOF','EOF',_), Cons)
+		string.size(s,z)
+		z=start
+		info2=info
+	
+rel run(s,start,l)
+	run2(s,start,l,Info(1,1),info2)
+
+
+//f=Info(0, 0)
+//step('a32', 0, i2, z, f, f2)
+//run2('a32', 0, z, f, f2)
+//run2('rel=a', 0, z, f, f2)
+//run2('x=1', 0, z, f, f2)
+//run2('rel', 0, z, f, f2)
+//run('rel = true', 0, z)
+//run('p(a,1) = true', 0, z)
+//run('a+1', 0, z)
+
+//step1('a', 0, z, a, f, f2)
+//print(f2)
+//test('rel', 0, 3, z)
+print(z)
+
+c::table_new(t)
+c::table_set(t,'run',run,t2)
+c::table_set(t2,'step2',step2,t3)
+export(t3)

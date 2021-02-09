@@ -1,0 +1,35 @@
+
+//write('Cosmos 0.12 - Rebirth of Quetzacoatl's Virtual Machina\n')
+//write('> ')
+
+functor(Cons, Functor)
+functor(F, Functor)
+
+f=F
+f2=F(1,2,'a')
+
+print(f2)
+
+print([f,1])
+
+l=Cons(f,Cons(1,Cons))
+//c::lsize(l,n)
+
+print(n)
+
+x=1
+s=2
+
+rel pause()
+	c::read(x)
+
+require('list5.bc', list)
+cut
+list.map(vars, rel(x,s) s='_'+x;, v2)
+
+//And(And(Eq(Var(0)#1, Const(0)#1)#2, Pred([Var(1)#1], 0)#2)#2, Host([Val(1)#1], 1)#2)#2
+//And(And(Eq(Var(0)#1, Const(0)#1)#2, And(Pred([Var(1)#1], 0)#2, Eq(Val(1)#1, Var(2)#1)#2)#2)#2, Host([Var(2)#1], 1)#2)#2
+
+//And(Pred([Var(1)], 0), Eq(Var(2), Val(1))), Host([Val(2)], 1)
+
+//And(Pred([Var(1)], 0), Eq(Val(1)#1, Var(2)#1)#2), 

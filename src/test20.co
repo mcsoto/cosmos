@@ -1,0 +1,107 @@
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+
+//require('string.bc', string)
+
+require('io2.bc', io)
+
+require('lexer.bc', lexer)
+require('parser3.bc', parser)
+
+require('test14.bc', env)
+require('gen.bc', gen)
+
+require('ws2.bc', ws)
+
+require('test18.bc', sel)
+
+rel run(s, s0)
+	//lexer.run(s,0,l)
+	c::lexer(s,l)
+	c::full_print(l)
+	c::info()
+	//c::pause()
+	//c::coll()
+	//c::pause()
+	//c::halt()
+	c::cut()
+	ws.run(l,l4)
+	c::cut()
+	c::ws(l,l2)
+	c::full_print(l2)
+	c::full_print(l4)
+	c::halt()
+	//ws.run(l,l2)
+	print(l)
+	print(l2)
+	//c::full_print(l) and c::full_print(l2)
+	//c::halt()
+	c::info()
+	//c::pause()
+
+	print('parse')
+	parser.parse_body(l2,l3,fc)
+	c::cut()
+	c::full_print(l2)
+	print(fc)
+	c::halt()
+	
+	print('gen')
+	nil=[]
+	env.new(e, nil, nil)
+	//c::pause()
+	gen.generate_body(e, e2, fc, s1)
+	print(s1)
+	c::cut()
+	c::info()
+	//c::halt()
+
+	io.openBinary(s0, 'write', f)
+
+	sel.serialize(f, s1, e2)
+	
+	print(l)
+	print(l2)
+	print(fc)
+	print(e2)
+	print(fc)
+	print(s1)
+	//c::full_print(fc)
+	
+rel comp(name)
+	print(name)
+	s1=name+'.co'
+	//c::break()
+	io.readFile(s1, s)
+	s2=name+'.bc'
+	run(s, s2)
+
+rel test(name)
+	run(s+'.co', s+'.bc')
+	
+print(io)
+
+//io.readFile('test1.cosmos', s)
+//io.readFile('test0.co', s)
+//io.readFile('test5.co', s)
+
+//io.readFile('table.co', s)
+//io.readFile('lexer3.co', s)
+
+//s='rel p(x) x=1; and p(2)'
+//s='test1'
+//s='parser4'
+//s='test'
+s='test6'
+//s='lexer4'
+//s='gen4'
+//cosmos.comp(s)
+
+comp(s)

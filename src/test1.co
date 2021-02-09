@@ -1,0 +1,65 @@
+//functor(Upvalue, Functor Integer)
+//c::require('table.bc', _table)
+/*
+*/
+functor(Cons, Functor)/*
+
+//bc
+rel q(x) x=2;
+
+	//a=10
+
+p(4)
+	
+c::coll()
+
+c::require('list4.bc', list)
+ncall()
+//x=1
+rel print(i) c::print(i);
+c::require('list5.bc', list)
+
+l=[1,2]
+n=#l
+c::print(n)
+print(list.push)
+x=1+2
+print(x)
+t={
+	'run'=run
+}
+export(t)
+*/
+
+//require('table5.bc', table)
+
+t={}
+table.new(t2)
+print(t)
+
+s=''+1
+print(s)
+
+/*
+require('string5.bc', string)
+string.concat('::','s1',s)
+print(s)
+
+t={
+	'a'=1
+}
+
+vars=t['run']
+print(vars)
+t={}
+print(t)
+require('env7.bc', env)
+//nil={}
+print(nil)
+env.new(e, [], nil)
+print(e)
+	
+//i!=1
+//i!=-1
+x=2
+i=-1*/

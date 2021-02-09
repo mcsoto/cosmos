@@ -21,6 +21,8 @@ functor(SoftCut, Functor)
 functor(Host, Functor)
 functor(Once, Functor)
 functor(Declaration, Functor)
+functor(Exclamation, Functor)
+functor(Size, Functor)
 
 functor(Num, Functor)
 functor(Str, Functor)
@@ -37,6 +39,7 @@ require('lexer', lexer)
 require('parser', parser)
 require('whitespacer', whitespacer)
 require('types', types)
+require('table', table)
 
 rel custom_throw(msg, info)
 	info=Info(line, col)
@@ -178,7 +181,7 @@ rel extract_modules(env, l, env2)
 	else
 		env2=env
 		
-Relation extract_type_args
+//Relation extract_type_args
 Relation extract_type
 Relation extract_args
 Relation Any Any Any Any specialize_args
@@ -190,22 +193,34 @@ rel id_var(x, y)
 	x=Id(name, t)
 	y=Var(name, 'local', t)
 	
+rel extract_type_args(l,ts,env)
+	case
+		l=Cons(f1,Cons)
+		ts=Cons(t,Cons)
+		extract_type(env,f1,t)
+	case
+		l=Cons(f1,tail)
+		ts=Cons(t1,t2)
+		extract_type(env,f1,t1)
+		extract_type_args(tail,t2,env)
+	case
+		l=Cons
+		ts=Cons
+
 rel compare_relation(fvar, args, env, env2, info)
-	/*io.writeln('comparing')
-	io.rawWriteln(args)
-	io.rawWriteln(fvar)*/
 	fvar=Var(name,_,t1)
 	extract_type_args(args,targs,env)
 	//list.filter(args, is_id, ids)
 	//list.fold(ids, env_push, env, env_a)
-	specialize_args(args,targs,env,env2)
+	//specialize_args(args,targs,env,env2)
 	t2=Cons('Relation',targs)
 	//io.writeln(t1)
 	//io.writeln(t2)
 	if(types.compare_types(t1,t2))
 		true
 	else
-		msg='calling relation "'+name+'" of type "'+types.type_to_string(t1)+'" as "'+types.type_to_string(t2)+'"'
+		//msg='calling relation "'+name+'" of type "'+types.type_to_string(t1)+'" as "'+types.type_to_string(t2)+'"'
+		msg='calling relation'
 		custom_throw(msg,info)
 	
 rel compare_functor(var_fc, args, env, info)
@@ -288,6 +303,7 @@ rel generate_lambda(code, prefix, temp_functions, module)
 	prefix=''
 	
 rel extract_name(Functor f, String s2, env, env2, String prefix, String module)
+	//io.writeln(f)
 	if(f=Id(name,_))
 		env=env2
 		if(name='Cons')
@@ -378,13 +394,14 @@ rel extract_name(Functor f, String s2, env, env2, String prefix, String module)
 			s2='closure('+c+',Env0)'
 		else
 			if(env_has_var(env, Lib(a,_)))
-				io.writeln('yes')
+				//io.writeln('yes')
 				prefix='obj_get(Env0,"'+a+'","'+b+'",'+c+'),'
 				s2='closure('+c+',Env0)'
 			else
-				io.writeln('no')
+				//io.writeln('no')
 				prefix='normal_get(_'+a+',"'+b+'",'+c+'),'
 				s2=c
+		
 	elseif(f=Func(name,args,info))
 		if(name='Cons')
 			extract_args(args,sb,env,env2,prefix,module)
@@ -420,6 +437,7 @@ rel extract_name(Functor f, String s2, env, env2, String prefix, String module)
 
 	elseif(f=Func(obj,name,args,info)) //ObjFunc
 		//env=env2
+		//io.writeln(obj)
 		if(env_get_types(env, obj, ts) and ts!=[])
 			if(_env_get_var(ts,name,fvar))
 				list.concat(args,['Any'],args2)
@@ -438,6 +456,12 @@ rel extract_name(Functor f, String s2, env, env2, String prefix, String module)
 		prefix2='obj_call2(Env0,"'+obj+'",'+'"'+name+'",'+"["+sargs2+"]),"
 		prefix=prefix1+prefix2
 	
+	elseif(f=Size(a, info))
+		env1=env2
+		extract_name(a,sa,env,env2,prefix1,module)
+		gensym('T',s2)
+		prefix=prefix1+'dynamic_size('+sa+','+s2+'),'
+		
 	elseif(f=TList(args))
 		env=env2
 		extract_list(args,sargs,env,prefix)
@@ -639,8 +663,6 @@ rel generate_cond(l, code, env, env2, module)
 rel specialize_type(env, a, ta, tb, env2)
 	if(a=Id(name,_))
 		if(types.strict_type(ta,tb,tc))
-			//io.writeln('strict type')
-			//io.writeln(tc)
 			env_push_if_not_found(env, Var(name,'local',tc), env2)
 		else
 			io.writeln([ta,tb])
@@ -674,6 +696,7 @@ rel generate_body(Functor f, code, env, env2, module)
 		code='('+code0+')'
 			
 	elseif(f=Eq(a,b,info))
+		//io.writeln(Eq(a,b))
 		extract_name(a,sa,env,env_a,prefix1,module)
 		extract_name(b,sb,env_a,env_b,prefix2,module)
 		extract_type(a,ta,env)
@@ -776,7 +799,7 @@ rel generate_body(Functor f, code, env, env2, module)
 				code=prefix+'obj_call2(Env0,"'+obj+'",'+'"'+name+'",'+"["+sargs+"])"
 			else
 				custom_throw('cannot find module \"'+obj+'"', info)
-	
+		
 	elseif(f=Cond(a,b,l)) //if(a) b [l]
 		generate_body(a, sa, env, env_a, module)
 		generate_body(b, sb, env_a, env_b, module)
@@ -840,6 +863,7 @@ rel generate_world(f, code, env1, env2, module)
 		env_push(env1, fvar, env_a)
 		env_set_lambdas(env_a, lambdas, env2)
 	elseif(f=Fact(name, args, info))
+		c::break()
 		if(name='require')
 			args=Cons(Str(arg0), Cons(Id(arg1,_), _))
 			string.size(arg0, len)

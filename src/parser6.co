@@ -1,0 +1,259 @@
+
+functor(Cons, Functor)
+functor(Tuple, Functor)
+functor(Info, Functor)
+functor(Token, Functor)
+
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+
+rel pause()
+	c::read(x)
+	
+//require('string.bc', string)
+//string lib
+
+rel at(s,i,c)
+	c::at()
+	
+//parser
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Mut, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(ObjGet2, Functor)
+functor(Func, Functor)
+functor(TList, Functor)
+functor(TTable, Functor)
+
+functor(Error, Functor)
+functor(None, Functor)
+
+//gen
+functor(Var, Functor) //Var(name, object|local|args, type)
+functor(Void, Functor)
+functor(Local, Functor)
+functor(Lib, Functor)
+functor(Cur, Functor)
+
+functor(Put, Functor)
+
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(Func, Functor)
+functor(TList, Functor Functor)
+//functor(TTable, Functor Functor)
+functor(Op, Functor)
+	
+/* misc */
+
+rel parse_type(l,tail,type)
+	l = [Token(_,type,_)|tail]
+	
+rel parse_string(l,tail,str)
+	l = [Token(_,str,_)|tail]
+
+rel get_info(l,info)
+	l = [Token(_,_,info)|_]
+	
+rel get_line(l,info1)
+	l = [Token(_,_,info)|_]
+	info=Info(info1,_)
+	
+rel custom_throw(String msg, Functor info)
+	//info=Info(line, col)
+	//logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+	c::throw(msg)
+	
+	
+/* ... */
+
+Relation parse_exp
+rel parse_args(l,tail,f)
+	case
+		parse_exp(l,l1,f1)
+		parse_type(l1,l2,',')
+		parse_args(l2,tail,f2)
+		f=[f1|f2]
+	case
+		parse_exp(l,tail,f1)
+		f=[f1]
+	case	
+		f=[]
+		tail=l
+			
+rel parse_args2(l,tail,f)
+	case
+		parse_exp(l,l1,f1)
+		parse_type(l1,l2,s)
+		if(s='|')
+			parse_exp(l2,tail,f2)
+			f=[f1,Tuple(f2)]
+		elseif(s=',')
+			parse_args2(l2,tail,f2)
+			f=[f1|f2]
+		else
+			false
+	case
+		parse_exp(l,tail,f1)
+		f=[f1]
+	case	
+		f=[]
+		tail=l
+		
+/* expression parsing */
+
+rel parse_obj_get(l,tail,f)
+	l = [Token(a,'id',_),Token(_,'.',_),Token(b,'id',_)| tail]
+	f=ObjGet(a,b)
+	
+rel parse_obj_get2(l,tail,f)
+	l = [Token(a,'id',_),Token(_,'[',_)|l2]
+	parse_exp(l2,l3,f1)
+	l3=[Token(_,']',_)|tail]
+	f=ObjGet2(a,f1)
+	
+rel parse_exp_call(l,tail,f)
+	l = [Token(name,'id',_),Token(_,'(',_)| l2]
+	parse_args(l2,l3,args)
+	l3=[Token(_,')',_)|tail]
+	f=Func(name,args,get_info(l))
+
+rel parse_obj_pred(l,tail,f)
+	l = [Token(obj,'id',_),Token(_,'.',_),Token(a,'id',_),Token(_,'(',_)| l2]
+	parse_args(l2,l3,code_args)
+	l3=[Token(_,')',_)|tail]
+	f=ObjPred(obj,a,code_args,get_info(l))
+
+rel parse_list(l,tail,f)
+	l = [Token(_,'[',_)|l2]
+	parse_args2(l2,l3,args)
+	l3=[Token(_,']',_)|tail]
+	f=TList(args)
+
+Relation parse_body
+
+rel parse_table(l,tail,f)
+	l = Cons(Token(_,'{',_),l2)
+	print('table')
+	//cut
+	//parse_args(l2,l3,args)
+	parse_body(l2,l3,args)
+	//l2=l3
+	print('table=')
+	l3=Cons(Token(_,'}',_),tail)
+	//print(args)
+	//args=[]
+	f=TTable(args)
+/*
+rel parse_table2(l,tail,f)
+	print('table')
+	l = [Token(_,'{',_),Token(_,'}',_)|tail]
+	args=[]
+	f=TTable(args)
+*/
+rel name_list_to_type2(l,l2)
+	if(l=[head])
+		l2=[[head]]
+	else
+		l=Cons(head, tail)
+		name_list_to_type2(tail, tail2)
+		l2=Cons([head], tail2)
+		
+
+//Relation parse_body
+
+rel parse_true(l,tail,f)
+	l = [Token(a,'true',_)|tail]
+	f=True
+
+rel parse_body(l,tail,f)
+	true
+	
+//parse any simple statement
+rel parse_call(l,tail,code)
+	//parse_true(l,tail,code)
+	true
+
+
+/*
+	run
+*/
+
+//require('test9.bc', lexer)
+require('lexer5.bc', lexer)
+//c::cut()
+//lexer.run('rel=a',0, l2)
+//lexer.run('rel=a',0,l)
+//lexer.run('a=b',0,l)
+//s='q.p(a,1,2)'
+//s='x=-1'
+//s='rel p() x=1+a;'
+//s='1+2'
+//print(l)
+s='{}'
+
+require('io5.bc', io)
+//s='x=1 and a=2'
+//io.readFile('test0.co',s)
+//s="p(a,1,2,'a')"
+lexer.run(s,0,l)
+print(['l',l])
+require('ws4.bc', ws)
+ws.run(l,l2)
+c::cut()
+print(['l',l2])
+//parse_eq(l2,l3,f)
+//parse_name(l2,tail,type,f)
+//parse_exp(l2,l3,f)
+//parse_call(l2,l3,f)
+//parse_body(l2,l3,f)
+parse_table(l2,l3,f)
+//parse_body(l2,l3,f)
+//run(l2,l3,f)
+print(['l',f])
+
+//require('table5.bc', table)
+t={
+	'parse_exp'=parse_exp
+	'parse_call'=parse_call
+	'parse_body'=parse_body
+	'run'=run
+}
+print(l)
+print(l2)
+print(l3)
+print(f)
+print(t)
+export(t)
