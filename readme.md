@@ -98,8 +98,6 @@ io.writeln(l2) //[1, 2, 3, 55]
 
 Cosmos adopts principles from (procedural) scripting languages, logic programming and functional programming. You may write using an almost imperative style, this will however compile to logic code.
 
-Cosmos adopts many principles and features that are common in functional programming languages (although the principles apply to *relations* rather than *functions*).
-
 
 Relations
 ----
@@ -182,6 +180,8 @@ rel main()
     list.map(l, math.inc, l2) //l2 is [2, 3, 4]
     list.filter(l, rel(x) x!=3;, l4) //l4 is [1, 2]
 ```
+
+Cosmos adopts many principles and features that are common in functional programming languages (although the principles apply to *relations* rather than *functions*).
 
 Tables
 ----
