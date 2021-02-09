@@ -8,6 +8,7 @@ Cosmos is a modern logic programming language.
 
 _Cosmos 0.12 VM - Alpha version released._
 
+Status
 ---
 
 The language is in testing stage.
@@ -16,8 +17,10 @@ This was published only to release the current code.
 
 Ideally, it'll go:
 
+```
 alpha -> beta (most bugs fixed, no missing features)
 beta -> full (decent performance)
+```
 
 This answers any "when is it done?" questions.
 
@@ -34,6 +37,8 @@ Documentation
 ---
 
 _Wait for it._
+
+See test samples.
 
 Building
 ---
@@ -85,7 +90,7 @@ Although it is a logic programming language, code in this language can look and 
 
 However, it's a declarative language. As such, variables are immutable. Instead of modifying a value we create a new one.
 
-```
+```javascript
 list.push(l, 55, l2) //instead of modifying l, we create a new variable l2
 io.writeln(l)  //[1, 2, 3]
 io.writeln(l2) //[1, 2, 3, 55]
@@ -112,7 +117,7 @@ cosmos -i
 
 If the system picks one answer and it turns out to be invalid, the system will backtrack and pick the other.
 
-```
+```javascript
 rel p(x)
     x=1 or x=2
     
