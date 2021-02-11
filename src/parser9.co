@@ -411,10 +411,7 @@ rel parse_if(l,tail,f)
 	//pl::writeln(cond)
 
 rel parse_case2(l,l1)
-	case
-		l = [Token(_,'case',_)| l1]
-	case
-		l = [Token(_,'cond',_)| l1]
+	l = [Token(_,'case',_)| l1]
 	
 rel parse_case1(l,tail,f)
 	case

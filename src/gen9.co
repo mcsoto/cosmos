@@ -91,7 +91,8 @@ rel halt()
 
 require('env9.bc', Env)
 
-require('list5.bc', list)
+//require('list5.bc', list)
+require('list.bc', list)
 
 require('string5.bc', string)
 
@@ -1023,7 +1024,7 @@ rel var_name(x,y)
 	x=Var(y,_,_)
 
 
-rel gen4(env, env2, Functor f, Functor code)
+rel gen4(env, env2, Functor f, Functor code, info)
 	if(f=Declaration(name, type))
 		debug('declaration')/*
 		if(type=['Relation'|t])
@@ -1059,8 +1060,8 @@ rel gen4(env, env2, Functor f, Functor code)
 		generate_body(env, env2, f1, code)
 	
 	else
-		debug(f)
-		c::throw('cannot compile code')
+		print(f)
+		custom_throw('cannot compile code',info)
 		
 rel gen3(env, env2, Functor f, Functor code)
 	get(env, 'vars', vars)
@@ -1181,7 +1182,11 @@ rel check_relation(name, env, env2,info)
 		env2=env
 		true
 	//is_type(a, 'Relation', env)
-
+rel helper1(a,b)
+	//print([a,b])
+	//rel (a,b) b=And(Fact('cut',[],info),a);
+	b=And(a,Fact('cut',[],info))
+	
 rel generate_body(env, env2, Functor f, code)
 	get(env, 'vars', vars)
 	n_vars=#vars
@@ -1212,7 +1217,16 @@ rel generate_body(env, env2, Functor f, code)
 	elseif(f=Cond(a,b,l)) //if(a) b [l]
 		generate_body(env, env2, Cond(And(a,b), l), code)
 		debug(F1(code))
-		
+			
+	elseif(f=SoftCut(a,b,l)) //if(a) b [l]
+		print(l)
+		a1=And(a,Fact('cut',[],info))
+		list.map(l,helper1,l2)
+		print(l2)
+		//throw(21)
+		generate_body(env, env2, Cond(And(a1,b), l2), code)
+		debug(F1(code))
+	
 	elseif(f=Cond(a,l)) //if(a) true [l]
 		get(env,'branch',branch)
 		debug(['-cond',branch])
@@ -1402,7 +1416,7 @@ rel generate_body(env, env2, Functor f, code)
 			//custom_throw('cannot find relation '+name, info)
 			custom_throw('cannot find object '+obj, info)
 	else
-		gen4(env, env2, f, code)
+		gen4(env, env2, f, code, info)
 
 
 t={

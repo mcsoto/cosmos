@@ -1,0 +1,606 @@
+
+require('string5.bc', string)
+//require('table5.bc', table)
+require('list5.bc', list)
+
+functor(Cons, Functor)
+functor(Token, Functor)
+functor(Info, Functor) //Info(line,column)
+functor(F, Functor)
+functor(F2, Functor)
+
+rel check(s)	
+	if(string.size(s,633))
+		c::halt()
+	else
+		true
+			
+rel debug(s)	
+	true
+			
+rel at(s,i,c)
+	c::at()
+
+rel findIndex(String s1, String s2, Number i, Number pos)
+	c::findIndex(s1, s2, i, pos)
+		
+rel s_find(String s1, String s2, Number pos)
+	findIndex(s1,s2,0,pos)
+	
+//lib
+/* todo
+rel iterate(Relation p, Number n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+*/
+
+rel iterate(p, Number n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+
+rel s_concat(String s,String s2,String s3)
+	c::concat(s,s2,s3)
+		
+//list lib
+
+rel rest(Functor l, Any b)
+	l=Cons(_,b)
+
+rel fold(Functor l, pred, Any a, Any result)
+	if(l=Cons(b,tail))
+		pred(a,b,c)
+		fold(tail, pred, c, result)
+	else
+		l=Cons
+		result=a
+
+//lexer
+rel digit(c)
+	string.lessOrEqual(c,'9')
+	string.lessOrEqual('0',c)
+
+rel letter(c)
+	string.lessOrEqual(c,'z') and string.lessOrEqual('a',c) or
+	string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+
+rel letter2(c)
+	case
+		string.lessOrEqual(c,'z') and string.lessOrEqual('a',c)
+	case
+		string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+	case
+		c='_'
+
+rel single_quote(c) 
+	string.code(c,x)
+	string.code(c, 39)
+rel double_quote(c) 
+	c='\"'
+rel quote(c) 
+	single_quote(c) or double_quote(c)
+rel endline(c)
+	c='\n'
+rel slash(c) 
+	string.code(c, 92)
+rel newline(c)
+	string.code(c, 10)
+rel newline2(c)
+	string.code(c, 13)
+rel tab(c) 
+	string.code(c, 9)
+
+rel whitespace(c) 
+	c=' ' or c='\t' or c='\n' or c='\r'
+
+//matching utilities
+	
+rel match_rel2(s,i,i2,f)
+	if(true)
+		string.at(s,i,c)
+		f(c)
+		match_rel2(s,i+1,i2,f)
+	else
+		i=i2
+
+rel match_some(s,i,i2,f)
+	string.at(s,i,c)
+	f(c) and match_rel2(s,i+1,i2,f)
+
+rel match_one(s,i,i2,f)
+	i2=i+1
+	string.at(s,i,c)
+	f(c)
+
+rel match_any(s,i,i2,f)
+	case
+		string.at(s,i,c)
+		f(c)
+		match_any(s,i+1,i2,f)
+	case
+		i=i2
+
+rel match_until(s,i,i2,f)
+	case
+		string.at(s,i,c)
+		f(c)
+		i=i2
+	case
+		match_until(s,i+1,i2,f)
+
+rel match_string(s,i,i2,str)
+	string.size(str,size1)
+	c::def(i)
+	i2=i+size1
+	string.slice(s,i,i2,str2)
+	c::def(i2)
+	str2=str //todo unnecessary var
+
+//parsing
+	
+rel match_whitespace(s,i,i2)
+	match_some(s,i,i2,whitespace)
+
+rel parse_double_string(s,i,i2)
+	string.at(s,i,c)
+	if(double_quote(c))
+		i=i2
+	elseif(slash(c))
+		parse_double_string(s,i+2,i2)
+	else
+		parse_double_string(s,i+1,i2)
+		
+rel parse_string(s,i,i2)
+	j=i+1
+	string.at(s,i,c)
+	if(double_quote(c))
+		parse_double_string(s,j,j2)
+		i2=j2+1
+	else
+		single_quote(c)
+		match_until(s,j,j2,single_quote)
+		i2=j2+1
+		
+rel parse_number(s,i,i2)
+	match_some(s,i,i2,digit)
+	
+rel parse_id(s,i,i2)
+	match_some(s,i,x,letter)
+	match_any(s,x,i2,digit)
+
+//tries to find if word s is in list, if so set s=z
+rel match_list(l,s,z)
+	l=Cons(head, tail)
+	if(head=s) //choose
+		z=s
+	else
+		match_list(tail, s, z)
+		
+//parses whitespace and updates line/column information
+rel navigate_ws2(String s,Integer i,Integer i2,line,col,info2)
+	if(string.at(s,i,c))
+		if(c='\n')
+			navigate_ws2(s,i+1,i2,line+1,1,info2)
+		elseif(c='\t')
+			navigate_ws2(s,i+1,i2,line,col+4,info2)
+		elseif(c='\r')
+			navigate_ws2(s,i+1,i2,line,col,info2)
+		else
+			whitespace(c)
+			navigate_ws2(s,i+1,i2,line,col+1,info2)
+	else
+		i2=i
+		info2=Info(line,col)
+
+rel navigate_whitespace(s,i,i2,info,info2)
+	string.at(s,i,c)
+	whitespace(c)
+	info=Info(line,col)
+	if(c='\n')
+		navigate_ws2(s,i+1,i2,line+1,0,info2)
+	else
+		navigate_ws2(s,i+1,i2,line,col,info2)
+
+rel navigate_until_asterisk(s,i,i2,info,info2)
+	info=Info(line,col)
+	string.at(s,i,c)
+	if(c='*')
+		i=i2 and info2=info
+	else
+		if(c='\n')
+			info1=Info(line+1, 1)
+		elseif(c='\t')
+			info1=Info(line, col+4)
+		else
+			info1=Info(line, col+1)
+		navigate_until_asterisk(s,i+1,i2,info1,info2)
+	/*
+		case
+			string.findIndex(s,'\n',x,i2) //todo fails on eof
+		case
+			//c::pause()
+			debug(i2)
+			string.size(s,i2)
+			debug(i2)
+			//c::pause()*/
+
+//parses comment and updates line/column information
+rel navigate_comment(s,i,i2,info,info2)
+	if(match_string(s,i,x,'//'))
+		info2=info
+		if(string.findIndex(s,'\n',x,z)) //todo add to trace //fails on eof
+			i2=z
+		else
+			string.size(s,i2)
+			//debug(i2)
+			//c::pause()
+	else
+		match_string(s,i,x,'/*')
+		navigate_until_asterisk(s,x,y,info,info2)
+		//c::info()
+		//c::pause()
+		string.at(s,y,c1)
+		match_string(s,y,i2,'*/') //todo fails
+		c::cut()
+	
+//rel step4(s, i, j, z, c, info)
+rel step5(s, i, j, z, c, info)
+	case
+		l=['<=','>=']
+		string.slice(s,i,i+2,s2) //todo syntax for this
+		match_list(l, s2, z) and j=i+2
+	case
+		l=['+','-','<','>','[',']','/','*','#','_','!']
+		match_list(l, c, z) and	j=i+1
+	case
+		match_one(s,i,j,single_quote)
+		z='single_quote'
+
+rel keywords(s, z)
+	list.has(['rel', 'and', 'or', 'true', 'false', 'if', 'case', 'elseif', 'else', 'choose', 'once'],s)
+	z=s
+	
+rel step1(s, i, j, z, info, info2)
+	c::def(i)
+	cut
+	if(navigate_whitespace(s,i,j,info,info2))
+		z='whitespace'
+		//check(s)
+	elseif(navigate_comment(s,i,j,info,info2))
+		z='comment'
+		//check(s)
+	else
+		string.at(s,i,c)
+		k=i+1
+		l=['=',';','(',')','{','}','.',',','|']
+		if(match_list(l, c, z))
+			j=i+1
+		elseif(letter(c))
+			//c::break()
+			parse_id(s,i,j)
+			string.slice(s,i,j,s2)
+			if(keywords(s2,z))
+				true
+			elseif(s2='cond')
+				z='case'
+			else
+				z='id'
+		else
+			//c::break()
+			//step4(s,i,j,z,c,info)
+			case
+				parse_string(s,i,j)
+				z='string'
+			case
+				parse_number(s,i,j)
+				z='number'
+			case
+				match_string(s,i,j,'!=')
+				z='!=' //todo doesn't work if this goes first
+			case
+				match_string(s,i,j,'::')
+				z='::'
+			case
+				step5(s, i, j, z, c, info)
+			
+		info=Info(line, col)
+		info2=Info(line, col+j-i)
+		//debug(info2)
+
+rel run_tk(tk, type, l0, l)
+	case
+		type!='comment'
+		l=Cons(tk,l0)
+	case
+		l=l0
+
+rel run2(s,start,l,info,info2)
+	case
+		//c::break()
+		//debug([start,string.size(s)])
+		//check(s)
+		step1(s,start,x,type,info,info1)
+		string.at(s,start,c)
+		//io.writeln(c)
+		//debug([start,string.size(s),c])
+		c::cut()
+		run2(s,x,l0,info1,info2)
+		string.slice(s,start,x,lexeme)
+		run_tk(Token(lexeme, type, info), type, l0, l)
+		c::cut()
+	case
+		l=Cons(Token('EOF','EOF',_), Cons)
+		string.size(s,z)
+		cut
+		z=start
+		info2=info
+	case
+		throw('error')
+		
+rel run(s,start,l)
+	//run2(s,start,l,Info(1, 0),info2)
+	run2(s,start,l,Info(1-1, 1),info2)
+	c::cut()
+
+rel test(s,i,j,z)
+	match_string(s,i,j,'rel')
+	z='rel'
+
+/*
+t={
+	'run'=run
+}
+export(t)
+
+f=Info(0, 0)
+//step('a32', 0, i2, z, f, f2)
+//run2('a32', 0, z, f, f2)
+run2('rel=a', 0, z, f, f2)
+//run2('x=1', 0, z, f, f2)
+//run2('rel', 0, z, f, f2)
+//run('rel = true', 0, z)
+//run('p(a,1)+ = true', 0, z)
+//run('a+1', 0, z)
+
+//step1('a', 0, z, a, f, f2)
+//debug(f2)
+//test('rel', 0, 3, z)
+debug(z)
+
+x=''
+//Number s=x
+
+functor(F, Functor Any String)
+y=F(1,x)
+debug(y)
+cut
+*/
+
+//ws
+
+//require('lexer', lexer)
+
+rel find_last_char2(s,c,i,pos)
+	i!=-1
+	if(at(s, i, ci))
+		ci=c
+		pos=i
+	else
+		find_last_char2(s,c,i-1,pos)
+
+rel find_last_char(s,c,pos)
+	s!=''
+	string.size(s,n)
+	find_last_char2(s, c, n-1, pos)
+
+rel remove_from_start(s1,s2,s3)
+	//remove s2 from s1, e.g. remove_from_start('zxc',z') = 'xc'
+	s_find(s1,s2,pos) //might fail if s2 is not found
+	c::cut()
+	string.size(s2,n)
+	string.size(s1,n2)
+	k=n+pos
+	string.slice(s1, k, n2, s3) //s3 = s2[#s2+s.find(s2) : #s] //
+	
+rel remove_prev_inds(s1,ind,s2)
+	fold(ind, remove_from_start, s1, s2)
+
+rel remove_cur_inds(ind, sgoal, n)
+	case
+		fold(ind, s_concat, '', s)
+		s=sgoal
+		n=0
+	case
+		ind=Cons(h,tail)
+		remove_cur_inds(tail, sgoal, i)
+		n=i+1
+
+rel after_nl(a, a2)
+	string.size(a, i)
+	find_last_char(a,'\n',i2)
+	string.slice(a, i2+1, i, a2)
+
+rel push_semicolon(l,l2)
+	l2=Cons(Token(';', ';',_), l)
+
+require('io5.bc',io)
+
+rel pr(l)
+	case
+		l=[Token(a,_,_)|l2]
+		io.write(a)
+		io.write(' ')
+		pr(l2)
+	case
+		l=[]
+	
+rel ws(l, ind, tk_prev, l2)
+	case
+		l=Cons(Token(_,'EOF',_),Cons)
+		if(ind=Cons)
+			l2=l
+		else
+			l2=Cons(Token(';',';',_),l)
+	
+	case
+		//c::del(tk_prev)
+		//not a whitespace
+		l=Cons(h1, t1)
+		h1=Token(a, tk_type,_)
+		tk_type!='whitespace'
+		ws(t1, ind, h1, t2)
+		l2=Cons(h1,t2)
+	
+	case
+		//two whitespace tokens found, ignore the first
+		l=Cons(_, t1)
+		t1=Cons(h2, t2)
+		h2=Token(_, 'whitespace',_)
+		ws(t1, ind, tk_prev, t3)
+		l2=t3
+		
+	case
+		//one whitespace
+		//check if a token needs to be added
+		//update indent
+		l=Cons(h1, t1)
+		h1=Token(a, 'whitespace',info)
+		after_nl(a, a2)
+		l=Cons(_, Cons(Token(_, type_next,_), _)) //l1 <- token(y2), l <- [l1]
+		//l2=t1
+		debug([a2,ind,snew])
+		//c::break()
+		if(type_next='EOF') //end of file, do not add 'and's, add ';'s for the remaining indents
+			list.size(ind,n)
+			t2=t1
+			iterate(push_semicolon, n, t2, l2)
+			//do_semicolons(0,n,t2,l2)
+		else
+			if(remove_prev_inds(a2,ind,snew))
+				//snew is the string of the new indent (if old indent is '\t' and indent is '\t  ', snew is '  ')
+				//if the indent is the same, snew is ''
+				//if it's an unindent, e.g. ('',' ')
+				//it fails
+				debug(['indent', snew])
+				//c::break()
+				if(snew='')
+					//same indent level, ''
+					ind2=ind
+					tk_prev=Token(_, type_prev,_)
+					type_next!=';'
+					type_next!='connective'
+					type_next!='else'
+					type_next!='elseif'
+					type_next!='case'
+					type_prev!=';'
+					type_prev!='{'
+					type_prev!='connective'
+					type_prev!='else'
+					type_prev!='elseif'
+					type_prev!='case'
+					//debug(type_prev)
+					ws(t1, ind2, h1, t2)
+					l2=Cons(Token('and','connective',info), t2)
+				else
+					//more indent
+					snew!=''
+					ind2=Cons(snew, ind)
+					ws(t1, ind2, h1, t2)
+					l2=t2
+			else
+				//unindent
+				debug('unindent')
+				remove_cur_inds(ind,a2,n)
+				iterate(rest, n, ind, ind2)
+				tk_prev=Token(_, type_prev,_)
+				debug(['prev',tk_prev,n])
+				type_next!=';'
+				type_next!='connective'
+				//type_next!='}'
+				type_prev!='connective'
+				type_prev!='else'
+				type_prev!='elseif'
+				type_prev!='case'
+				if (type_prev!=';') //add semicolons, 'and'
+					//type_prev!='}'
+					type_next!='}'
+					type_next!='else'
+					type_next!='elseif'
+					type_next!='case'/*
+					rel neq(x)
+						type_next!=x
+					list.forall(['}','else','elseif','case'],neq)*/
+					debug(1)
+					iterate(push_semicolon, n, Cons(Token('and','connective',info), t2), l2)
+					ws(t1, ind2, h1, t2)
+				elseif(type_prev='}') //also counts as terminator
+					debug(2)
+					l2=Cons(Token('and','connective',info), t2)
+					//l2=t2
+					ws(t1, ind2, h1, t2)
+				elseif(type_prev=';') //already terminated
+					debug(2)
+					l2=Cons(Token('and','connective',info), t2)
+					ws(t1, ind2, h1, t2)
+				else
+					n2=n-1 //math.sub
+					debug([3,n2])
+					iterate(push_semicolon, n2, t2, l2)
+					ws(t1, ind2, h1, t2)
+		
+	case
+		//skip whitespace
+		l=Cons(h1, t1)
+		ws(t1, ind, h1, t2)
+		l2=t2
+
+rel run_ws(l1,l2)
+	if(l1=Cons(Token(_,'whitespace',_), tks_tail)) //remove whitespace at the beginning
+		run_ws(tks_tail, l2)
+		if(l2=[Token('EOF',_,_)])
+			true
+		else
+			debug(l2)
+			//custom_throw('lexer error',_)
+			throw('lexer error')
+	else
+		ws(l1, [], Token('','SOF',_), l2) //SOF=start of file token
+/*
+	run
+*/
+
+rel halt()
+	c::halt()
+
+rel run_all(s,l3)
+	debug("lexer...")
+	run(s, 0, l2)
+	debug(l2)
+	//halt()
+	debug("whitespace...")
+	run_ws(l2,l3)
+	debug(l2)
+	debug(l3)
+	//halt()
+	
+t={
+	'run'=run_all
+}
+export(t)
+cut
+//run_all('a=2',l)
+//s='rel p.p() true;'
+s='x2\nonce x=cond1 and cond <='
+run_all(s,l)/*
+//s='a=2'
+//s='true'
+//s='rel p(x) x=2; and p(x)\n'
+//run_all(s,l)
+//s='x=((1)+2)//a'
+//s='t={\n\tx=\trel()\n\t\tx=1\n}'
+//io.readFile('test8.co',s)*/

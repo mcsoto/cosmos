@@ -904,6 +904,10 @@ Object* check_rel(Object *o2) {
 	}
 }
 
+char* env_name(Env *e0) {
+	return e0->debug!=NULL ? e0->debug->name : "";
+}
+
 void pr_header(Env *e0) {
 	if(e0->debug!=NULL) {
 		printf("%s", e0->debug!=NULL ? e0->debug->name : "");
@@ -1328,7 +1332,10 @@ main:
 	c->cur_trail = trail.size();
 	c->cur_cp = cp;
 	c->last = last;
-	p4("new closure %d(y%du%d)\n", c, e0->n_locals, e0->n_upvals);
+	#ifdef DEBUG
+	printf("new closure ;%d(y%du%d)%d\n", c, e0->n_locals, e0->n_upvals, e0->debug);
+	//printf("%s\n", e0->debug!=NULL ? e0->debug->name : "");
+	#endif
 	//if(e0->n_upvals>250)
 	//if(true)
 		//return;
@@ -1630,14 +1637,12 @@ vm:
 			o = &c->locals[n];
 			o->type = T_REF;
 			o->value.o = o;
-			regs[0] = o;
-			//puts const value n2 into cregister 0
-			o = deref(regs[0]);
-			p4("eq_var:y(%d),c(%d),i:%d\n",n,n2,i);
-			if(!unify(o, &e0->consts[n2])) goto fail;
-			p(displayFormatln(o));
-			//optimize into instruction later
 			o2 = &e0->consts[n2];
+			p4("eq_var:y(%d),c(%d),i:%d; ",n,n2,i);
+			p(displayFormatln(o));
+			p(displayFormatln(o2));
+			if(!unify(o, &e0->consts[n2])) goto fail;
+			//optimize into instruction later
 			check_rel(o2);
 			break;
 			
@@ -1645,34 +1650,18 @@ vm:
 			//puts value of variable into a cregister
 			i16(bc,i,n); i16(bc,i,n2);
 			o = deref(&c->locals[n]);
-			p3("eq_val:y(%d),c(%d)\n",n,n2);
-			regs[0] = o;
-			//puts const value n2 into cregister 0
-			o = deref(regs[0]);
+			p3("eq_val:y(%d),c(%d); ",n,n2);
 			o2 = &e0->consts[n2];
+			p(displayFormatln(o));
+			p(displayFormatln(o2));
 			
 			#ifdef DEBUG
-			p(displayFormat(o)); //puts(' = ');
-			//o2 = &e0->consts[n2];
 			//p(displayFormat(o)); p1(' = ');
 			//p(displayFormatln(o2));
 			#endif
 			if(!unify(o, &e0->consts[n2])) goto fail;
 			//optimize into instruction later
-			if(o2->type==T_REL) {
-				e = o2->value.e;
-				if(e->n_upvals > 0) {
-					//p2("upvals: %d\n",e->n_upvals);
-					e->upvalues = new Object[e->n_upvals];
-					for(int i=0;i<e->n_upvals;++i) {
-						e->upvalues[i] = c->locals[e->upvals[i]];
-						//p2("(i=y%d) ",i);	//printf("(u%d=c%d) ",i,e->upvals[i]);
-						//p(displayFormatln(&e->upvalues[i]));
-					}
-					//p1("\n");
-				}
-			}
-			//p(displayFormatln(o));
+			check_rel(o2);
 			break;
 			
 		case OBJ_GET_TEMP:

@@ -13,6 +13,8 @@ helper files (unix-only):
 
 12.co uses gen9.co, which was compiled with 10.co, which uses gen5.co, and so on. 
 
+0 -> 10 -> 12 -> 2(?)
+
 comp.js is only for comparison (a vm written in a non-C language), it is not maintained
 
 the code is written in a C-style on purpose, with a few C++ features, so as to (possibly) be C-compatible later. this won't happen, though. do not complain about this.

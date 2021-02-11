@@ -135,11 +135,8 @@ When a relation is nested, the last parameter is hidden.
 rel double(x, y)
     y = x*2
 
-io.writeln(double(3)) //this will print 6
 double(4,x) //x is 8
 ```
-
-Logic-wise, `double(4,x)` is read as a statement: "the double of 4 is x".
 
 Relations may adopt function syntax. When nesting, for example,
 
@@ -147,6 +144,9 @@ Relations may adopt function syntax. When nesting, for example,
 print(double(3)) //this will print 6
 ```
 
+Logic-wise, `double(4,x)` is read as a statement: "the double of 4 is x".
+
+`double(4)` reads as a function; "the double of 4".
 
 Functors
 ----
@@ -254,9 +254,11 @@ Details
 
 With the advent of the Cosmos 0.12 VM,
 - It's still in alpha.
+- It does not rely on other languages to build.
 - C++ VM released. Parser is still built in Cosmos(!) itself.
 - The VM is based on the WAM, as it provides a set of bytecode instructions for Prolog. Temporary variables are not used. See original WAM paper.
 - The parser makes use of an intermediary language, "CWAM". `Put(Var(0), 1)` translates to `put_variable 0,1`.
 - This has missing features, however, it's already more than (raw) Prolog. Again, this was uploaded only to give the language a basis.
 - It has its own license.
+- Does not rely on other Prolog implementations.
 - For language samples, see test examples.
