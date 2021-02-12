@@ -15,7 +15,7 @@ rel check(s)
 	else
 		true
 			
-rel debug(s)	
+rel debug(s)
 	true
 			
 rel at(s,i,c)
@@ -412,7 +412,7 @@ rel remove_prev_inds(s1,ind,s2)
 
 rel remove_cur_inds(ind, sgoal, n)
 	case
-		fold(ind, s_concat, '', s)
+		fold(ind, string.concat, '', s)
 		s=sgoal
 		n=0
 	case
@@ -591,7 +591,7 @@ rel run_all(s,l3)
 t={
 	'run'=run_all
 }
-export(t)
+//export(t)
 cut
 //run_all('a=2',l)
 //s='rel p.p() true;'

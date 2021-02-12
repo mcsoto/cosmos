@@ -1,3 +1,5 @@
+//unmaintained
+
 functor(Var, Functor) //Var(name, object|local|args, type)
 functor(Local, Functor)
 functor(Lib, Functor)

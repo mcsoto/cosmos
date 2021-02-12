@@ -3,8 +3,6 @@ functor(Info, Functor)
 
 /* misc */
 
-require('list5.bc', list)
-
 require('string5.bc', string)
 
 require('io5.bc', io)
@@ -17,9 +15,7 @@ rel custom_throw(String msg, Functor info)
 	//c::throw('(line '+line+', col '+col+') '+msg)
 
 t={
-	'generate_body'=generate_body
-	'generate_world'=generate_world
-	'run'=generate_world
+	'custom_throw'=custom_throw
 }
 export(t)
-print(t)
+//print(t)

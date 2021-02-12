@@ -216,7 +216,7 @@ c::args(args)
 rel main(args)
 	cut
 	version = "Cosmos 0.12 alpha - Rebirth of Quetzacoatl's Virtual Machina"
-	if(find_flag0(args, '-i'))
+	choose(find_flag0(args, '-i'))
 		print(version)
 		interpreter()
 	elseif(find_flag1(args, '-c', name))
@@ -225,7 +225,7 @@ rel main(args)
 		run_bytecode(name+'.bc')
 	elseif(find_flag0(args, '-h'))
 		io.writeln(version)
-		io.writeln('\n-h\t\t\tGet help.\n'+'-i\t\t\tOpen interpreter.\n'+'-q [str]\t\tMake query.\n'+'-l [name]\t\tCompile name.co to name.bc, run name.bc.\n'+"--no-std-libs\t\tDon't load stdlibs.\n"+'\n  e.g. cosmos -l test -q main(x)   //compile test.co and run `main(x)`')
+		io.writeln('\n-h\t\t\tGet help.\n'+'-i\t\t\tOpen interpreter.\n'+'-q [str]\t\tMake query.\n'+'-l [name]\t\tCompile name.co to name.bc, run name.bc.\n'+'-c [name]\t\tCompile name.co to name.bc.\n'+'-b [name]\t\tRun bytecode file name.bc.\n'/*+"--no-std-libs\t\tDon't load stdlibs.\n"*/+'\n  e.g. cosmos -l test -q main(x)   //compile test.co and run `main(x)`')
 	elseif(find_flag1(args, '-l', name))
 		s1=name+'.bc'
 		compile_to_file(name)
@@ -250,6 +250,7 @@ rel main(args)
 		exec('./q.exe')
 	elseif(find_flag0(args, '-v'))
 		print(version)
+		false
 	else
 		print('No argument given.')
 

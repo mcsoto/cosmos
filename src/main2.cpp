@@ -23,8 +23,6 @@ int main(int argc, char* argv[]){
 		}
 	}
 	else {
-		//e0 = read_file("out.bc");
-		//e0 = read_file("test.bc");
 		e0 = read_file("nil.bc");
 	}
 	

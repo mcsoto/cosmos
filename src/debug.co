@@ -1,6 +1,8 @@
 
 require('mutable',mutable)
 
+functor(Cons, Functor)
+
 mutable.new(t)
 mutable.set(t,'on',1)
 

@@ -7,7 +7,7 @@ functor(Cons, Functor)
 //a=1
 
 //parse any simple statement
-/*
+
 rel parse_call(x)
 	case
 		x=1
@@ -24,14 +24,6 @@ if(y=1)
 else
 	x=3
 
-c::coll()
-
-rel s_slice(String s, Integer n, Integer n2, String s2)
-	c::slice(s,n,n2,s2)
-c::table_new(t0)
-c::table_set(t0,'p',p,t)
-//export(t)
-
 
 c::coll()
 
@@ -43,50 +35,7 @@ parse_call(2)
 
 
 x=2
-	
 
-functor(Info, Functor)
-f=Info(2,1)
-
-rel p()
-	print('hook')
-
-c::print(2)
-*/
-debug={
-	getnargs=rel(c)
-		c::getnargs(c)
-	sethook=rel(p)
-		c::sethook(p)
-		//print('set hook')
-		
-	rel getlocal(i,x)
-		c::getlocal(0,x)
-	rel getfname(name)
-		c::getfname(name)
-}
-
-rel q()
-	true
-
-rel p()
-	print('hook')
-	debug.getfname(s)
-	print(s)
-
-rel callbacks()
-	i=2
-	c::getfname(name)
-	print(name)
-	c::getlocal(0,x)
-	c::getlocal(1,x1)
-	debug.getlocal(2,x2)
-	c::getnargs(c)
-	//c::getnlocals(c)
-	print([c,x,x1,x2])
-	debug.sethook(p)
-	
-callbacks()
 /*
 rel p(x)
 	x=1//+2
@@ -170,4 +119,3 @@ fcs=env.fcs
 c::print(fcs)
 */
 //print('hook')
-q()

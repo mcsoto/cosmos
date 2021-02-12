@@ -363,17 +363,9 @@ rel setup_new_var2(env, env2, name, CVal x, tc)
 		push_top(env1, n, env2)
 		x=Val(n)
 	
-rel reverse(Functor l, Functor l2)
-	if(l=Cons(a,tail))
-		reverse(tail, ltemp)
-		list.concat(ltemp, Cons(a,Cons), l2)
-	else
-		l=Cons
-		l2=Cons
-	
 rel make_upval(env, env2, n, x)
 	get(env,'upvals',upvals)
-	reverse(upvals,upvals2)
+	list.reverse(upvals,upvals2)
 	if(list.find(upvals2, n, n2))
 		debug(['up',upvals, n])
 		env2=env
@@ -1185,8 +1177,12 @@ rel check_relation(name, env, env2,info)
 rel helper1(a,b)
 	//print([a,b])
 	//rel (a,b) b=And(Fact('cut',[],info),a);
-	b=And(a,Fact('cut',[],info))
-	
+	if(a=And(a1,a2))
+		b=And(a1,And(Fact('cut',[],info),a2))
+	else
+		b=And(Fact('cut',[],info),a)
+	//print([a,b])
+			
 rel generate_body(env, env2, Functor f, code)
 	get(env, 'vars', vars)
 	n_vars=#vars
@@ -1219,10 +1215,10 @@ rel generate_body(env, env2, Functor f, code)
 		debug(F1(code))
 			
 	elseif(f=SoftCut(a,b,l)) //if(a) b [l]
-		print(l)
+		//print(l)
 		a1=And(a,Fact('cut',[],info))
 		list.map(l,helper1,l2)
-		print(l2)
+		//print(l2)
 		//throw(21)
 		generate_body(env, env2, Cond(And(a1,b), l2), code)
 		debug(F1(code))

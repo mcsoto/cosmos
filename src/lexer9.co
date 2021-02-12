@@ -314,6 +314,9 @@ rel step1(s, i, j, z, info, info2)
 				match_string(s,i,j,'case')
 				z='case'
 			case
+				match_string(s,i,j,'cond')
+				z='case'
+			case
 				match_string(s,i,j,'elseif')
 				z='elseif'
 			case
@@ -553,8 +556,10 @@ rel ws(l, ind, tk_prev, l2)
 					type_next!='}'
 					type_next!='else'
 					type_next!='elseif'
-					type_next!='case'
-					//list.forall(['}','else','elseif','case'],rel(x) x!=type_next;)
+					type_next!='case'/*
+					rel neq(x)
+						type_next!=x
+					list.forall(['}','else','elseif','case'],neq)*/
 					debug(1)
 					iterate(push_semicolon, n, Cons(Token('and','connective',info), t2), l2)
 					ws(t1, ind2, h1, t2)

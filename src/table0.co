@@ -43,6 +43,9 @@ rel get2(t,o,o2)
 	if(get(t,o,o2))
 		cut
 	else
+		print('-')
+		print(t)
+		print(o)
 		throw("variable not found in module")
 	
 c::table_new(t0)
