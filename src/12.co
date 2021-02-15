@@ -13,7 +13,7 @@ rel each2(l,p)
 		p(e,e2)
 		each2(l2,p)
 
-each2(['lexer9.bc', lexer,'parser9.bc', parser,'gen9.bc', gen,'env7.bc', env,'io5.bc', io,'serialize9.bc', sel],require)
+each2(['lexer9.bc', lexer,'parser9.bc', parser,'gen9.bc', gen,'env7.bc', env,'io5.bc', io,'serialize9.bc', sel,'list',list],require)
 //require In In
 //already defined
 _prefix='c::cut() and rel print(i) c::print(i); and rel require(i,i2) c::require(i, i2);\n'
@@ -79,7 +79,14 @@ rel comp(name)
 	//s0='functor(Cons, Functor) and functor(Pair, Functor) and functor(Tuple, Functor)\nrel print(i) c::print(i); and rel require(i,i2) c::require(i, i2); and rel halt(i) c::halt(i);\n'
 	//s0=''
 	s0="c::require('table9.bc', _table) and c::require('table5.bc', table)\n"
-	run(s0+_prefix+s, e, e2, fc,l)
+	c::args(args)
+	if(list.has(args,'--no-std'))
+		s1=s0
+		print('std')
+		//c::halt()
+	else
+		s1=s0+_prefix
+	run(s1+s, e, e2, fc,l)
 	io.openBinary(name+'.bc', 'write', f)
 	sel.serialize(f, fc, e2)
 	c::cut()

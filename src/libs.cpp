@@ -8,10 +8,12 @@ static FILE *in=stdin, *out=stdout;
 #define prep(X) do { o = regs[0]; } while (0)
 #define prep2(X) do { o = regs[0]; o2 = regs[1]; } while (0)
 #define prep3(X) do { o = regs[0]; o2 = regs[1]; o3 = regs[2]; } while (0)
+#define prep4(X) do { o = regs[0]; o2 = regs[1]; o3 = regs[2]; o4 = regs[3]; } while (0)
 #define d3(X) do { o = regs[0]; o2 = regs[1]; o3 = deref(regs[2]); } while (0)
 #define fcvalue(o) (Functor*)o->value.fc
+#define ivalue(o) o->value.i
 
-//#define eq_s(o1,V) do { Object* o=new Object; sets(o,V); trail_push(o); unify(o1,o); } while (0)
+//#define eqs(o1,V) do { Object* o=new Object; sets(o,V); trail_push(o); unify(o1,o); } while (0)
 //#define eq_s(o1,V,c) do { Object* o=new Object; sets(o,V); trail_push(o); unify(o1,o); } while (0)
 //#define eq_s(o1,V,c) do { Object* o=new Object; sets(o,V); trail_push(o); c=unify(o1,o); } while (0)
 
@@ -73,8 +75,7 @@ int require() {
 		/* call upon a function */
 		co_execute();
 		p2("\nend require %s\n\n",s);
-		if(regs[252]->type==T_NULL)
-			throw "required file has no export value";
+		//if(regs[252]->type==T_NULL) throw "required file has no export value";
 		unify(o2,regs[252]);
 		#ifdef DEBUG
 		printf("value = ");
@@ -93,8 +94,6 @@ int require() {
 	e0 = e;
 	p1("\n");
 }
-
-static Closure* saved_c;
 
 int eval_file() {
 	prep2();
@@ -116,10 +115,6 @@ int export_c() {
 	regs[252] = regs[0];
 }
 
-Functor* cons() {
-	Functor* fc = new Functor();fc->n=2;fc->name="Cons";
-	return fc;
-}
 /*
 Functor* list_to_fc() {
 	return fc;
@@ -173,9 +168,9 @@ int set() {
 }
 
 int table_new() {
-	o2=regs[0];
-	o2->type = T_OBJ;
-	o2->value.t = new Table;
+	prep();
+	o->type = T_DATA;
+	o->value.t = new Table;
 }
 
 int arg() {
@@ -207,6 +202,18 @@ int get_args() {
 	fc->n=0;
 }
 
+int fc_get() {
+	prep3();
+	Functor* fc = fcvalue(o);
+	unify(o3,fc->param[(int)ivalue(o2)]);
+}
+
+int fc_size() {
+	prep2();
+	Functor* fc = fcvalue(o);
+	unify(o2,fc->n);
+}
+
 static Closure *c1;
 //static ChoicePoint *c1;
 //static Env *e;
@@ -215,9 +222,6 @@ static Closure *c0;
 
 static char** arr;
 
-int closure() {
-	pr_locs(saved_c);
-}
 
 int locs() {
 	Closure* c=saved_c;
@@ -261,29 +265,58 @@ int sethook() {
 }
 
 int get_nargs() {
-	prep2();
+	prep();
+	o2=new Object;
 	seti(o2,c->e->n_args);
+	printf("%d\n",c->e->n_args);
 	unify(o,o2);
 }
 
+int get_nlocs() {
+	prep();
+	o2=new Object;
+	seti(o2,c->e->n_locals+c->e->n_upvals);
+	unify(o,o2);
+	pr_locs(c);
+}
+
 int get_local() {
+	prep3();
+	Closure* c=(Closure*)(o->value.data);
+	displayFormatln(&c->locals[(int)o2->value.i]);
+	unify(o3,&c->locals[(int)o2->value.i]);
+}
+
+int get_register() {
 	prep2();
-	//Closure* c=saved_c;
-	displayFormatln(&c->locals[(int)o->value.i]);
-	unify(o2,&c->locals[(int)o->value.i]);
-	//printf("loc%d\n",c0);
+	printf("put %d:\n",o->value.i);
+	displayln(o);
+	unify(o2,regs[(int)(o->value.i)]);
+	displayln(o2);
 }
 
 int get_fname() {
 	prep2();
-	printf("name;%s\n",c->e->debug->name);
-	sets(o,c->e->debug->name);
+	//printf("name;%s\n",c->e->debug->name);
+	sets(o2,((Closure*)(o->value.data))->e->debug->name);
 }
 
 int loc() {
 	prep2();
 	Closure* c=saved_c;
 	unify(o,&c->locals[(int)o2->value.i]);
+}
+
+int closure() {
+	prep4();
+	Closure* c=saved_c;//(Closure*)(o->value.data);
+	//printf("name;%s\n",c->e->debug->name);
+	printf("%d,%d,\n",c,c->e);
+	sets(o2,c->e->debug->name);
+	seti(o3,c->e->n_args);
+	seti(o4,c->e->n_locals);
+	//seti(o5,c->e->n_locals);
+	
 }
 
 //logic
@@ -361,7 +394,7 @@ int undef() {
 
 int undata() {
 	prep();
-	assert(o->type!=T_OBJ,"userdata sent");
+	assert(o->type!=T_DATA,"userdata sent");
 }
 
 int is_int() {
@@ -372,10 +405,6 @@ int is_int() {
 
 int type() {
 	prep2();
-	//bool v;
-	//displayFormatln(o);	displayFormatln(o2);
-	//undef(o2);
-	//Object* o3 = new Object;
 	if(o->type==T_INT) {
 		sets(o2,"Number");
 		//eq_s(o3,"Number",v);
@@ -384,13 +413,20 @@ int type() {
 		sets(o2,"String");
 	}
 	else if(o->type==T_FUNCTOR) {
-		sets(o2,"Number");
+		sets(o2,"Functor");
+	}
+	else if(o->type==T_FILE) {
+		sets(o2,"File");
+	}
+	else if(o->type==T_DATA) {
+		sets(o2,"data");
+	}
+	else if(o->type==T_REL) {
+		sets(o2,"Relation");
 	}
 	else {
 		sets(o2,"ref");
-	}/*
-	if(!unify(o2,o3))
-		valid=false;*/
+	}
 }
 
 //vm
@@ -511,7 +547,7 @@ int table_set() {
 	o4=deref(regs[3]);
 	//t->insert(std::pair<const char*, Object*>(o2->value.s, o3));
 	t = set(t,o2,o3);//o3 = get(t,o2);//(*t)[o2->value.s] = o3;
-	o4->type = T_OBJ;
+	o4->type = T_DATA;
 	o4->value.t = t;
 	p(displayln(regs[3]));
 	//std::cout << (t) << std::endl;
@@ -575,14 +611,7 @@ int io_write() {
 		printf("%s",o->value.s);
 	//puts("");
 }
-/*
-int reg() {
-	prep2();
-	printf("put %d:\n",o2->value.i);
-	//displayln(o);
-	regs[(int)o2->value.i] = o;
-}
-*/
+
 int io_read() {
 	Object* o = regs[0];
 	char *s = new char[256]; //todo is this necessary to allocate?
@@ -742,8 +771,8 @@ int math_sqrt() {
 	puts("sqrt:");
 	Object* o = regs[0];
 	Object* o2 = regs[1];
-	o2->value.r = sqrt(o->value.r);
-	o2->type = T_NUM;
+	o2->value.i = sqrt(o->value.i);
+	o2->type = T_INT;
 }
 
 int math_seed() {
@@ -753,26 +782,26 @@ int math_seed() {
 
 int math_random() {
 	Object* o = regs[0];
-	o->value.r = (double)(rand()%RAND_MAX) / RAND_MAX;
-	o->type = T_NUM;
+	o->value.i = (double)(rand()%RAND_MAX) / RAND_MAX;
+	o->type = T_INT;
 }
 
 int math_abs() {
 	Object* o = regs[0];
 	Object* o2 = regs[1];
-	o2->value.r = abs(o->value.r);
+	o2->value.i = abs(o->value.i);
 }
 
 int math_floor() {
 	Object* o = regs[0];
 	Object* o2 = regs[1];
-	o2->value.r = floor(o->value.r);
+	o2->value.i = floor(o->value.i);
 }
 
 int math_ceil() {
 	Object* o = regs[0];
 	Object* o2 = regs[1];
-	o2->value.r = ceil(o->value.r);
+	o2->value.i = ceil(o->value.i);
 }
 
 int toStr() {
@@ -790,7 +819,7 @@ int math_sub() {
 	o3->value.i = o->value.i-o2->value.i;
 	//p4("%d - %d = %d\n",o->value.i,o2->value.i,o3->value.i);
 }
-
+/*
 void _add(Object* o, int i, int y) {
 	setr(o3, i+y);
 }
@@ -798,11 +827,11 @@ void _add(Object* o, int i, int y) {
 void _add(Object* o, int i, double y) {
 	setr(o3, o->value.i+o2->value.i);
 }
-
+*/
 int math_add() {
 	prep3();
 	seti(o3, o->value.i+o2->value.i);
-	p4("%d + %d = %d\n",o->value.i,o2->value.i,o3->value.i);
+	p4("%g + %g = %g\n",o->value.i,o2->value.i,o3->value.i);
 }
 
 int math_div() {
@@ -975,9 +1004,7 @@ int string_at() { //s, i, c
 }
 
 int string_concat() {
-	Object* o = regs[0];
-	Object* o2 = regs[1];
-	Object* o3 = regs[2];
+	prep3();
 	char *s1 = o->value.s;
 	char *s2 = o2->value.s;
 	int i, j, len1=strlen(o->value.s), len2=strlen(o2->value.s);
@@ -1033,16 +1060,16 @@ int string_eq(Object* o, Object* o2) {
 //general
 
 int any_add() {
-	//d3();
-	//o3->type = T_INT; o3->value.i = o->value.i+o2->value.i;
 	prep();
 	if(o->type==T_STR) {
 		//throw 1;
 		string_concat();
 	}
-	else {
-		//printf("%d + %d = %d\n",o->value.i,o2->value.i,o3->value.i);
+	else if(o->type==T_INT)
 		math_add();
+	else {
+		displayFormatln(o);
+		throw "math operation with unrecognised value";
 	}
 }
 
@@ -1064,12 +1091,6 @@ void rdy() {
 	unmark();
 }
 
-/*
-int overwrite(Object* o, Object* o2) {
-	o->value = o2->value;
-	o->type = o2->type;
-}
-*/
 //register libs
 
 typedef struct reg {
@@ -1150,23 +1171,25 @@ reg lib[] = {
 	{"eval", eval_file},
 	{"apply1", apply1},
 	{"apply2", apply2},
-	//("cur", closure},
 	
+	//debug
 	{"loc", loc},
 	{"locs", locs},
-	{"getfname", get_fname},
-	{"getlocal", get_local},
-	{"getnargs", get_nargs},
+	{"reg", get_register},
 	{"check", check},
 	{"undata", undata},
 	{"type", type},
+	{"fcget", fc_get},
+	{"fcsize", fc_size},
 	
 	{"require", require},
 	{"toString", toStr},
 	
-	{"get_fname", get_fname},
-	{"get_local", get_local},
-	{"get_nargs", get_nargs},
+	{"getnargs", get_nargs},
+	{"getnlocs", get_nlocs},
+	{"getfname", get_fname},
+	{"getlocal", get_local},
+	{"closure", closure},
 	{"sethook", sethook},
 	nil
 };
@@ -1185,7 +1208,6 @@ static int libsize (const reg *l) {
 int register_lib (const reg *l) {
 	for (i=0; i<libsize(l); i++)
 		cregister(l[i].name, l[i].p);
-		//cregister(l[i]->name, l[i]->func);
 }
 //
 

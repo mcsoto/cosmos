@@ -251,11 +251,11 @@ rel navigate_comment(s,i,i2,info,info2)
 //rel step4(s, i, j, z, c, info)
 rel step5(s, i, j, z, c, info)
 	case
-		l=['<=','>=']
+		l=['<=','>=','!=','::']
 		string.slice(s,i,i+2,s2) //todo syntax for this
 		match_list(l, s2, z) and j=i+2
 	case
-		l=['+','-','<','>','[',']','/','*','#','_','!']
+		l=['+','-','<','>','[',']','/','*','#','_','!',':']
 		match_list(l, c, z) and	j=i+1
 	case
 		match_one(s,i,j,single_quote)
@@ -299,12 +299,6 @@ rel step1(s, i, j, z, info, info2)
 			case
 				parse_number(s,i,j)
 				z='number'
-			case
-				match_string(s,i,j,'!=')
-				z='!=' //todo doesn't work if this goes first
-			case
-				match_string(s,i,j,'::')
-				z='::'
 			case
 				step5(s, i, j, z, c, info)
 			

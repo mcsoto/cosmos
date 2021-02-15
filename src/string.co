@@ -40,6 +40,7 @@ rel findIndex(String s1, String s2, Integer pos)
 t= {
 	'get'=get
 	'findIndex'=findIndex
+	'find'=findIndex
 	'size'=size
 	'slice'=slice
 	'at'=get

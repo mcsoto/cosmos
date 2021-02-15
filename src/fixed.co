@@ -1,0 +1,17 @@
+
+functor(F, Functor)
+
+rel size(f,n)
+	c::fcsize(f,n)
+
+rel get(f,i,o2)
+	c::fcget(f,i,o2)
+	
+t={
+	'new'=new
+	'get'=get
+	'set'=set
+	size=size
+}
+
+export(t)

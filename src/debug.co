@@ -1,22 +1,24 @@
 
-require('mutable',mutable)
+//require('mutable',mutable)
+
+require('fixed',fixed)
+
+require('io5',io)
 
 functor(Cons, Functor)
 
-mutable.new(t)
-mutable.set(t,'on',1)
-
-print2=print
+//print2=print
 
 debug={
-	sethook=rel(p)
-		//c::sethook(p)
+	rel sethook(p)
+		c::sethook(p)
 		x=1
-		print('-')
+		//print(p)
+		//print('-')
 		
 	rel getlocal(i,x)
 		c::getlocal(i,x)
-		
+/*		
 	rel print(o)
 		if(mutable.get(t,'on',1))
 			print2(o)
@@ -24,24 +26,60 @@ debug={
 			true
 		
 	rel switch(i)
-		mutable.set(t,'on',i)
+		mutable.set(t,'on',i)*/
+	rel p(i)
+		true
 }
 
-rel parse_call(x)
+rel p(x)
 	true
 
+rel q(x,y,z)
+	true
+	
+rel str(l,i,n,s)
+	choose(i=n)
+		s=''
+	elseif(i=n-1)
+		fixed.get(l,i,e)
+		s=''+e
+	else
+		fixed.get(l,i,e)
+		s1=''+e+', '
+		str(l,i+1,n,s2)
+		s=s1+s2
+		
+rel trace(l)
+	c::closure(e,name,n,i)
+	//print(['-',l,name,n,i])
+	str(l,0,n,s)
+	//print(name)
+	print(l)
+	print(s)
+	io.write(name)
+	io.write('('+s+')\n')
+	//c::getlocal(e,0,x) and print(x)
+	
 rel callbacks()
 	i=2
 	c::getfname(name)
-	print(name)
+	print(name)/*
 	c::getlocal(0,x)
-	c::getlocal(1,x1)
+	c::getlocal(1,x1)*/
 	debug.getlocal(2,y)
+	//debug.p()
+	//o=debug.p
 	c::getnargs(c)
-	print([c,x,x1])
-	//debug.sethook(p)
-	
-callbacks()
+	c::getnlocs(n)
+	print([c,n,x,x1])
+	debug.sethook(p)
+print(debug)
+//print(_table)
+//callbacks()
+debug.sethook(trace)
+//p(x)
+p(1)
+q(1,x,3)
 /*
 rel p(x)
 	x=1//+2
@@ -51,5 +89,5 @@ rel callbacks()
 	
 //p(3)
 p(x)
-*/
-export(debug)
+
+export(debug)*/

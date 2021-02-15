@@ -51,11 +51,11 @@ c::table_new(t0)
 c::table_set(t0,'new',new,t1)
 c::table_set(t1,'get',get2,t2)
 c::table_set(t2,'set',set2,t3)
-c::table_set(t3,'set2',set2,t4)
-c::table_set(t4,'fget',get2,t)
+//c::table_set(t3,'set2',set2,t4)
+//c::table_set(t4,'fget',get2,t)
 //export(t1)
 //exports=t3
-export(t)
+export(t3)
 
 /*
 rel print(i) c::print(i);

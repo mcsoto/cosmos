@@ -53,13 +53,11 @@ vars=t['run']
 print(vars)
 t={}
 print(t)
-require('env7.bc', env)
 //nil={}
 print(nil)
-env.new(e, [], nil)
-print(e)
 	
 //i!=1
 //i!=-1
 x=2
 i=-1*/
+print(1)

@@ -205,6 +205,11 @@ rel iterate(p, Number n, x, y)
 		p(x,x2)
 		iterate(p, n-1, x2, y)
 
+rel first(Functor l, Any a)
+	l=Cons(a,_)
+
+rel rest(Functor l, Any b)
+	l=Cons(_,b)
 t={
 	'find'=find
 	findOnce=findOnce
@@ -226,13 +231,8 @@ t={
 	eachIndex=eachIndex
 	iterate=iterate
 	reverse=reverse
-	/*
-	rel first(Functor l, Any a)
-		l=Cons(a,_)
-
-	rel rest(Functor l, Any b)
-		l=Cons(_,b)
-*/
+	first=first
+	last=last
 }
 export(t)/*
 c::table_new(t)

@@ -1,9 +1,7 @@
 
-//examples from readme
-
-require('io', io)
-require('math', math)
-require('list', list)
+require('io5.bc', io)
+require('math.bc', math)
+require('list.bc', list)
 /*
 rel main()
 	x = io.read()
@@ -19,30 +17,14 @@ rel main()
 	//io.writeln('the double of '+math.integerToString(x)+' is '+math.integerToString(y)) //the double of 3 is 6
 	print('-')
 	print(y)
+	
+main()
 
-double(3,y)
-print(y)
-//x=double(3)
-print(x)
-//main()
-cut
 functor(Cons, Functor)
 l = [1,2,3]
-print(math.inc)
-inc=math.inc
-print(inc)
 list.first(l, head) //head is 1
 list.rest(l, tail) //tail is [2, 3]
 list.map(l, math.inc, l2) //l2 is [2, 3, 4]
-list.filter(l, rel(x) x!=3;, l4) //l4 is [1, 2]
+list.map(l3, math.inc, l) //l3 is [0, 1, 2]
+//list.filter(l, rel(x) x!=3;, l4) //l4 is [1, 2]
 print(l4)
-print(tail)
-print(l)
-print([l,inc,l2])
-
-
-Table t = {x=1 and y=2}
-table.set(t, 'a', 1, t2)
-
-print(t) //{}
-print(t2) //

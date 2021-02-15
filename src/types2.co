@@ -85,7 +85,7 @@ rel strict_type2(t1, t2, t3)
 		strict_type2(b1,b2,b3)
 		t3=Cons(a3,b3)
 
-//used after strictest_type?
+//this is a hack, eventually will be replaced by strictest_type
 rel strict_type(t1, t2, t3)
 	t1=[a1|b1]
 	t2=[a2|b2]
@@ -114,11 +114,14 @@ rel strictest_type(t1, t2, t3)
 		//print(a3)
 		if(b1=Cons)
 			t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+			//print(t3)
 		elseif(b2=Cons)
 			t3=Cons(a3,Cons) //if second subtype is not specified comparison automatically works (e.g. 'Relation' is a 'Relation Any')
+			//print(t3)
 		else
 			strict_type2(b1,b2,b3)
 			t3=Cons(a3,b3)
+			//print(t3)
 	c::cut()
 
 rel match_until_space(s,i,i2)
@@ -197,7 +200,7 @@ t={
 	'compare_types'=compare_types
 	//'strict_type'=strict_type
 	'strict_type'=strictest_type
-	//'strictest_type'=strictest_type
+	'strictest_type'=strictest_type
 	'string_to_type'=string_to_type
 }
 export(t)

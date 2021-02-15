@@ -584,7 +584,10 @@ rel term(env,env2,prefix,a,CWam f)
 		send(a2,lib)
 		debug(['op',op, a1,lib])
 		if(lib='any')
-			f3=Host('c', s,[a1,b1,temp])
+			if(op='add')
+				f3=Host('c', 'dyn_add',[a1,b1,temp])
+			else
+				f3=Host('c', s,[a1,b1,temp])
 		elseif(lib='math')
 			f3=Host('c', s,[a1,b1,temp])
 		elseif(lib='string')
@@ -1175,8 +1178,6 @@ rel check_relation(name, env, env2,info)
 		true
 	//is_type(a, 'Relation', env)
 rel helper1(a,b)
-	//print([a,b])
-	//rel (a,b) b=And(Fact('cut',[],info),a);
 	if(a=And(a1,a2))
 		b=And(a1,And(Fact('cut',[],info),a2))
 	else
@@ -1328,8 +1329,9 @@ rel generate_body(env, env2, Functor f, code)
 		elseif(name='throw')
 			f1=Host('c','throw',args)
 			generate_body(env, env2, f1, code)
-			args=[c|_]
-			//c::throw(c)
+		elseif(name='label')
+			env2=env
+			args=[c]
 		else
 			c::throw('fc')
 			

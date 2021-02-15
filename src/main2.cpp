@@ -15,7 +15,7 @@ int main(int argc, char* argv[]){
 				e0 = read_file(argv[2]);
 			}
 			else
-				e0 = read_file("out.bc");
+				e0 = read_file("nil.bc");
 		}
 		else {
 			//printf("Reading: %s\n", argv[1]);

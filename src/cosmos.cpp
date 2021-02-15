@@ -161,7 +161,7 @@ typedef enum
 typedef enum
 {
 	T_NULL,
-	T_NUM,
+	T_NUM, //unused
 	T_INT,
 	T_STR,
 	T_REL,
@@ -169,8 +169,7 @@ typedef enum
 	T_FILE,
 	T_REF,
 	T_DATA,
-	T_FUNCTOR,
-	T_OBJ
+	T_FUNCTOR
 } Type;
 
 void rdy ();
@@ -403,9 +402,7 @@ void fdisplay(FILE *f, Object* o, int layer);
 
 void display(FILE *f, Object* o, int layer) {
 	//printf(";%d;%d\n",o,o->type);
-	//else if(o->type==T_REF)
-		//printf("#val");
-	if(o==NULL) fprintf(f,"null");
+	if(o==NULL) fprintf(f,"c::null");
 	else
 	//if(o==NULL) throw 1;
 	//if(o->type==NULL) throw 1;
@@ -413,10 +410,12 @@ void display(FILE *f, Object* o, int layer) {
 		throw "type unknown";
 	}
 	if(o->type==T_NUM)
-		fprintf(f,"%g",o->value.r);
-	else if(o->type==T_INT)
+		//fprintf(f,"%g",o->value.r);
+		throw "type num";
+	else if(o->type==T_INT) {
 		//fprintf(f,"%d",o->value.i);
 		fprintf(f,"%g",o->value.i);
+	}
 	else if(o->type==T_STR) {
 		//fprintf(f,"'%s'",o->value.s);
 		#ifdef DEBUG
@@ -437,6 +436,9 @@ void display(FILE *f, Object* o, int layer) {
 	}
 	else if(o->type==T_NULL)
 		fprintf(f,"null");
+	else if(o->type==T_DATA) {
+		fprintf(f,"#data");
+	}/*
 	else if(o->type==T_OBJ) {
 		//printf("{}");
 		//print_map(o->value.t);
@@ -453,7 +455,7 @@ void display(FILE *f, Object* o, int layer) {
 			display(f,it->second, layer+1);
 		}
 		fprintf(f,"}");
-	}
+	}*/
 	else if(o->type==T_FUNCTOR) {
 		Functor* fc = (Functor*)o->value.fc;
 		//if(layer>4) { printf("..."); return; }
@@ -620,10 +622,12 @@ void fdisplay(FILE *f, Object* o, int layer) {
 		throw "type unknown";
 	}
 	else if(o->type==T_NUM)
-		fprintf(f,"%g",o->value.r);
-	else if(o->type==T_INT)
+		//fprintf(f,"%g",o->value.r);
+		throw "type num";
+	else if(o->type==T_INT) {
 		//fprintf(f,"%d",o->value.i);
 		fprintf(f,"%g",o->value.i);
+	}
 	else if(o->type==T_STR) {
 		//fprintf(f,"'%s'",o->value.s);
 		#ifdef DEBUG
@@ -640,8 +644,8 @@ void fdisplay(FILE *f, Object* o, int layer) {
 	}
 	else if(o->type==T_NULL)
 		fprintf(f,"null");
-	else if(o->type==T_OBJ) {
-		fprintf(f,"data#");
+	else if(o->type==T_DATA) {
+		fprintf(f,"#data");
 	}
 	else if(o->type==T_FUNCTOR) {
 		//fprintf(f,"fc#");
@@ -773,9 +777,10 @@ char* to_str(Object* o) {
 	if(o->type==T_NUM) {
 		//printf("str;%f\n",o->value.r);
 		sprintf(s,"%f",o->value.r);
+		throw "type num";
 	}
 	else if(o->type==T_INT)
-		sprintf(s,"%d",o->value.i);
+		sprintf(s,"%f",o->value.i);
 	else if(o->type==T_STR) {
 		//sprintf(s,"'%s'",o->value.s);
 		#ifdef DEBUG
@@ -824,10 +829,8 @@ char* to_str(Object* o) {
 	}
 	else if(o->type==T_NULL)
 		strcpy(s,"null");
-	else if(o->type==T_OBJ) {
-		s[0]='{';
-		s[1]='}';
-		s[2]=0;
+	else if(o->type==T_DATA) {
+		sprintf(s,"#data");
 	}
 	else if(o->type==T_REF) {
 		printf(s,"#var%d\n",o);
@@ -863,11 +866,7 @@ void display_cpln(ChoicePoint* cp) {
 	printf("\n");
 }
 
-void clist_to_list() {
-	
-}
-
-
+//
 
 Object* get(Table* t, Object* o) {
 	//printf("get\n"); displayFormatln(o);
@@ -1069,38 +1068,6 @@ void print_locals(Env* e0, Closure* c) {
 	}
 	printf("\n");
 }
-//
-
-bool test(Object *o, Object *o2) {
-	return o->type==T_NUM ? (o->value.i != o2->value.i) : (o->type==T_OBJ ? o->value.t==o2->value.t : false);
-}
-
-static Object* hook1 = null;
-
-//void (Closure*) eval;
-//Closure (*eval)();
-
-Closure* eval(void);
-Closure* co_execute(void);
-
-void call(Object* o) {
-	printf("hook1\n");
-	Env* e = e0;
-	Closure *prev=c;
-	Object* temp=hook1;
-	hook1=null;
-	e0 = o->value.e;
-	co_execute();
-	hook1=temp;
-	//eval();
-	e0=e;c=prev;
-}
-
-void hookcall() {
-	if(hook1->type==T_REL) {
-		call(hook1);
-	}
-}
 
 //
 
@@ -1173,6 +1140,79 @@ bool unify(Object *o, Object *o2) {
 
 void print(Object* o) {
 	printf("(%d,%d)",o->value.i, o->type);
+}
+
+//
+
+Functor* cons() {
+	Functor* fc = new Functor();fc->n=2;fc->name="Cons";
+	return fc;
+}
+
+void clist_to_list() {
+	
+}
+
+Object* clist_to_fc(Object* args[], int n) {
+	//
+	Functor* fc = new Functor();
+	fc->n=n;fc->name="F";
+	fc->param = new Object*[n];
+	//
+	Object* o = new Object;
+	o->value.fc=fc;
+	o->type=T_FUNCTOR;
+	for(int i=0;i<n;i++) {
+		fc->param[i] = args[i];//new Object;
+		displayFormatln(args[i]);
+		//unify(fc->param[i], args[i]);
+	}
+	return o;
+}
+
+//
+
+static Object* hook1 = null;
+
+//void (Closure*) eval;
+//Closure (*eval)();
+
+Closure* eval(void);
+Closure* co_execute(void);
+
+static Closure* saved_c;
+
+void call(Object* o) {
+	printf("hook1\n");
+	Env* e = e0;
+	Closure *prev=c;
+	saved_c=c;
+	Object* temp=hook1;
+	hook1=null;
+	e0 = o->value.e;
+	//
+	Object* o2 = new Object;
+	Object* temp1 = regs[0],* temp2 = regs[1],* temp3 = regs[2];
+	o2->type=T_DATA;
+	o2->value.data=prev;
+	o2=clist_to_fc(regs,prev->e->n_args);
+	displayFormatln(o2);
+	regs[0] = o2;
+	//
+	co_execute();
+	hook1=temp;
+	regs[0]=temp1;
+	regs[1]=temp2;
+	regs[2]=temp3;//todo
+	//delete o;
+	//eval();
+	e0=e;c=prev;
+}
+
+void hookcall() {
+	if(hook1->type==T_REL) {
+		call(hook1);
+	}
 }
 
 //libs
@@ -1297,7 +1337,7 @@ int to_int16(u8* bc, int i) {
 	j=n2 + n;
 	return j;
 }
-//#define test(bc,i) printf("[%d,%d,%d,%d,%d,%d,%d]\n",bc[i+1],bc[i+2],bc[i+3],bc[i+4],bc[i+5],bc[i+6],bc[i+7]);
+
 #define i32(bc,i,j) do { j=to_int32(bc,i); i+=4; } while (0)
 #define i16(bc,i,j) do { j=to_int16(bc,i); i+=2; } while (0)
 	
@@ -1345,7 +1385,6 @@ main:
 	if(trace)
 		info();
 	c->prev=c0;
-	hookcall();
 	//set to null
 	for(int i=0;i<e0->n_locals;++i) {
 		c->locals[i].flag = 0; //= NULL;
@@ -1386,17 +1425,14 @@ main:
 		}
 		p("\n");
 	}
-	//pr_header(e0);
-	//printf(";%s;", e0->debug!=NULL ? e0->debug->name : "");
+	hookcall();
 	#ifdef DEBUG
-	//#endif
 	p(printf("\n---------------\n"));
 	if(e0->debug!=NULL) {
 		pr_header(e0);
 		printf("\n");
 		//trace
 	}
-	//#ifdef DEBUG
 	//symbol[c] = (void*)new Debug;
 	//print_consts(e0);
 	#endif
@@ -1670,7 +1706,7 @@ vm:
 			o = &(c->locals[n]); //gets object from locals
 			o2 = regs[251]; //gets constant from Ai
 			o = deref(o);
-			if(o->type!=T_OBJ) {
+			if(o->type!=T_DATA) {
 				p1("null\n");
 				displayFormatln(o);
 				displayFormatln(o2);
@@ -1696,7 +1732,7 @@ vm:
 			p4("obj_get:y(%d),c(%d),y(%d)\n",n,n2,n3);
 			o = deref(&(c->locals[n])); //gets object from locals
 			o2 = &e0->consts[n2]; //gets constant
-			//if(o->type==T_OBJ) {//check if it's a c/stl or runtime object
+			//if(o->type==T_DATA) {//check if it's a c/stl or runtime object
 			t = o->value.t;
 			//}
 			p2("o.%s = ",o2->value.s);
@@ -1881,7 +1917,7 @@ vm:
 			o = &(c->locals[n]); //gets object from locals
 			o2 = &e0->consts[n2]; //gets constant
 			p(displayln(o));
-			if(o->type==T_OBJ) {
+			if(o->type==T_DATA) {
 				t = o->value.t;
 			}
 			else {
@@ -1967,9 +2003,6 @@ vm:
 			else if(streq(o->value.s, "halt")) {
 				//printf("halt\n");
 				return c;
-			}
-			else if(streq(o->value.s, "rec")) {
-				i=0;
 			}
 			//calling c function
 			int (*fn2)();
@@ -2077,6 +2110,7 @@ Env* read_fn(FILE* f) {
 		else if (ch==1) {
 			consts->type = T_NUM;
 			//consts->value.d = d;
+			throw "type num";
 		}
 		else if (ch==2) {
 			c->type = T_INT;

@@ -1,0 +1,39 @@
+functor(Cons, Functor)
+/*
+	case
+		a=True
+		b=True
+	case
+		b=And(Fact('cut',[],info),a)
+cond
+	x=1
+cond
+	x=2
+if(x=1)
+	true
+else
+	true
+c::print(x)
+rel parse_call(x)
+	cond
+		x=1
+	cond
+		a=2
+	cond
+		a=2
+	cond
+		a=2
+		true
+x=2
+choose(x=1)
+	true
+elseif(x=2)
+	y=1
+else
+	true
+c::print(x)*/
+
+x=2
+//c::eval('false')
+a=x+2
+throw(a)//print(x+1)
