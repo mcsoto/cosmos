@@ -7,10 +7,9 @@ CFLAGS= -g -std=c++0x -fpermissive -w
 
 all:
 	$(CC) $(CFLAGS) main2.cpp -o p
-	./p nil
 	$(CC) $(CFLAGS) -DDEBUG=1 main2.cpp -o p2
-	#./p2
 	$(CC) $(CFLAGS) main.cpp -o cosmos
+	$(CC) $(CFLAGS) -DDEBUG=1 main.cpp -o cosmos2
 	
 test:
 	$(CC) $(CFLAGS) main2.cpp -o p
@@ -49,8 +48,8 @@ clean-test:
 	rm *exe*
 	
 clean:
-	rm cosmos cosmos2 test*.bc p p2 temp* log
-	rm *.exe
+	rm -f cosmos cosmos2 test*.bc p p2 temp* log
+	rm *.exe *.exe.stackdump
 	
 gen4: p
 	./p c3 gen4

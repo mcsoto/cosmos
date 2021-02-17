@@ -1,24 +1,11 @@
 	
-//write('Cosmos 0.12 - Rebirth of Quetzacoatl's Virtual Machina\n')
-//write('> ')
-
 functor(Cons,Functor)
 functor(F,Functor)
-/*
-rel require(i,i2)
-	c::require(i, i2)
-
-rel print(i)
-	c::print(i)
-*/
-
-rel pr(i)
-	//c::print(i)
-	true
 
 require('io5.bc', io)
 //require('table5.bc', table)
 require('list.bc', list)
+//require('logic.bc', logic)
 require('string5.bc', string)
 
 //require('ws4.bc', whitespacer)
@@ -66,7 +53,7 @@ rel filter(vars,l)
 	list.removeAll(vars,in_lib,l3)
 	unique(l3,l,[])
 	
-rel print_vars(l)
+rel print_vars2(l)
 	case
 		l=[]
 	case
@@ -82,8 +69,14 @@ rel print_vars(l)
 			io.write('\n')
 		else
 			io.write(' and ')
-		print_vars(l2)
-
+		print_vars2(l2)
+		
+rel print_vars(l)
+	if(l=[])
+		io.writeln('true')
+	else
+		print_vars2(l)
+		
 each2(['lexer9.bc', lexer, 'parser9.bc', parser,'gen9.bc', gen,'env7.bc', env,'serialize9.bc', sel], require)
 
 //require('bytecode', bytecode)
@@ -108,7 +101,6 @@ rel parse(s1,e2,fc1)
 	//parser.run(fc1,fc)
 	parser.run_parser(f1,fc)
 	c::cut()
-	pr(fc)
 	//io.writeln('Generating code...')
 	new_env(e)
 	gen.generate_body(e, e2, fc, fc1)
@@ -121,10 +113,16 @@ rel write(f, s1, e2)
 	
 rel run_bytecode(s)
 	//print('run bc')
+	//c::eval(s,i)
 	if(c::eval(s,i))
+		//print(i)
 		true
 	else
-		io.writeln('| false')/*
+		//io.writeln('| false')
+		false
+		/*
+	io.writeln('eval')
+	io.writeln(i)
 	print(i)
 	if(i=0)
 		throw('failed eval')
@@ -132,6 +130,12 @@ rel run_bytecode(s)
 		true*/
 	
 rel run_bytecode2(s)
+	if(run_bytecode(s))
+		true
+	else
+		io.writeln("\nCosmosError: Program did not return successfully.")
+
+rel exec_bytecode(s)
 	//c::eval(s)
 	exec('./p2 '+s)
 	
@@ -170,15 +174,15 @@ rel interpreter()
 	s=input
 	run_query(s,e) 
 	//eval
-	run_bytecode('temp')
-	cut
-	//print('run') and print(e)
-	io.write('| ')
-	filter(e.vars,l)
-	if(l=[])
-		io.writeln('true')
+	if(run_bytecode('temp'))
+		cut
+		//print('run') and print(e)
+		io.write('| ')
+		filter(e.vars,l)
+		print_vars(l)
 	else
-		print_vars(l)/*
+		true
+	/*
 	filter(e.vars,l)
 	print(l)
 	print_vars(l)*/
@@ -211,41 +215,40 @@ rel main2(s)
 c::args(args)
 
 //print(args)
-
+require('debug',debug)
 	
 rel main(args)
-	cut
-	version = "Cosmos 0.12 alpha - Rebirth of Quetzacoatl's Virtual Machina"
+	version = "Cosmos 0.12.1 alpha - Rebirth of Quetzacoatl's Virtual Machina"
 	choose(find_flag0(args, '-i'))
 		print(version)
 		interpreter()
 	elseif(find_flag1(args, '-c', name))
 		compile_to_file(name)
 	elseif(find_flag1(args, '-b', name))
-		run_bytecode(name+'.bc')
+		//debug.sethook(debug.trace)
+		run_bytecode2(name+'.bc')
 	elseif(find_flag0(args, '-h'))
 		io.writeln(version)
 		io.writeln('\n-h\t\t\tGet help.\n'+'-i\t\t\tOpen interpreter.\n'+'-q [str]\t\tMake query.\n'+'-l [name]\t\tCompile name.co to name.bc, run name.bc.\n'+'-c [name]\t\tCompile name.co to name.bc.\n'+'-b [name]\t\tRun bytecode file name.bc.\n'/*+"--no-std-libs\t\tDon't load stdlibs.\n"*/+'\n  e.g. cosmos -l test -q main(x)   //compile test.co and run `main(x)`')
 	elseif(find_flag1(args, '-l', name))
 		s1=name+'.bc'
 		compile_to_file(name)
-		c::cut()
-		run_bytecode(s1)
+		run_bytecode2(s1)
 		//print('\n== end of bytecode ===\n')
 		//exec('./p cosmos.bc -b '+name)
 	elseif(find_flag1(args, '-q', s))
-		c::cut()
 		run_query(s,e)//run_query(s+'\nc::cur() and c::print("info:") and c::locs()\n',e)
-		cut
-		run_bytecode('temp')
-		//print('=')
-		//c::locs()
-		table.get(e,'vars',vars)
-		//print(vars)
-		filter(vars,l)
-		//print(l)
-		io.write('| ')
-		print_vars(l)
+		if(run_bytecode('temp'))
+			//print('=')
+			//c::locs()
+			table.get(e,'vars',vars)
+			//print(vars)
+			filter(vars,l)
+			//print(l)
+			//c::locs()
+			io.write('| ')
+		else
+			io.writeln('| false')
 	elseif(find_flag0(args, '-t'))
 		exec('./q.exe')
 	elseif(find_flag0(args, '-v'))
@@ -254,6 +257,7 @@ rel main(args)
 	else
 		print('No argument given.')
 
+//debug.sethook(debug.trace)
 main(args)
 //interpreter()
 //find_flag0(args, '-i')

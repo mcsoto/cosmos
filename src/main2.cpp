@@ -1,6 +1,13 @@
 
 #include "cosmos.cpp"
 
+void pr_regs() {
+	printf("regs: [");
+	display(regs[0]); printf(", "); display(regs[1]); printf(", "); display(regs[2]);
+	printf("]\n");
+}
+
+
 int main(int argc, char* argv[]){
 	start();
 	//resolve args
@@ -39,7 +46,6 @@ int main(int argc, char* argv[]){
 	}*/
 	/* display result */
 	#ifdef DEBUG
-	//printf("==> regs: ["); display(regs[0]); printf(", "); display(regs[1]); printf(", "); display(regs[2]); printf("]\n");
 	fclose(f);
 	#endif
 	end();

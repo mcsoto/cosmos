@@ -66,6 +66,7 @@ static FILE* f;
 #define setr(o,V) do { o->type = T_NUM; o->value.r = V; trail_push(o); } while (0)
 #define seti(o,V) do { o->type = T_INT; o->value.i = V; trail_push(o); } while (0)
 #define sets(o,V) do { o->type = T_STR; o->value.s = V; trail_push(o); } while (0)
+#define setfc(o,V) do { o->type = T_FUNCTOR; o->value.fc = V; trail_push(o); } while (0)
 	
 #define news(o,V) do { o=new Object; o->type = T_STR; o->value.s = V; } while (0)
 #define newi(o,V) do { o=new Object; seti(o,V); } while (0)
@@ -180,7 +181,7 @@ union Value
 {
 	//int    i;
 	double i;
-	double r; //real
+	//double r; //real
 	char*  s;
 	u8*    f;
 	void  (*p)();
@@ -350,6 +351,7 @@ void prefix() {
 //static Object pool_locals[MAXVARS] = {{T_NUM,2},{T_NUM,3},{T_NUM,4}};
 
 #define ALLOC_REGS 256
+#define MAX_ARGS 25
 static Object* regs[ALLOC_REGS]; //hopefully not too much memory to allocate all these regs
 
 static std::vector<Object*> trail;
@@ -776,7 +778,7 @@ char* to_str(Object* o) {
 		throw 22;
 	if(o->type==T_NUM) {
 		//printf("str;%f\n",o->value.r);
-		sprintf(s,"%f",o->value.r);
+		//sprintf(s,"%f",o->value.r);
 		throw "type num";
 	}
 	else if(o->type==T_INT)
@@ -787,6 +789,7 @@ char* to_str(Object* o) {
 		//return "...";
 		return "str#";
 		#endif
+		return o->value.s;/*
 		char *s1 = o->value.s;
 		sprintf(s,"'");
 		int size=strlen(s1);
@@ -819,7 +822,7 @@ char* to_str(Object* o) {
 		if(size>50) for(j++;j<i+4;j++) s[j]='.';
 		else 1;
 		s[j]='\'';
-		s[j+1]='\0';
+		s[j+1]='\0';*/
 	}
 	else if(o->type==T_REL) {
 		sprintf(s,"#rel%d",(int)o->value.e / 100);
@@ -859,11 +862,6 @@ void display_cp(ChoicePoint* cp) {
 	printf("cp{");
 	printf("%d, %s, #%d",cp->i, cp->e->debug ? cp->e->debug->name : "", cp->pos);
 	printf("}");
-}
-
-void display_cpln(ChoicePoint* cp) {
-	display_cp(cp);
-	printf("\n");
 }
 
 //
@@ -975,25 +973,7 @@ void pr_cp() {
 	}
 	printf("null\n");
 }
-/*
-void pr_locs(Closure* c, int n) {
-	Object* o;
-	printf("locs: [");
-	for(int i=0;i<n;++i) {
-		//printf("%d : ",i); printf("%d\n",c->locals[i]);
-		if(&c->locals[i]) {
-			o = deref(&c->locals[i]);
-			if(o->type==T_REF) {
-				printf("...");
-				break;
-			}
-			displayFormat(o);
-			printf(", ");
-		}
-	}
-	printf("]\n");
-}
-*/
+
 void display_args(Closure* c) {
 	Object* o;
 	int n=c->e->n_args;
@@ -1039,35 +1019,11 @@ void pr_cl(Closure *c) {
 	printf("null;\n");
 }
 
-void pr_cl2(Closure *c) {
-	Closure *c0=c;
-	while(c0!=NULL) {
-		printf("%s(",c0->e->debug->name, c->i);
-		display_args(c0);
-		printf(") ... \n");
-		c0 = c0->prev;
-	}
-	printf("null;\n");
-}
-
-void pr_regs() {
-	printf("regs: [");
-	display(regs[0]); printf(", "); display(regs[1]); printf(", "); display(regs[2]);
-	printf("]\n");
-}
-
-
 void trail_push(Object* o) {
 	trail.push_back(o);
 }
 
-void print_locals(Env* e0, Closure* c) {
-	printf("locals: ",e0->n_locals);
-	for(int i=e0->n_locals;i<e0->n_locals;++i) {
-		display(&c->locals[i]); printf(", ");
-	}
-	printf("\n");
-}
+typedef std::vector<Object*> vec;
 
 //
 
@@ -1153,18 +1109,29 @@ void clist_to_list() {
 	
 }
 
-Object* clist_to_fc(Object* args[], int n) {
-	//
+Functor* block(int n) {
 	Functor* fc = new Functor();
 	fc->n=n;fc->name="F";
-	fc->param = new Object*[n];
+	fc->param = new Object*[n];	
+	return fc;
+}
+
+void blockcpy(Object* arr[], Object* arr2[], int n) {
+	//
+	for(int i=0;i<n;i++) {
+		//unify(fc->param[i], args[i]);
+	}
+}
+
+Object* clist_to_fc(Object* args[], int n) {
+	//
+	Functor* fc = block(n);
 	//
 	Object* o = new Object;
 	o->value.fc=fc;
 	o->type=T_FUNCTOR;
 	for(int i=0;i<n;i++) {
-		fc->param[i] = args[i];//new Object;
-		displayFormatln(args[i]);
+		fc->param[i] = args[i];
 		//unify(fc->param[i], args[i]);
 	}
 	return o;
@@ -1174,16 +1141,13 @@ Object* clist_to_fc(Object* args[], int n) {
 
 static Object* hook1 = null;
 
-//void (Closure*) eval;
-//Closure (*eval)();
-
 Closure* eval(void);
 Closure* co_execute(void);
 
 static Closure* saved_c;
 
 void call(Object* o) {
-	printf("hook1\n");
+	p1("hookcall\n");
 	Env* e = e0;
 	Closure *prev=c;
 	saved_c=c;
@@ -1193,20 +1157,24 @@ void call(Object* o) {
 	//
 	Object* o2 = new Object;
 	Object* temp1 = regs[0],* temp2 = regs[1],* temp3 = regs[2];
+	vec l;
+	for(int i=0;i<c->e->n_args;++i)
+		l.push_back(regs[i]);
+	//copy(l,regs,c->e->n_args);
 	o2->type=T_DATA;
 	o2->value.data=prev;
 	o2=clist_to_fc(regs,prev->e->n_args);
-	displayFormatln(o2);
+	//displayFormatln(o2);
 	regs[0] = o2;
 	//
 	co_execute();
 	hook1=temp;
-	regs[0]=temp1;
-	regs[1]=temp2;
-	regs[2]=temp3;//todo
 	//delete o;
-	//eval();
 	e0=e;c=prev;
+	for(int i=c->e->n_args-1;i>=0;--i) {
+		regs[i]=l.back();
+		l.pop_back();
+	}
 }
 
 void hookcall() {

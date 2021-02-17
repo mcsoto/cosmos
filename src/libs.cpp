@@ -100,15 +100,21 @@ int eval_file() {
 	//p2("\neval:%s\n",o->value.s);
 	Env* e = e0;
 	Closure *prev=c;
+	ChoicePoint *cp0 = cp;
+	//
+	cp=NULL;
 	e0 = read_file(o->value.s);
 	if(e0==NULL) throw "eval: cannot open file";//return;
 	
-	saved_c=eval();
+	Closure *c2=eval();
+	saved_c=c2;
+	if(c2==0)
+		valid=false;
 	//printf("eval:%d\n",saved_c);
 	//if(saved_c==0) throw "failed eval";
-	//seti(o2,(double)(int)saved_c);
+	seti(o2,(double)(int)c2);
 	//pr_locs(saved_c);
-	e0=e;c=prev;
+	e0=e;c=prev;cp=cp0;
 }
 
 int export_c() {
@@ -202,6 +208,12 @@ int get_args() {
 	fc->n=0;
 }
 
+int block_new() {
+	prep2();
+	Functor* fc = block((int)ivalue(o2));
+	setfc(o,fc);
+}
+
 int fc_get() {
 	prep3();
 	Functor* fc = fcvalue(o);
@@ -226,7 +238,7 @@ static char** arr;
 int locs() {
 	Closure* c=saved_c;
 	printf(";%d,%d\n",c,c->e);
-	pr_locs(c);
+	//pr_locs(c);
 	/*
 	Object* o;
 	for(int i=0;i<c1->e->n_locals;++i) {
@@ -304,14 +316,17 @@ int get_fname() {
 int loc() {
 	prep2();
 	Closure* c=saved_c;
-	unify(o,&c->locals[(int)o2->value.i]);
+	int i=(int)o2->value.i;
+	if(i>c->e->n_locals) {
+		displayFormatln(o2);
+		throw "no local variable to access";
+	}
+	unify(o,&c->locals[i]);
 }
 
 int closure() {
 	prep4();
 	Closure* c=saved_c;//(Closure*)(o->value.data);
-	//printf("name;%s\n",c->e->debug->name);
-	printf("%d,%d,\n",c,c->e);
 	sets(o2,c->e->debug->name);
 	seti(o3,c->e->n_args);
 	seti(o4,c->e->n_locals);

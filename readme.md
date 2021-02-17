@@ -43,11 +43,14 @@ See test samples.
 Building
 ---
 
-Use `make` or `make cosmos`
+Requirements:
+- gcc
 
-It should only require gcc (7.4.0)
+Use `make cosmos` or `make` (this will install additional utilities)
 
-Tested using cygwin.
+Linux will require `sudo make`
+
+Tested using mingw/cygwin and gcc (7.4.0).
 
 See readme.txt for dev info.
 
@@ -251,6 +254,15 @@ Note that relations from different lines are separated by _ands_ (semicolons are
 
 Details
 ----
+
+**0.12.1**
+
+- Added trace for debugging. Simply add this to your file,
+```
+debug.sethook(debug.trace)
+```
+
+**0.12**
 
 With the advent of the Cosmos 0.12 VM,
 - It's still in alpha.

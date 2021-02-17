@@ -8,14 +8,46 @@ require('io5',io)
 functor(Cons, Functor)
 
 //print2=print
-
+/*
+rel write(s)
+	if(type(s,'string'))
+	else
+	
+rel write(s)
+	if(s!='get')
+		io.write(s)
+	else
+		true
+	*/
+rel write(s)
+	io.write(s)
+		
+rel str(l,i,n)
+	choose(i=n)
+		io.write('')
+	elseif(i=n-1)
+		fixed.get(l,i,e)
+		write(e)
+	else
+		fixed.get(l,i,e)
+		write(e)
+		io.write(', ')
+		str(l,i+1,n)
+	
 debug={
 	rel sethook(p)
 		c::sethook(p)
-		x=1
-		//print(p)
-		//print('-')
 		
+	rel trace(l)
+		c::closure(e,name,n,i)
+		//print(['-',l,name,n,i])
+		//print(name)
+		io.write('| ')
+		io.write(name)
+		io.write('(')
+		str(l,0,n)
+		io.write(')\n')
+			
 	rel getlocal(i,x)
 		c::getlocal(i,x)
 /*		
@@ -37,29 +69,6 @@ rel p(x)
 rel q(x,y,z)
 	true
 	
-rel str(l,i,n,s)
-	choose(i=n)
-		s=''
-	elseif(i=n-1)
-		fixed.get(l,i,e)
-		s=''+e
-	else
-		fixed.get(l,i,e)
-		s1=''+e+', '
-		str(l,i+1,n,s2)
-		s=s1+s2
-		
-rel trace(l)
-	c::closure(e,name,n,i)
-	//print(['-',l,name,n,i])
-	str(l,0,n,s)
-	//print(name)
-	print(l)
-	print(s)
-	io.write(name)
-	io.write('('+s+')\n')
-	//c::getlocal(e,0,x) and print(x)
-	
 rel callbacks()
 	i=2
 	c::getfname(name)
@@ -73,10 +82,10 @@ rel callbacks()
 	c::getnlocs(n)
 	print([c,n,x,x1])
 	debug.sethook(p)
-print(debug)
+//print(debug)
 //print(_table)
 //callbacks()
-debug.sethook(trace)
+//debug.sethook(debug.trace)
 //p(x)
 p(1)
 q(1,x,3)
@@ -89,5 +98,5 @@ rel callbacks()
 	
 //p(3)
 p(x)
-
-export(debug)*/
+*/
+export(debug)
