@@ -1,9 +1,7 @@
 
-YACC=yacc
-YFLAGS= -d
-LEX=flex
 CC=g++
 CFLAGS= -g -std=c++0x -fpermissive -w
+C=./p
 
 all:
 	$(CC) $(CFLAGS) main2.cpp -o p
@@ -41,11 +39,9 @@ debug:
 8:
 	./gen7 gen8
 c:
-	./p c0 c10
-
-clean-test:
-	rm cosmos cosmos2 test*.bc p p2 temp* log
-	rm *exe*
+	#./p c0 c10
+	$(C) 10 12
+	$(C) 12 2
 	
 clean:
 	rm -f cosmos cosmos2 test*.bc p p2 temp* log

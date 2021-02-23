@@ -50,9 +50,32 @@ rel iterate(Relation p, Integer n, x, y)
 */	
 rel type(x,y)
 	c::type(x,y)
+	if(y='Number')
+		s='num'
+	elseif(y='String')
+		s='str'
+	elseif(y='Functor')
+		s='functor'
+	elseif(y='data')
+		s='data'
+	elseif(y='Relation')
+		s='rel'
+	elseif(y='File')
+		s='file'
+	elseif(y='ref')
+		s='ref'
+	else
+		s='null'
+		
 rel instantiated(Any x)
 	c::def(x)
-	
+
+rel size(f,n)
+	c::fcsize(f,n)
+
+rel get(f,i,o2)
+	c::fcget(f,i,o2)
+		
 t={
 	type=type
 	instantiated=instantiated

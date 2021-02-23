@@ -1,0 +1,167 @@
+	
+rel halt()
+	c::halt()
+
+//require('string.bc', string)
+functor(Cons, Functor)
+
+rel each2(l,p)
+	case
+		l=[]
+	case
+		l=[e,e2|l2]
+		p(e,e2)
+		each2(l2,p)
+
+each2(['lexer12.bc', lexer,'parser9.bc', parser,'gen9.bc', gen,'env7.bc', env,'io5.bc', io,'serialize9.bc', sel,'list',list],require)
+//require In In
+//already defined
+_prefix='c::cut() and rel print(i) c::print(i); and rel require(i,i2) c::require(i, i2);\n'
+
+require('debug',debug)
+	
+rel run(s, e, e2, s1,l)
+	io.write('==\n')
+	//debug.sethook(debug.trace)
+	c::clock(t0)
+	print('lexer')
+	//parser.lexer(s,fc1)
+	print(lexer)
+	c::cut()
+	lexer.run(s,fc1)
+	print(fc1)
+	//halt()
+	c::clock(t1)
+	print('parse')
+	parser.run_parser(fc1,fc)
+	c::cut()
+	//c::full_print(l2)
+	print(fc)
+	c::clock(t2)
+	//c::full_print(fc)
+	//c::halt()
+	io.write('==\n')
+	print('gen')
+	//c::pause()
+	//c::break()
+	gen.generate_body(e, e2, fc, s1)
+	print('')
+	print(e2.vars)
+	print('serialize')
+	print(s1)/* */
+	c::clock(t3)
+	//print([t1,t2,t3])
+	l=[t0,t1,t2,t3]
+	//c::halt()
+	
+rel new_env(e)
+	table.new(t1)
+	nil=Cons
+	env.new(e, [], t1)
+	print(e)
+	
+rel core(e)
+	io.readFile('core.co', s)
+	new_env(e1)
+	run(s, e1, e2, _, _)
+	env.vars(e2,vars)
+	env.functors(e2,fcs)
+	env.init(e, [], fcs, [], [])
+	
+rel comp(name)
+	//c::break()
+	io.readFile(name+'.co', s)
+	//print(s)
+	new_env(e)
+	//core(e)
+	print(e)
+	io.write('--\nstart ')
+	print(name)
+	//c::halt()
+	//s0='functor(Cons, Functor) and functor(Pair, Functor) and functor(Tuple, Functor)\nrel print(i) c::print(i); and rel require(i,i2) c::require(i, i2); and rel halt(i) c::halt(i);\n'
+	//s0=''
+	s0="c::require('table9.bc', _table) and c::require('table5.bc', table)\n"
+	c::args(args)
+	if(list.has(args,'--no-std'))
+		s1=s0
+		print('std')
+		//c::halt()
+	else
+		s1=s0+_prefix
+	run(s1+s, e, e2, fc,l)
+	io.openBinary(name+'.bc', 'write', f)
+	sel.serialize(f, fc, e2)
+	c::cut()
+	print('Generated:')
+	print(fc)
+	//c::full_print(fc)
+	c::clock(t4)
+	l=[t0,t1,t2,t3]
+	//x=t2-t1
+	//print(l)
+	print(['lexer',t1-t0])
+	print(['parser',t2-t1])
+	print(['gen',t3-t2])
+	print(['sel',t4-t3])
+
+//io.readFile('test1.cosmos', s)
+//readFile=io['readFile']
+//readFile('test0.co', s)
+c::print('-')
+//c::def(io)
+//io.readFile('test3.co', s)
+//io.readFile('test5.co', s)
+//print(readFile)
+//io.readFile('table.co', s)
+//io.readFile('lexer3.co', s)
+
+//s='x=1'
+//s='rel p(x) x=1; and p(2)'
+//s='test5'
+//s='test6'
+//s='gen2'
+//cosmos.comp(s)
+//s='a.p(2)'
+//s='test0'
+//s='x=1'
+c::cut()
+c::arg(s)
+print(s)
+c::cut()
+
+comp(s)/*
+//core(e)
+//print(e)
+//c::parser2()
+['lexer', 5.912]
+['parser', 11.56]
+['gen', 4.866]
+['sel', 7.379]
+
+require('list5.bc', list)
+list.push([1],2,l)
+print(l)
+lexer.run(s,0,l1)
+print(l1)
+ws.run(l1,l2)
+cut
+
+parser.parse_body(l2,tail,fc)
+//parser.run(l2,fc)
+print(fc)
+
+env.new(e, [], [])
+//new_env(e)
+print(e)
+c::cut()
+t1=['Any']
+
+gen.generate_body(e,e2,fc,fwam)
+print(env)
+print(fwam)
+print(gen)*/
+//require('list5.bc', table)
+//env.new(e, [], [])
+
+//run('x=1', e, e2, fc)
+print(s)

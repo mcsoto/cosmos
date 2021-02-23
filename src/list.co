@@ -94,7 +94,7 @@ rel pop(Functor l, Functor l2)
 	l2=tail
 	
 rel find(Functor l, Any e, i)
-	c::type(i,'int')
+	c::is_int(i)
 	c::def(e)
 	l=Cons(e1,tail)
 	if(e=e1)

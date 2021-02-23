@@ -1,7 +1,7 @@
 
 require('string5.bc', string)
 //require('table5.bc', table)
-require('list5.bc', list)
+require('list.bc', list)
 
 functor(Cons, Functor)
 functor(Token, Functor)
@@ -171,10 +171,10 @@ rel parse_number(s,i,i2)
 	match_some(s,i,i2,digit)
 	
 rel parse_id(s,i,i2)
-	match_some(s,i,x,letter)
+	match_some(s,i,x,letter2)
 	match_any(s,x,i2,digit)
 
-//tries to find if word s is in list, if so set s=z
+//tries to find if word c is in list, if so set c=z
 rel match_list(l,s,z)
 	l=Cons(head, tail)
 	if(head=s) //choose
@@ -186,7 +186,7 @@ rel match_list(l,s,z)
 rel navigate_ws2(String s,Integer i,Integer i2,line,col,info2)
 	if(string.at(s,i,c))
 		if(c='\n')
-			navigate_ws2(s,i+1,i2,line+1,1,info2)
+			navigate_ws2(s,i+1,i2,line+1,0,info2)
 		elseif(c='\t')
 			navigate_ws2(s,i+1,i2,line,col+4,info2)
 		elseif(c='\r')
@@ -206,7 +206,7 @@ rel navigate_whitespace(s,i,i2,info,info2)
 		navigate_ws2(s,i+1,i2,line+1,0,info2)
 	else
 		navigate_ws2(s,i+1,i2,line,col,info2)
-
+	
 rel navigate_until_asterisk(s,i,i2,info,info2)
 	info=Info(line,col)
 	string.at(s,i,c)
@@ -252,15 +252,36 @@ rel navigate_comment(s,i,i2,info,info2)
 //rel step4(s, i, j, z, c, info)
 rel step5(s, i, j, z, c, info)
 	case
-		l=['<=','>=','!=','::']
-		string.slice(s,i,i+2,s2) //todo syntax for this
-		match_list(l, s2, z) and j=i+2
+		match_string(s,i,j,'<=')
+		z='<='
 	case
-		l=['+','-','<','>','[',']','/','*','#','_','!',':']
+		match_string(s,i,j,'>=')
+		z='>='
+	case
+		l=['+','-','<','>','[',']','/','*','#','_','!']
 		match_list(l, c, z) and	j=i+1
 	case
 		match_one(s,i,j,single_quote)
 		z='single_quote'
+
+rel step4(s, i, j, z, c, info)
+	case
+		parse_string(s,i,j)
+		z='string'
+	case
+		parse_id(s,i,j)
+		z='id'
+	case
+		parse_number(s,i,j)
+		z='number'
+	case
+		match_string(s,i,j,'!=')
+		z='!=' //todo doesn't work if this goes first
+	case
+		match_string(s,i,j,'::')
+		z='::'
+	case
+		step5(s, i, j, z, c, info)
 
 rel keywords(s, z)
 	list.has(['rel', 'and', 'or', 'true', 'false', 'if', 'case', 'elseif', 'else', 'choose', 'once'],s)
@@ -269,7 +290,7 @@ rel keywords(s, z)
 rel step1(s, i, j, z, info, info2)
 	c::def(i)
 	cut
-	choose(navigate_whitespace(s,i,j,info,info2))
+	if(navigate_whitespace(s,i,j,info,info2))
 		z='whitespace'
 		//check(s)
 	elseif(navigate_comment(s,i,j,info,info2))
@@ -291,17 +312,10 @@ rel step1(s, i, j, z, info, info2)
 				z='case'
 			else
 				z='id'
+
 		else
 			//c::break()
-			//step4(s,i,j,z,c,info)
-			case
-				parse_string(s,i,j)
-				z='string'
-			case
-				parse_number(s,i,j)
-				z='number'
-			case
-				step5(s, i, j, z, c, info)
+			step4(s,i,j,z,c,info)
 			
 		info=Info(line, col)
 		info2=Info(line, col+j-i)
@@ -339,7 +353,7 @@ rel run2(s,start,l,info,info2)
 		
 rel run(s,start,l)
 	//run2(s,start,l,Info(1, 0),info2)
-	run2(s,start,l,Info(1-1, 1),info2)
+	run2(s,start,l,Info(1-1, 0),info2)
 	c::cut()
 
 rel test(s,i,j,z)
@@ -407,7 +421,7 @@ rel remove_prev_inds(s1,ind,s2)
 
 rel remove_cur_inds(ind, sgoal, n)
 	case
-		fold(ind, string.concat, '', s)
+		fold(ind, s_concat, '', s)
 		s=sgoal
 		n=0
 	case
@@ -554,15 +568,23 @@ rel ws(l, ind, tk_prev, l2)
 		ws(t1, ind, h1, t2)
 		l2=t2
 
+rel check_eof(l2)
+	if(l2=[Token('EOF',_,_)])
+		true
+	else
+		//debug(l2)
+		//custom_throw('lexer error',_)
+		throw('lexer error')
 rel run_ws(l1,l2)
-	if(l1=Cons(Token(_,'whitespace',_), tks_tail)) //remove whitespace at the beginning
+	choose(l1=Cons(Token(_,'whitespace',_), tks_tail)) //remove whitespace at the beginning
 		run_ws(tks_tail, l2)
 		if(l2=[Token('EOF',_,_)])
 			true
 		else
-			debug(l2)
+			//debug(l2)
 			//custom_throw('lexer error',_)
-			throw('lexer error')
+			//throw('lexer error')
+			debug('lexer error')
 	else
 		ws(l1, [], Token('','SOF',_), l2) //SOF=start of file token
 /*
@@ -576,8 +598,10 @@ rel run_all(s,l3)
 	debug("lexer...")
 	run(s, 0, l2)
 	debug(l2)
+	//debug("whitespace...")
+	print("whitespace...")
+	cut
 	//halt()
-	debug("whitespace...")
 	run_ws(l2,l3)
 	debug(l2)
 	debug(l3)
@@ -587,18 +611,19 @@ t={
 	'run'=run_all
 }
 export(t)
+require('debug',debug2)
+debug2.sethook(debug2.trace)
 cut
+//require('table.bc', table)
 //run_all('a=2',l)
 //s='rel p.p() true;'
-//s='x2\nonce x=cond1 and cond <='
-//s='x2\nonce x=cond1 and cond <='
-//s='x2\nonce x=cond1 and cond <='
-s="c::require('table9.bc', _table)"
-run_all(s,l)/*
 //s='a=2'
 //s='true'
 //s='rel p(x) x=2; and p(x)\n'
-//run_all(s,l)
 //s='x=((1)+2)//a'
+io.readFile('test8.co',s)
 //s='t={\n\tx=\trel()\n\t\tx=1\n}'
-//io.readFile('test8.co',s)*/
+run_all(s,l)/**/
+
+list.join(l,' ',l2)
+debug(l2)

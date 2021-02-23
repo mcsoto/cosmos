@@ -105,8 +105,9 @@ rel parse(s1,e2,fc1)
 	new_env(e)
 	gen.generate_body(e, e2, fc, fc1)
 	
-rel write(f, s1, e2)
+rel write(fname, s1, e2)
 	c::cut()
+	io.openBinary(fname, 'write', f)
 	sel.serialize(f, s1, e2)
 	//print(fc) and print('Generated:') and print(s1)
 	io.close(f)
@@ -114,11 +115,9 @@ rel write(f, s1, e2)
 rel run_bytecode(s)
 	//print('run bc')
 	//c::eval(s,i)
-	if(c::eval(s,i))
-		//print(i)
+	if(c::eval(s))
 		true
 	else
-		//io.writeln('| false')
 		false
 		/*
 	io.writeln('eval')
@@ -136,7 +135,6 @@ rel run_bytecode2(s)
 		io.writeln("\nCosmosError: Program did not return successfully.")
 
 rel exec_bytecode(s)
-	//c::eval(s)
 	exec('./p2 '+s)
 	
 rel run_query(s,e2)
@@ -144,10 +142,7 @@ rel run_query(s,e2)
 	s1='temp'
 	parse(s,e2,fc2)//+' and c::cur() and c::locs()'
 	//print('Generated:') and print(fc2)
-	io.openBinary(s1, 'write', f)
-	write(f, fc2, e2)
-	//c::locs()
-	//exec('./p2 cosmos.bc -b temp')
+	write(s1, fc2, e2)
 	//cut
 	//print('Program:')
 	//run_bytecode(s1)
@@ -155,9 +150,8 @@ rel run_query(s,e2)
 rel compile(s, fname) //parse and write to bytecode
 	parse(s,e2,l1)
 	io.openBinary(fname, 'write', f)
-	write(f, l1, e2)
-	io.close(f)
-
+	write(fname, l1, e2)
+	
 rel compile_to_file(module)
 	name1=module+'.'+'co'
 	name2=module+'.bc'
@@ -247,6 +241,7 @@ rel main(args)
 			//print(l)
 			//c::locs()
 			io.write('| ')
+			print_vars(l)
 		else
 			io.writeln('| false')
 	elseif(find_flag0(args, '-t'))

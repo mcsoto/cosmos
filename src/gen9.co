@@ -583,7 +583,7 @@ rel term(env,env2,prefix,a,CWam f)
 		extract_type(env,a1,a2)
 		send(a2,lib)
 		debug(['op',op, a1,lib])
-		if(lib='any')
+		if(lib='any')			
 			if(op='add')
 				f3=Host('c', 'dyn_add',[a1,b1,temp])
 			else
@@ -949,7 +949,7 @@ rel bind(env,env2, a, b, CWam t, info)
 			bind_void(env1,env3, b, y)
 			debug([a,b,x,y])
 			bind_type(env3,env2,a,b,ta,tb,info)
-			t=Eq(x, y)
+			t=Eq(x, y)/*
 		elseif(b=Id(name2,_))
 			debug(env.vars)
 			setup_var(env,env1,name,x)
@@ -960,7 +960,7 @@ rel bind(env,env2, a, b, CWam t, info)
 			t=Eq(x, y)
 			debug(['var-eq',name,name2])
 			//debug(env2)
-			debug(Tuple(x,y,t))
+			debug(Tuple(x,y,t))*/
 		else
 			debug(['bind-term',a,b])
 			bind_term(env,env1, name, b, t)
@@ -1054,6 +1054,42 @@ rel gen4(env, env2, Functor f, Functor code, info)
 		f1=Host('c',fn,l)
 		generate_body(env, env2, f1, code)
 	
+	elseif(f=Fact(name, args, info))
+		if(name='functor') //1. add functor
+			code=True
+			c=Var(name2,0,type)
+			args=[Id(name2,_), Id(arg1, arg2)]
+			//args=[h|t]
+			debug(F(arg1,arg2))
+			if(arg2=[])
+				type=[arg1]
+			else
+				list.concat(arg2, [[arg1]], type) //add last name (arg1) to the end of type
+				debug(type)
+			type=Cons(first_type, _)
+			debug(['fc',first_type,arg1,arg2,type])
+			//debug(c)
+			Env.push_on(env, 'fcs', c, env1)
+			if(first_type!='Functor')
+				Env.get(env,'types',o)
+				table.set(o,first_type,'Functor',o2)
+				Env.set(env1, 'types', o2, env2)
+			else
+				env1=env2
+			//env1=env2
+		elseif(list.has(['cut'],name))
+			f1=Host('c',name,args)
+			generate_body(env, env2, f1, code)
+		elseif(name='throw')
+			f1=Host('c','throw',args)
+			generate_body(env, env2, f1, code)
+			args=[c|_]
+		elseif(name='label')
+			env2=env
+			args=[c]
+		else
+			c::throw('fc')
+			
 	else
 		print(f)
 		custom_throw('cannot compile code',info)
@@ -1178,6 +1214,8 @@ rel check_relation(name, env, env2,info)
 		true
 	//is_type(a, 'Relation', env)
 rel helper1(a,b)
+	//print([a,b])
+	//rel (a,b) b=And(Fact('cut',[],info),a);
 	if(a=And(a1,a2))
 		b=And(a1,And(Fact('cut',[],info),a2))
 	else
@@ -1300,41 +1338,6 @@ rel generate_body(env, env2, Functor f, code)
 		//debug(table.get(env3,'upvals'))
 		//env2=env1
 	
-	elseif(f=Fact(name, args, info))
-		if(name='functor') //1. add functor
-			code=True
-			c=Var(name2,0,type)
-			args=[Id(name2,_), Id(arg1, arg2)]
-			//args=[h|t]
-			debug(F(arg1,arg2))
-			if(arg2=[])
-				type=[arg1]
-			else
-				list.concat(arg2, [[arg1]], type) //add last name (arg1) to the end of type
-				debug(type)
-			type=Cons(first_type, _)
-			debug(['fc',first_type,arg1,arg2,type])
-			//debug(c)
-			Env.push_on(env, 'fcs', c, env1)
-			if(first_type!='Functor')
-				Env.get(env,'types',o)
-				table.set(o,first_type,'Functor',o2)
-				Env.set(env1, 'types', o2, env2)
-			else
-				env1=env2
-			//env1=env2
-		elseif(list.has(['cut'],name))
-			f1=Host('c',name,args)
-			generate_body(env, env2, f1, code)
-		elseif(name='throw')
-			f1=Host('c','throw',args)
-			generate_body(env, env2, f1, code)
-		elseif(name='label')
-			env2=env
-			args=[c]
-		else
-			c::throw('fc')
-			
 	elseif(f=Eq(a,b,info))
 		debug(['code',code])
 		bind(env,env_b,a,b,code,info)

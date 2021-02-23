@@ -5,6 +5,10 @@ require('fixed',fixed)
 
 require('io5',io)
 
+require('logic5',logic)
+
+require('string5.bc', string)
+
 functor(Cons, Functor)
 
 //print2=print
@@ -20,7 +24,16 @@ rel write(s)
 		true
 	*/
 rel write(s)
-	io.write(s)
+	logic.type(s,x)
+	if(x='str')
+		//x='String'
+		string.size(s,n)
+		n>10
+		cut
+		io.write('#str')
+	else
+		io.write(s)
+		cut
 		
 rel str(l,i,n)
 	choose(i=n)
@@ -42,15 +55,18 @@ debug={
 		c::closure(e,name,n,i)
 		//print(['-',l,name,n,i])
 		//print(name)
-		io.write('| ')
-		io.write(name)
-		io.write('(')
-		str(l,0,n)
-		io.write(')\n')
+		choose(name='get')
+			true
+		else
+			io.write('| ')
+			io.write(name)
+			io.write('(')
+			str(l,0,n)
+			io.write(')\n')
 			
 	rel getlocal(i,x)
 		c::getlocal(i,x)
-/*		
+		
 	rel print(o)
 		if(mutable.get(t,'on',1))
 			print2(o)
@@ -58,11 +74,11 @@ debug={
 			true
 		
 	rel switch(i)
-		mutable.set(t,'on',i)*/
+		mutable.set(t,'on',i)
 	rel p(i)
 		true
 }
-
+/*
 rel p(x)
 	true
 
@@ -72,9 +88,6 @@ rel q(x,y,z)
 rel callbacks()
 	i=2
 	c::getfname(name)
-	print(name)/*
-	c::getlocal(0,x)
-	c::getlocal(1,x1)*/
 	debug.getlocal(2,y)
 	//debug.p()
 	//o=debug.p
@@ -89,7 +102,7 @@ rel callbacks()
 //p(x)
 p(1)
 q(1,x,3)
-/*
+
 rel p(x)
 	x=1//+2
 	

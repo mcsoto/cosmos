@@ -61,16 +61,6 @@ static FILE* f;
 
 #define	set_i(o,n) ((o)->value.i = n;)
 
-#define setf(o) do { o->type = T_REF; o->value.o = o; } while (0)
-	
-#define setr(o,V) do { o->type = T_NUM; o->value.r = V; trail_push(o); } while (0)
-#define seti(o,V) do { o->type = T_INT; o->value.i = V; trail_push(o); } while (0)
-#define sets(o,V) do { o->type = T_STR; o->value.s = V; trail_push(o); } while (0)
-#define setfc(o,V) do { o->type = T_FUNCTOR; o->value.fc = V; trail_push(o); } while (0)
-	
-#define news(o,V) do { o=new Object; o->type = T_STR; o->value.s = V; } while (0)
-#define newi(o,V) do { o=new Object; seti(o,V); } while (0)
-
 #define cpy(o,o2) {o->type=o2->type;o->value=2;}
 
 //#define get(t,s,o2) do { o2 = (*t)[s]; } while (0)
@@ -170,6 +160,7 @@ typedef enum
 	T_FILE,
 	T_REF,
 	T_DATA,
+	T_OBJ,
 	T_FUNCTOR
 } Type;
 
@@ -389,12 +380,29 @@ bool unbound(Object* o) {
 	return o->value.o==o;
 }
 
+bool bound(Object* o) {
+	return o->type!=T_REF || unbound(o);
+}
+
 Object* deref(Object *o) {
 	while(o->type==T_REF && !unbound(o)) {
 		o = o->value.o;
 	}
 	return o;
+
 }
+//#define out(o) do { if(bound(o)) throw "calling a relation that needs an unbound variable (Out) parameter with a value or bound variable (In)"; } while (0)
+#define out(o) 0;
+#define setf(o) do { o->type = T_REF; o->value.o = o; } while (0)
+	
+#define setr(o,V) do { out(o); o->type = T_NUM; o->value.r = V; trail_push(o); } while (0)
+#define seti(o,V) do { out(o); o->type = T_INT; o->value.i = V; trail_push(o); } while (0)
+#define sets(o,V) do { out(o); o->type = T_STR; o->value.s = V; trail_push(o); } while (0)
+#define setfc(o,V) do { out(o); o->type = T_FUNCTOR; o->value.fc = V; trail_push(o); } while (0)
+#define seto(o,V) do { out(o); o->type = T_OBJ; o->value.t = V; trail_push(o); } while (0)
+	
+#define news(o,V) do { o=new Object; o->type = T_STR; o->value.s = V; } while (0)
+#define newi(o,V) do { o=new Object; seti(o,V); } while (0)
 
 void display(Object*, int);
 
@@ -440,7 +448,7 @@ void display(FILE *f, Object* o, int layer) {
 		fprintf(f,"null");
 	else if(o->type==T_DATA) {
 		fprintf(f,"#data");
-	}/*
+	}
 	else if(o->type==T_OBJ) {
 		//printf("{}");
 		//print_map(o->value.t);
@@ -448,7 +456,7 @@ void display(FILE *f, Object* o, int layer) {
 			fprintf(f,"...");
 			return;
 		}
-		fprintf(f,"data#{");
+		fprintf(f,"ctable#{");
 		Table* t = o->value.t;
 		for (Table::iterator it=t->begin(); it!=t->end(); ++it) {
 			if(it!=t->begin()) std::cout << ", ";
@@ -457,7 +465,7 @@ void display(FILE *f, Object* o, int layer) {
 			display(f,it->second, layer+1);
 		}
 		fprintf(f,"}");
-	}*/
+	}
 	else if(o->type==T_FUNCTOR) {
 		Functor* fc = (Functor*)o->value.fc;
 		//if(layer>4) { printf("..."); return; }
@@ -1674,7 +1682,7 @@ vm:
 			o = &(c->locals[n]); //gets object from locals
 			o2 = regs[251]; //gets constant from Ai
 			o = deref(o);
-			if(o->type!=T_DATA) {
+			if(o->type!=T_OBJ) {//T_DATA) {
 				p1("null\n");
 				displayFormatln(o);
 				displayFormatln(o2);
@@ -2217,7 +2225,7 @@ Env *read_file(char* fname) {
 		f = fopen(s, "rb");
 		if(f==NULL) {
 			printf("Could not open file: %s[2]\n",s);
-			throw "Could not open file;;";
+			throw "Could not open file";
 			//return e0;
 		}
 	}

@@ -163,6 +163,7 @@ print(o1)
 */
 l=['a','b']
 //list.map(x, toString, l2)
+/*
 list.join(l, ', ', s)
 print(s)
 string.findIndex(s,',',0,x)
@@ -172,7 +173,7 @@ if(x>2)
 	true
 else
 	true
-/*
+
 cond
 	x=1
 cond
@@ -222,7 +223,7 @@ rel range(i, j, x)
 		x=i
 	else
 		range(i+1,j,x)
-
+/*
 logic.listOf(x,range,[0,4,x],l)
 //list.listOf(x,range,[0,4,x],l)
 //forall(x,range,[0,4,x],rel(x) x!=y;)
@@ -236,4 +237,8 @@ rel p(x)
 //t.lonce(p,[yz])
 logic.applyOnce(p,[yz])
 print(yz)
-yz=2
+yz=2*/
+zz=F
+logic.type(1,x)
+print(x)
+print(zz)

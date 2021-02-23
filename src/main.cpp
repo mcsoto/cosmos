@@ -33,8 +33,7 @@ int main(int argc, char* argv[]){
 	/*read from file*/
 	e0 = read_file("cosmos.bc");
 	
-	f = fopen("log", "w");
-	if(f==NULL) throw NULL;
+	//f = fopen("log", "w"); if(f==NULL) throw NULL;
 	
 	if(e0==NULL) return 1;
 	//throw 2;
@@ -45,7 +44,7 @@ int main(int argc, char* argv[]){
 	/* display result */
 	#ifdef DEBUG
 	//printf("==> regs: ["); display(regs[0]); printf(", "); display(regs[1]); printf(", "); display(regs[2]); printf("]\n");
-	fclose(f);
+	//fclose(f);
 	#endif
 	//double x=time();
 	//return i;

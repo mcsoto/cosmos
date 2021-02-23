@@ -173,12 +173,6 @@ int set() {
 	printf("mode:%c;%d\n",cgb.mode,cgb.line);
 }
 
-int table_new() {
-	prep();
-	o->type = T_DATA;
-	o->value.t = new Table;
-}
-
 int arg() {
 	Object* o = regs[0];
 	printf("arg[%d]",arg_n);
@@ -439,6 +433,9 @@ int type() {
 	else if(o->type==T_REL) {
 		sets(o2,"Relation");
 	}
+	else if(o->type==T_NULL) {
+		sets(o2,"null");
+	}
 	else {
 		sets(o2,"ref");
 	}
@@ -555,21 +552,26 @@ int apply() {
 
 //table
 
+int table_new() {
+	prep();
+	o->type = T_OBJ;//T_DATA;
+	o->value.t = new Table;
+}
+
 int table_set() {
-	t=deref(regs[0])->value.t;
-	o2=deref(regs[1]);
-	o3=deref(regs[2]);
-	o4=deref(regs[3]);
+	prep4();
+	t=o->value.t;
 	//t->insert(std::pair<const char*, Object*>(o2->value.s, o3));
 	t = set(t,o2,o3);//o3 = get(t,o2);//(*t)[o2->value.s] = o3;
-	o4->type = T_DATA;
-	o4->value.t = t;
+	seto(o4,t);
+	//o4->type = T_OBJ;//T_DATA;	o4->value.t = t;
 	p(displayln(regs[3]));
 	//std::cout << (t) << std::endl;
 }
 
 int table_get() {
 	prep3();
+	throw 2;/*
 	Functor *fc=o->value.fc;
 	if(o->type!=T_FUNCTOR) throw "not functor";
 	while(fc->n!=0) {
@@ -580,7 +582,7 @@ int table_get() {
 		}
 		fc = (Functor*)fc->param[2]->value.fc;
 	}
-	valid=false;
+	valid=false;*/
 }
 
 //object
@@ -775,7 +777,12 @@ int readFile() {
 }
 
 int close() {
+	prep();
+	if(o->type==T_NULL) {
+		throw "trying to close non-file (or a file that was closed beforehand)";
+	}
 	fclose((FILE *)regs[0]->value.fc);
+	o->type=T_NULL;
 }
 	
 
@@ -1127,12 +1134,6 @@ reg lib[] = {
 	{"write8", write8},
 	{"write32", write32},
 	{"fwrite", fwrite},
-	{"pause", pause},
-	{"def", def},
-	{"undef", undef},
-	{"type", is_int},
-	{"del", del},
-	{"coll", rdy},
 	
 	{"sqrt", math_sqrt},
 	{"seed", math_seed},
@@ -1193,9 +1194,15 @@ reg lib[] = {
 	{"reg", get_register},
 	{"check", check},
 	{"undata", undata},
-	{"type", type},
 	{"fcget", fc_get},
 	{"fcsize", fc_size},
+	{"pause", pause},
+	{"def", def},
+	{"is_int", is_int},
+	{"undef", undef},
+	{"type", type},
+	{"del", del},
+	{"coll", rdy},
 	
 	{"require", require},
 	{"toString", toStr},
