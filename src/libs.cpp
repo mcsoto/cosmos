@@ -677,16 +677,13 @@ int io_print2() {
 
 int open() {
 	//pl::fopen(name,mode,f)
-	Object* o = regs[0];
-	Object* o2 = regs[1];
-	Object* o3 = regs[2];
+	prep3();
 	char* name = o->value.s;
 	char* mode = o2->value.s;
 	FILE *f = fopen(name, mode);
 	//p2("%s,%s\n",name,mode);
 	if(f==NULL)
-		//valid=false;
-		throw "Could not open file;";
+		throw "Could not open file";
 	else {
 		o3->value.fc = f;
 		o3->type = T_FILE;
@@ -723,19 +720,11 @@ int write32() {
 	fwrite(&i, sizeof(int), 1, f);
 }
 
-int fwrite() {
+int fwrite_() {
 	prep2();
-	FILE *f = fopen(o->value.s, "write");
+	FILE *f = (FILE *)o->value.fc;
 	char *s = o2->value.s;
-	int n=strlen(s);
-	printf("write %s, %d\n", o->value.s, strlen(s));
-	//fwrite(s, sizeof(char), strlen(s), f);
-	//char buffer[1024];
-	//printf(";%s\n", o2->value.s); printf(";%s\n", to_str(o2));
-	fprintf(f, "%s\n", s);
-	fclose(f);
-	printf("end write %s, %d\n", o->value.s, strlen(s));
-	//printf("%s", s);
+	fwrite(s, sizeof(char), strlen(s), f);
 }
 
 int fileReadAll() {
@@ -1133,7 +1122,7 @@ reg lib[] = {
 	{"readFile", readFile},
 	{"write8", write8},
 	{"write32", write32},
-	{"fwrite", fwrite},
+	{"fwrite", fwrite_},
 	
 	{"sqrt", math_sqrt},
 	{"seed", math_seed},

@@ -406,9 +406,12 @@ rel parse_if(l,tail,f)
 	parse_body(l2,l3,fbody1)
 	l3=Cons(Token(_,')',_), l4)
 	parse_body(l4,l5,fbody2)
-	parse_elseifs(l5,l11,cond)
+	parse_elseifs(l5,l11,cond1)
+	if(cond1=[]) //no else
+		cond=[True]
+	else
+		cond=cond1
 	l11=Cons(Token(_,';',_), tail)
-	//pl::writeln(cond)
 
 rel parse_case2(l,l1)
 	l = [Token(_,'case',_)| l1]
@@ -430,7 +433,6 @@ rel parse_case(l,tail,f)
 	l3=[Token(_,';',_)| tail]
 	f=Cond(True,f1,cond)
 	debug(f)
-	//pl::writeln(f)
 	
 /* simple statements */
 		

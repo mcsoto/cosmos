@@ -1,1 +1,38 @@
-x=1 and x=2
+
+rel range(i, j, x)
+	if(i<j)
+		x=i
+	else
+		range(i+1,j,x)
+/*
+logic.listOf(x,range,[0,4,x],l)
+//list.listOf(x,range,[0,4,x],l)
+//forall(x,range,[0,4,x],rel(x) x!=y;)
+//list.forall([1,2],rel(x) x!=y;)
+
+rel p(x)
+	x=1 or x=2
+
+//logic.apply(print,[1])
+//lonce(print,[1])
+//t.lonce(p,[yz])
+logic.applyOnce(p,[yz])
+print(yz)
+yz=2*/
+print(l)
+zz=F
+logic.type(1,x)
+print(x)
+print(zz)
+rel p()
+	false
+
+cond
+	logic.apply(p,[])
+cond
+	x=2
+
+if(logic.apply(p,[]))
+	true
+else
+	true

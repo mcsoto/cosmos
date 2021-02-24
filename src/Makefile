@@ -1,6 +1,6 @@
-
 CC=g++
 CFLAGS= -g -std=c++0x -fpermissive -w
+CFLAGSP= -Wall -O2
 C=./p
 
 all:
@@ -10,18 +10,18 @@ all:
 	$(CC) $(CFLAGS) -DDEBUG=1 main.cpp -o cosmos2
 	
 test:
-	$(CC) $(CFLAGS) main2.cpp -o p
 	./p nil
-	$(CC) $(CFLAGS) -DDEBUG=1 main2.cpp -o p2
 	./p2 nil
-	$(CC) $(CFLAGS) main.cpp -o cosmos
-	$(CC) $(CFLAGS) -DDEBUG=1 main.cpp -o cosmos2
+	./cosmos -l test8
+	./cosmos -l test9
+	./cosmos -l test1
+	./cosmos -l test3
 
 parser:
 	./p c10 cosmos
 	
 cosmos:
-	$(CC) $(CFLAGS) main.cpp -o cosmos
+	$(CC) $(CFLAGS) $(CFLAGSP) main.cpp -o cosmos
 
 main:	
 	$(CC) $(CFLAGS) main2.cpp -o p
@@ -38,6 +38,9 @@ debug:
 	
 8:
 	./gen7 gen8
+12:
+	./gen 10 gen9
+
 c:
 	#./p c0 c10
 	$(C) 10 12

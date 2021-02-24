@@ -74,19 +74,6 @@ rel q(i)
 	else
 		i2=2
 //
-functor(Info, Functor)
-//f=Info(2,1)
-f=Info(2,1)
-c::coll()
-c::print(f)
-
-require('io2.bc', io)
-require('lexer4.bc', lexer)
-
-io.readFile('test0.co', s)
-lexer.run(s, 0, z)
-
-
 a!=2
 
 rel require(i,i2)

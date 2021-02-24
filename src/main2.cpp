@@ -42,12 +42,7 @@ int main(int argc, char* argv[]){
 	
 	if(e0==NULL) return 1;
 	/* call upon a function */
-	//regs[252] = NULL;
-	int i=eval();/*
-	if(regs[252]!=NULL) {
-		printf("\n==> ");
-		displayFormatln(regs[252]);
-	}*/
+	int i=eval();
 	/* display result */
 	end();
 	if(i==0)

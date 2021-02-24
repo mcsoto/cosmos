@@ -33,20 +33,7 @@ rel toString(Any x, String s)
 		pl::number_string(x, s)
 	else
 		s=x
-
-rel applyCatch(Relation p, Functor l, Relation q)
-	pl::apply_catch(p,l,q)
-	
-rel listOf(x, Relation p, args, Functor l)
-	pl::list_of(x, p, args, l)
-
-rel iterate(Relation p, Integer n, x, y)
-	if(n=0)
-		y=x
-	else
-		p(x,x2)
-		iterate(p, n-1, x2, y)
-		
+todo Integer->Number
 */	
 rel type(x,y)
 	c::type(x,y)
@@ -86,19 +73,28 @@ t={
 	rel applyOnce(p,l)
 		this.apply(p,l)
 		cut
+	
+	rel applyCatch(Relation p, Functor l, Relation q)
+		true
 		
+	rel listOf(x, Relation p, args, Functor l)
+		true
+	
 	rel exit()
 		c::halt()
 	rel halt()
 		c::halt()
+	rel toString(x,s)
+		c::toString()
 
 	rel pause()
 		c::read(x)
 	
 	rel throw(x)
 		c::throw(x)
-		
-	true
+	
+	'get'=get
+	'size'=size
 }
 export(t)
 

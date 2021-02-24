@@ -91,10 +91,10 @@ rel new_env(e)
 	env.new(e, [], t)
 
 //libs="functor(Cons, Functor) and c::require('table6.bc', _table) and c::require('table5.bc', table)\n"
-
+s0="c::cut() and rel print(i) c::print(i); and rel require(i,i2) c::require(i, i2); and functor(Cons, Functor) and c::require('table9.bc', _table) and c::require('table.bc', table) and functor(Cons, Functor) and functor(Tuple, Functor)\n"
+	
 rel parse(s1,e2,fc1)
 	//s0="rel print(i) c::print(i); and rel require(i,i2) c::require(i, i2); and functor(Cons, Functor) and c::require('table9.bc', _table) and c::require('table5.bc', table) and functor(Cons, Functor) and functor(Tuple, Functor)\n"
-	s0="c::cut() and rel print(i) c::print(i); and rel require(i,i2) c::require(i, i2); and functor(Cons, Functor) and c::require('table9.bc', _table) and c::require('table.bc', table) and functor(Cons, Functor) and functor(Tuple, Functor)\n"
 	s=s0+s1
 	//io.writeln('Parsing...')
 	lexer.run(s,f1)

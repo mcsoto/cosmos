@@ -967,9 +967,11 @@ rel bind(env,env2, a, b, CWam t, info)
 			compare_types(env1,env2,a,b,info)
 			//debug(t)
 	elseif(b=Id(name,_)) //assign b := a
-		bind_const(env,env2,a,c)
+		//bind_const(env,env2,a,c)
+		bind(env,env2, b, a, t, info)
 	else
-		custom_throw('comparing consts is redundant',info) //todo warning
+		//custom_throw('comparing consts is redundant',info) //todo warning
+		true
 	
 rel generate_cond(l, code, env, env2)
 	if(l=Cons(c, l2)) //elseif(c) d
@@ -1250,6 +1252,7 @@ rel generate_body(env, env2, Functor f, code)
 		code=And(s1,s2)
 
 	elseif(f=Cond(a,b,l)) //if(a) b [l]
+		//print(F1(f))
 		generate_body(env, env2, Cond(And(a,b), l), code)
 		debug(F1(code))
 			
