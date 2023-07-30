@@ -13,20 +13,12 @@ Status
 
 The language is in testing stage.
 
-This was published only to release the current code.
+The development has moved to [here](https://cosmos-lang.github.io/).
 
-Ideally, it'll go:
-
-```
-alpha -> beta (most bugs fixed, no missing features)
-beta -> full (decent performance)
-```
-
-This answers any "when is it done?" questions.
-
-The focus is on fixing issues and making it easy to try the language instead of performance, so as to make it usable for simple scripts, however.
-
-See details.
+* This repo has Cosmos(c). It's the repo for the standalone C compiler.
+* At some point if we or any contributor wants to work on the standalone C compiler, they may use this repo.
+* Currently, the most up-to-date version is Cosmos(pl).
+* Cosmos(pl) is found on the link.
 
 Download
 ---
