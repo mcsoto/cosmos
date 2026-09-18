@@ -1,0 +1,1 @@
+//t={1=2} and init x=2 and if(x=t[1]) next x=1; and print(x)

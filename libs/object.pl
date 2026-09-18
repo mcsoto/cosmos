@@ -1,16 +1,19 @@
 :- style_check(-singleton).
-cosmos_object__new(_o, _prop, __o) :- default_lib("table", _table), getnil(_table, "update", T1), call_cl(T1, [_o, _prop, _o2]).
-cosmos_object__get(_t, _o, _o2) :- (get_(_t, _o, _o2) -> true ; (getnil(_t, "_prototype", T2), cosmos_object__get(T2, _o, _o2) -> true ; add_("cannot access field ", _o, T3), add_(T3, " of object", T4), throw(T4))).
-cosmos_object__set(_t, _o, _o2, _t2) :- obj_set(_t, _o, _o2, _t2).
-cosmos_object__value_new(V1, V2, V3, _upvals) :- cosmos_object__new(V1, V2, V3).
-cosmos_object__value_get(V1, V2, V3, _upvals) :- cosmos_object__get(V1, V2, V3).
-cosmos_object__value_set(V1, V2, V3, V4, _upvals) :- cosmos_object__set(V1, V2, V3, V4).
-object(_t) :- crequire("table", _table, _), new(T5), _nil = T5, default_lib("table", _table), getnil(_table, "toList", T6), _list = T6, default_lib("table", _table), getnil(_table, "update", T7), _update_ = T7, default_lib("table", _table), getnil(_table, "set", T8), _set_ = T8, new(T9), set_(T9, "new", clos(upvals, cosmos_object__value_new), T10), set_(T10, "get", clos(upvals, cosmos_object__value_get), T11), set_(T11, "set", clos(upvals, cosmos_object__value_set), T12), _create = clos(upvals(_nil, _set_), cosmos_object__closure_1), set_(T12, "create", _create, T13), _createFrom = clos(upvals(_set_), cosmos_object__closure_2), set_(T13, "createFrom", _createFrom, T14), _update = clos(upvals(_update_), cosmos_object__closure_3), set_(T14, "update", _update, T15), _toString = clos(upvals, cosmos_object__closure_4), set_(T15, "toString", _toString, T18), __write = clos(upvals, cosmos_object__closure_5), set_(T18, "_write", __write, T19), _getTable = clos(upvals, cosmos_object__closure_6), set_(T19, "getTable", _getTable, T20), _map = clos(upvals, cosmos_object__closure_7), set_(T20, "map", _map, T22), _imap = clos(upvals, cosmos_object__closure_8), set_(T22, "imap", _imap, T24), _t = T24.
-cosmos_object__closure_1(_t, _obj, _upvals) :- _upvals = upvals(_nil, _set_), call_cl(_set_, [_t, "_prototype", _nil, _t2]), makeobj(_t2, _obj).
-cosmos_object__closure_2(_t, __o, _o2, _upvals) :- _upvals = upvals(_set_), call_cl(_set_, [_t, "_prototype", __o, _t2]), makeobj(_t2, _o2).
-cosmos_object__closure_3(_o1, _t2, _o3, _upvals) :- _upvals = upvals(_update_), makeobj(_t1, _o1), call_cl(_update_, [_t1, _t2, _t3]), makeobj(_t3, _o3).
-cosmos_object__closure_4(_o, _s, _upvals) :- _upvals = upvals, default_lib("table", _table), getnil(_table, "remove", T16), call_cl(T16, [_o, "_prototype", _o2]), default_lib("table", _table), getnil(_table, "toString", T17), call_cl(T17, [_o, _o2]).
-cosmos_object__closure_5(_o, _s, _upvals) :- _upvals = upvals, true.
-cosmos_object__closure_6(_o, _t, _upvals) :- _upvals = upvals, makeobj(_o, _t).
-cosmos_object__closure_7(_t, _l, _t2, _upvals) :- _upvals = upvals, default_lib("table", _table), getnil(_table, "map", T21), call_cl(T21, [_t, _l, _t2]).
-cosmos_object__closure_8(_t, _l, _t2, _upvals) :- _upvals = upvals, default_lib("table", _table), getnil(_table, "imap", T23), call_cl(T23, [_t, _l, _t2]).
+'object::$impl__new'(A,B,C,D):-cosmos_receiver("table",D),cosmos_method(D,"update",[A,B,E]).
+'object::$impl_get'(A,B,C):-get_(A,B,C)->true;cosmos_get(A,"_prototype",D),'object::get'(D,B,C)->true;add_("cannot access field ",B,E),add_(E," of object",F),throw(F).
+'object::$impl_set'(A,B,C,D):-obj_set(A,B,C,D).
+object(A):-cosmos_require("table",B),(new(C),D=C),(cosmos_receiver("table",B),cosmos_get(B,"toList",E),F=E),(cosmos_receiver("table",B),cosmos_get(B,"update",G),H=G),(cosmos_receiver("table",B),cosmos_get(B,"set",I),J=I),print("-obj"),(new(K),set_(K,"new",clos(upvals([B]),'object::$value__new'),L),set_(L,"get",clos(upvals([]),'object::$value_get'),M),set_(M,"set",clos(upvals([]),'object::$value_set'),N),set_(N,"create",clos(upvals([D,J]),'object::$closure_0.0'),O),set_(O,"createFrom",clos(upvals([J]),'object::$closure_1.0'),P),set_(P,"update",clos(upvals([H]),'object::$closure_2.0'),Q),set_(Q,"toString",clos(upvals([B]),'object::$closure_3.0'),R),set_(R,"_write",clos(upvals([]),'object::$closure_4.0'),S),set_(S,"getTable",clos(upvals([]),'object::$closure_5.0'),T),set_(T,"map",clos(upvals([B]),'object::$closure_6.0'),U),set_(U,"imap",clos(upvals([B]),'object::$closure_7.0'),V),A=V),print("-obj").
+'object::_new'(A,B,C,D):-'object::$impl__new'(A,B,C,D).
+'object::$value__new'(A,B,C,upvals([D])):-'object::_new'(A,B,C,D).
+'object::get'(A,B,C):-'object::$impl_get'(A,B,C).
+'object::$value_get'(A,B,C,upvals([])):-'object::get'(A,B,C).
+'object::set'(A,B,C,D):-'object::$impl_set'(A,B,C,D).
+'object::$value_set'(A,B,C,D,upvals([])):-'object::set'(A,B,C,D).
+'object::$closure_0.0'(A,B,upvals([C,D])):-call_cl(D,[A,"_prototype",C,E]),makeobj(E,B).
+'object::$closure_1.0'(A,B,C,upvals([D])):-call_cl(D,[A,"_prototype",B,E]),makeobj(E,C).
+'object::$closure_2.0'(A,B,C,upvals([D])):-makeobj(E,A),call_cl(D,[E,B,F]),makeobj(F,C).
+'object::$closure_3.0'(A,B,upvals([C])):-(cosmos_receiver("table",C),cosmos_method(C,"remove",[A,"_prototype",D])),cosmos_receiver("table",C),cosmos_method(C,"toString",[A,D]).
+'object::$closure_4.0'(A,B,upvals([])):-true.
+'object::$closure_5.0'(A,B,upvals([])):-makeobj(A,B).
+'object::$closure_6.0'(A,B,C,upvals([D])):-cosmos_receiver("table",D),cosmos_method(D,"map",[A,B,C]).
+'object::$closure_7.0'(A,B,C,upvals([D])):-cosmos_receiver("table",D),cosmos_method(D,"imap",[A,B,C]).

@@ -1,0 +1,25 @@
+require('table', table)
+require('object', object)
+set=table.set
+update=table.mixin
+class(Env,{
+	
+	rel new(env, o)
+		update(env,{x=1},o)
+		
+	rel inc(this,x,o)
+		table.set(this,'x',2,o)
+})
+/*
+Object o={x=1}
+o.inc(1,o2)
+print(Env)
+Object o={
+	x=1
+	rel inc(this,x,this2)
+		set(this,'x',2,this2)
+}
+print(o)
+o2=o.inc(1)
+print(o2.x)//2
+*/

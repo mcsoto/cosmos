@@ -1,0 +1,16 @@
+//simple relations
+//require('debug',debug) and debug.sethook(debug.trace)
+
+rel q(x)
+	x=2
+	print('q')
+print(q)
+q(2)
+
+rel q3(x,f)
+	//x=2
+	print('q2')
+	pl::writeln(f)
+	q(2)
+	f(2)
+q3(x,q)

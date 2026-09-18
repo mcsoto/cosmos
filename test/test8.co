@@ -1,0 +1,18 @@
+functor(T, Functor)
+functor(Pair, Functor)
+
+functor(Red, Functor)
+functor(Black, Functor)
+
+functor(Tree, Functor)
+functor(E, Functor) //empty
+functor(Tuple, Functor)
+functor(Pair, Functor)
+
+rel balance(f,f2)
+	true
+	
+if(s='<')
+	balance(Tuple(color, a2, y, b), f2)
+else
+	balance(Tuple(color, a, y, b2), f2)

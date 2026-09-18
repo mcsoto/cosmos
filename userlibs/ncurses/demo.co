@@ -1,0 +1,15 @@
+// Run from a Cygwin terminal after the Cygwin ncurses backend is built:
+//   /opt/swipl-cygwin/bin/swipl -q -s compiler/platform/repl.pl -- -l userlibs/ncurses/demo.co
+
+require('ncurses', ncurses)
+
+rel main()
+	ncurses.init()
+	ncurses.clear()
+	ncurses.printAt(0,0,'Cosmos ncurses')
+	ncurses.printAt(2,0,'Press any key to return to the shell.')
+	ncurses.refresh()
+	ncurses.getch(key)
+	ncurses.close()
+
+main()

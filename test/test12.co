@@ -1,0 +1,10 @@
+
+require('list', list)
+require('table', table)
+c::setmeta('list', list)
+pl::setmeta('table',table)
+
+t={2,3,1}
+for(x in t)
+	print(x)
+

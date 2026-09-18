@@ -1,0 +1,187 @@
+functor(T, Functor)
+functor(Pair, Functor)
+
+functor(Red, Functor)
+functor(Black, Functor)
+
+functor(Tree, Functor)
+functor(E, Functor) //empty
+functor(Tuple, Functor)
+functor(Pair, Functor)
+/*
+rel require(i,i2)
+	c::require(i, i2)
+
+rel print(i)
+	c::print(i)
+*/
+rel pause()
+	c::read(x)
+
+rel balance(f,f2)
+	case
+		f=Tuple(Black, Tree(Red, Tree(Red, a,x,b), y, c), z, d) //B (T R (T R a x b) y c) z d
+		f2=Tree(Red, Tree(Black, a,x,b), y, Tree(Black,c,z,d)) //T R (T B a x b) y (T B c z d)
+	case
+		f=Tuple(color,a,x,b)
+		f2=Tree(color,a,x,b) //color a x b = T color a x b
+
+rel lt(x,y,s)
+	x=Pair(a,v)
+	y=Pair(b,v2)
+	//a<b
+	c::pure_comp(a,b,s)
+	
+rel ins2(f,f2,x)
+	case
+		f=E
+		f2=Tree(Red, E, x, E) //E = T R E x E
+	case
+		//(T color a y b) | x < y = balance color (ins a) y b | x == y = T color a y b | x > y = balance color a y (ins b)
+		f=Tree(color, a, y, b)
+		lt(x,y,s)
+		if(s='<')
+			ins2(a, a2, x)
+			balance(Tuple(color, a2, y, b), f2)
+		elseif(s='=')
+			print([y,x])
+			f2=Tree(color, a, x, b)
+		else
+			ins2(b, b2, x)
+			balance(Tuple(color, a, y, b2), f2)
+
+rel ins(f,f2,x)
+	case
+		f=E
+		f2=Tree(Red, E, x, E) //E = T R E x E
+	case
+		//(T color a y b) | x < y = balance color (ins a) y b | x == y = T color a y b | x > y = balance color a y (ins b)
+		f=Tree(color, a, y, b)
+		lt(x,y,s)
+		if(s='<')
+			ins(a, a2, x)
+			balance(Tuple(color, a2, y, b), f2)
+		elseif(s='=')
+			f2=Tree(color, a, x, b)
+		else
+			ins(b, b2, x)
+			balance(Tuple(color, a, y, b2), f2)
+
+rel set(f,f2,x,y1)
+	ins(f, f1, Pair(x,y1))
+	f1=Tree(_, a, y, b)
+	f2=Tree(Black, a, y, b)
+
+rel member(f,x)
+	f=Tree(color, a, y, b)
+	lt(x,y,s)
+	print([s,f])
+	when(s='<')
+		print([s,a])
+		member(a,x)
+	elseif(s='=')
+		print([s,x,y])
+		x=y//??
+		print([s,x,y])
+		true
+	else
+		print([s,b])
+		member(b,x)
+
+rel get(f,x,y)
+	member(f,Pair(x,y))
+
+
+//rel find(Functor l, Any e, Integer i) l=Cons(x,tail);
+
+rel length(f,Number i)
+	if(f=E)
+		//write('E') and write(',')
+		i=0
+		true
+	elseif(f=Tree(color, a, y, b))
+		length(a,i1)
+		length(y,i3)
+		length(b,i2)
+		i=i1+i2+i3
+	else
+		i=1
+		
+rel has1(f, x)
+	get(f,x,_)
+	
+rel has(f, x)
+	if(f=Pair(_,_))
+		x=f
+	elseif(f=Tree(color, a, y, b))
+		has(a,i1)
+		has(y,i3)
+		has(b,i2)
+		i=i1+i2+i3
+		
+require('io',io)
+write=io.write
+//fun write_(f)
+rel write_(f)
+	if(f=Tree(color, a, y, b))
+		write_(a)
+		write_(y)
+		write_(b)
+	elseif(f=E)
+		//write('E') and write(',')
+		true
+	else
+		f=Pair(a,b)
+		write(a)
+		write('=')
+		write(b)
+		write(', ')
+t={
+	rel _write(f)
+		write('{')
+		write_(f)
+		write('}')
+	length=length
+}
+//insert(E, f, 2)
+f=E
+set(f, f2, 1,3)//todo functor inequality
+//f2=f4
+
+print(f)
+set(f2, f3, 3,'a')
+print(f3)
+set(f3, f4, 4,'b')/*
+//member(f4,x)
+member(f4,Pair(1,x))
+print(x)
+//print(get(f4,3))
+x=1
+x<y
+//print(length(f4))
+length(l,2)
+print(x)
+print(l)
+//x=3
+len(l,2)
+print(x)
+print(l)*/
+cut
+print(f4)
+//get(f4,3,y)
+//cut
+//member(f4,x)
+//print(x) and print([x,y])/**/
+//t._write(f4)
+//has1(f4,3)
+get(f4,3,_)
+rel concat(f, f1, f2)
+	if(f=E)
+		f2=f1
+	else
+		f=Tree(color, a, y, b)
+		has(a,i1)
+		has(y,i3)
+		has(b,i2)
+		i=i1+i2+i3
+		

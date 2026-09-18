@@ -1,0 +1,8 @@
+bool p(x)
+	x!=2
+/*p(x)*/
+rel q(x)
+	x!=2
+//not q(x)
+not p(x)
+//p(x)

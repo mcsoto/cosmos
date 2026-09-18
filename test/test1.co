@@ -1,0 +1,25 @@
+functor(Cons, Functor)
+
+//t={}
+//table.new(t2)
+print(t)
+
+s=''+1
+print(s)
+i!=2
+print(1)/*true
+print('run')
+choose(z=1)
+	c=1
+else
+	c=2
+if(z=1)
+	c=1
+else
+	c=2
+when(z=1)
+	c=1
+else
+	c=2
+true
+*/

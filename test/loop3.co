@@ -1,0 +1,135 @@
+//elseifs
+//require('list', list)
+/*
+cut
+functor(Cons, Functor)
+functor(Person, Functor)
+x2=1
+y=rel(x)
+	x=1
+print(x2)
+rel q(x)
+	x=2
+print(q)
+q(x)
+y(z)
+print(x)
+print(z)
+rel lambda1(s0,sargs,s2)//yall.pl
+	s2='['+sargs+']'//+'>>'+'('+s0+')'
+
+//lambda1(_,y,x)
+y='x+1'
+x=1+2
+a=2
+require('table', table)
+t={}
+//pl::set_(t,'x',y)
+pl::set_(t,'x',y,t2)
+//print([env1.module+test])
+print([a+t2.x])
+
+choose(true)
+	x=1
+	y=2
+else
+	x=2
+if(true)
+	x=1
+	y=2
+else
+	x=2
+rel p(x)
+	if(x=1)
+		y=2
+	else
+		x!=2
+rel p(x)
+	when(x=1)
+		y=2
+	elseif(x=2)
+		y=2
+	else
+		x!=2
+
+p(x)
+print(x)
+*/
+//require('comp2', c) and c.compile('nil')
+//export(2)
+/*
+rel q(x)
+	cond
+		x=1
+	cond
+		y=2
+
+print(str(x))
+	
+x='1'+'2'
+print(x)
+rel call(x)
+	case
+		x=1
+	case
+		a=2
+	list.map([])
+	print(list)
+rel call(x)
+	case
+		x=1
+	case
+		a=2
+	case
+		a=2
+rel p2(c)
+	true
+	if(z=1)
+		c=1
+	elseif(false)
+		true
+	elseif(c=3)
+		true
+	else
+		c=2*/
+/*
+rel p(c)
+	true
+	if(z=1 and z=2)
+		c=1
+	else
+		c=2
+rel p(c) 
+	true
+	z=1
+i=2+1
+p(i+1)
+print(i)
+l=[1]
+n=#l
+s='s'
+t={}
+t2={1=2}
+print([l,t,t2])
+//print({1=2})
+x2=p()
+x!=2
+2!=x
+1!=2
+c=Cons(1,Cons)
+o=Person
+o=Person(1)
+//print(Person(1))
+x=1
+rel q(x)
+	x=2
+	print(x)
+q(_)*/
+init x=0
+while(x=0)
+	//next x=1 or next x=2
+	next x=5
+	print(x)
+	
+//x=2
+print(x)

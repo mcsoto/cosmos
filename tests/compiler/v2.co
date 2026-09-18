@@ -1,0 +1,131 @@
+functor(Exp,Functor)
+functor(Var,Exp String)
+functor(Empty,Exp)
+rel empty(Empty)
+    true
+protocol(Positive,{
+    Number size
+    rel accept(In Number x)
+        x>2
+})
+protocol(Producer,{
+    rel produce(Out Number x)
+        x>2
+})
+class(Point,{
+    rel new(this,result,x)
+        result=object.create(this,{x=x})
+    rel offset(this,x,y)
+        y=x+1
+    rel read(this,result)
+        result=this.x
+})
+Factory={rel new(result,x) result={x=x}}
+rel increment(In Number x, Out Number y)
+    y=x+1
+rel missing(Out Number y)
+    true
+rel alternatives(x)
+    some(x in [1,2,2,3])
+        x>1
+function selected(In Number x,Out Number y)
+    if(x>0)
+        y=1
+    else
+        y=0
+function broken()
+    false
+bool test(x)
+    x=1 or x=2
+void effect()
+    true
+rel assertFailed()
+    assert(false,'specific failure')
+rel exact(Out Number x) det
+    x=1
+rel tooMany(Out Number x) det
+    x=1 or x=2
+rel badProtocol()
+    Positive object={size=3,rel accept(x) true}
+    object.accept(1)
+rel badType()
+    node=Var(x)
+    x=7
+rel run()
+    pl::string_length('abc',occupied)
+    increment(2,occupied)
+rel valid()
+    increment(2,result)
+    result=3
+    callback=increment
+    callback(5,other)
+    other=6
+    selected(-1,zero)
+    zero=0
+    effect()
+    assert(some(x in [1,2,3]) x>1)
+    x=2
+    value=Var('x')
+    value is Exp
+    value is Functor
+    empty(Empty)
+    unsafeNot(empty(Var('x')))
+    Positive positive={size=3,rel accept(x) true}
+    positive.accept(3)
+    method=positive.accept
+    method(4)
+    positive is Positive
+    Producer producer={rel produce(Out Number x) x=4}
+    producer.produce(produced)
+    produced=4
+    Point point=new Point(7)
+    point.x=7
+    Point.offset(2,three)
+    three=3
+    point is Point
+    !point.x+=1
+    point.x=8
+    point.read(eight)
+    eight=8
+    product=new Factory(2)
+    product.x=2
+    product is Factory
+    state=1
+    !state+=2
+    advance(!state)
+    state=4
+    if(state>0)
+        !state+=10
+    else
+        true
+    state=14
+    if(state<0)
+        !state+=100
+    else
+        true
+    state=14
+    obj={x=1}
+    !obj.x+=2
+    obj.x=3
+    count=0
+    while(count<3)
+        local=count+1
+        !count=local
+    count=3
+    total=0
+    for(i=0;i<3;!i+=1)
+        !total+=i
+    total=3
+    sum=0
+    for(item in [2,3,4])
+        !sum+=item
+    sum=9
+    localClosure=rel(x,y)
+        temporary=x+1
+        y=temporary
+    localClosure(1,2)
+    localClosure(3,4)
+rel advance(!x)
+    !x+=1
+export({valid=valid,badInput=run,missing=missing,alternatives=alternatives,exact=exact,tooMany=tooMany,badProtocol=badProtocol,badType=badType,
+        broken=broken,assertFailed=assertFailed,test=test})

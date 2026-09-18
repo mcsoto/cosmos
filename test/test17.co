@@ -1,0 +1,6 @@
+
+init x=1
+while(x<6)
+	print(x)
+	next x=1+x
+print(x)

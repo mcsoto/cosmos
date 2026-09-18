@@ -180,13 +180,19 @@ cosmos_protocol_before(Schemas,Args,Specs-_) :-
 cosmos_protocol_dispatch([_-contract(Kind,Det,_)|_],Object,Key,Args) :- !,
     cosmos_declared_call(Det,Key,Args,cosmos_callable(Kind,Key,cosmos_method(Object,Key,Args))).
 cosmos_protocol_dispatch(_,Object,Key,Args) :- cosmos_method(Object,Key,Args).
-cosmos_protocol_behavior(contract(_,_,Closure),Args) :- !,call_cl(Closure,Args).
-cosmos_protocol_behavior(Closure,Args) :- call_cl(Closure,Args).
+% Behavioral postconditions are opt-in on typed protocol views. Structural
+% conformance (cosmos_conforms/3) never runs a method or its protocol body.
 cosmos_protocol_after(Name,Key,Schemas,Args,Specs-Contract) :-
     (maplist(cosmos_output(Schemas),Specs,Args)->true;throw(error(cosmos_protocol_output(Name,Key),_))),
     (nb_current(cosmos_debug_contracts,true)->
-        (once(cosmos_protocol_behavior(Contract,Args))->true;throw(error(cosmos_protocol_behavior(Name,Key),_)))
+        (cosmos_protocol_behavior(Contract,Args)->true;
+         throw(error(cosmos_protocol_behavior(Name,Key),_)))
     ;true).
+cosmos_protocol_behavior(deferred,_) :- !.
+cosmos_protocol_behavior(contract(_,_,Behavior),Args) :- !,
+    cosmos_protocol_behavior(Behavior,Args).
+cosmos_protocol_behavior(Closure,Args) :-
+    copy_term(Closure-Args,Check-Values),once(call_cl(Check,Values)).
 
 cosmos_object_wrapper(Object) :- nonvar(Object),
     (Object=typed(_,_);Object=instance(_,_);Object=cosmos_class(_,_);Object=prototype_object(_,_)).

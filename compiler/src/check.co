@@ -6,6 +6,7 @@ functor(TypedDecl,Functor)
 functor(VarExpr,Functor)
 functor(LiteralExpr,Functor)
 functor(CallExpr,Functor)
+functor(RawFunctorExpr,Functor)
 functor(ListExpr,Functor)
 functor(DictExpr,Functor)
 functor(CompileError,Functor)
@@ -24,6 +25,7 @@ functor(Fact,Functor)
 functor(ExportDecl,Functor)
 functor(FieldExpr,Functor)
 functor(TrueGoal,Functor)
+functor(IsGoal,Functor)
 functor(BinaryExpr,Functor)
 functor(UnaryExpr,Functor)
 functor(SizeExpr,Functor)
@@ -155,6 +157,11 @@ rel expression_type(node,schemas,env,typeName)
     elseif(node=SizeExpr(child,_))
         walk(child,schemas,env)
         typeName='Real'
+    elseif(node=FieldExpr(owner,key,loc) and known_table(owner,schemas,env,entries) and unsafeNot(field_path(node,path) and imported_path(path,schemas)))
+        choose(pl::member(Entry(LiteralExpr(key,_),value),entries))
+            expression_type(value,schemas,env,typeName)
+        else
+            throw(CompileError('Field '+key+' does not exist in table',loc))
     elseif(node=FieldExpr(_,_,loc) and field_path(node,path) and pl::get_assoc('$imports',schemas,metadata) and pl::get_assoc(path,metadata.fields,fieldType))
         typeName=fieldType
     elseif(node=FieldExpr(_,_,loc) and field_path(node,path) and imported_path(path,schemas))
@@ -198,6 +205,9 @@ rel expression_type(node,schemas,env,typeName)
                 throw(CompileError('Functor needs arguments: '+name,spec.location))
         else
             typeName='Any'
+    elseif(node=RawFunctorExpr(_,args,_))
+        walk(args,schemas,env)
+        typeName='Functor'
     elseif(node=CallExpr(VarExpr(name,_),args,loc)
         and pl::get_assoc(name,schemas,spec) and unsafeNot(pl::get_assoc('kind',spec,_)))
         choose(spec.open=1)
@@ -245,6 +255,8 @@ rel protocol_shape([member|members],entries,schemas,env,loc)
     choose(member=TypedDecl(['Relation'|types],name,_,_))
         protocol_entry(name,entries,loc,value)
         method_shape(value,#types,loc)
+        declared_method_params(types,loc,params)
+        method_modes(value,params,schemas,loc)
     elseif(member=TypedDecl(types,name,_,_))
         protocol_entry(name,entries,loc,value)
         pl::last(types,expected)
@@ -261,6 +273,9 @@ rel protocol_shape([member|members],entries,schemas,env,loc)
     else
         true
     protocol_shape(members,entries,schemas,env,loc)
+rel declared_method_params([],loc,[]) true
+rel declared_method_params([typeName|types],loc,[TypedParam([typeName],'_',loc)|params])
+    declared_method_params(types,loc,params)
 rel method_shape(value,arity,loc)
     choose(value=ClosureExpr(_,params,_,_))
         choose(#params=arity)
@@ -290,7 +305,7 @@ rel compatible_parameters([],[],schemas,loc) true
 rel compatible_parameters([expected|es],[actual|as],schemas,loc)
     parameter_spec(expected,em,et)
     parameter_spec(actual,am,at)
-    choose((em='In' and am='Out') or (em='Out' and am='In') or (em in ['InOut','Unspecified'] and am in ['In','Out']))
+    choose((em='In' and am='Out') or (em='Out' and am='In') or (em='InOut' and am in ['In','Out']))
         throw(CompileError('Incompatible protocol method mode: '+em+' versus '+am,loc))
     else
         true
@@ -446,11 +461,24 @@ rel flow(node,schemas,callables,env,bound,after,known)
         flow(body,schemas,callables,locals,inputs,_,_)
         after=env
         known=bound
+    elseif(node=IsGoal(value,expected,loc))
+        choose(value=VarExpr(name,_) and pl::get_assoc(name,callables,_))
+            actual='Relation'
+        else
+            expression_type(value,schemas,env,actual)
+        compatible(actual,expected,schemas,loc)
+        choose(pl::get_assoc(expected,schemas,spec) and pl::get_assoc('kind',spec,'protocol') and known_table(value,schemas,env,entries))
+            protocol_shape(spec.fields,entries,schemas,env,loc)
+        else
+            true
+        after=env
+        known=bound
     elseif(node=AndGoal(nodes) or pl::is_list(node) and node=nodes)
         flow_list(nodes,schemas,callables,env,bound,after,known)
     elseif(node=CallGoal(VarExpr(name,_),args,loc))
         flow_call(name,args,loc,schemas,callables,env,bound,after,known)
     elseif(node=CallGoal(fn,args,loc) and fn=FieldExpr(_,_,_) and field_path(fn,path))
+        expression_type(fn,schemas,env,_)
         flow_call(path,args,loc,schemas,callables,env,bound,after,known)
     elseif(node=TypedDecl(words,name,value,loc))
         annotation_type(words,typeName)
@@ -472,14 +500,18 @@ rel flow(node,schemas,callables,env,bound,after,known)
             typed=env
         else
             pl::set_(env,name,typeName,typed)
-        choose(value=VarExpr(source,_) and (pl::get_assoc('$call_'+source,env,options) or pl::get_assoc(source,callables,options)))
-            pl::set_(typed,'$call_'+name,options,after)
-        elseif(value=ClosureExpr(_,params,_,_))
-            pl::set_(typed,'$call_'+name,[params],after)
-        elseif(value=FieldExpr(VarExpr(owner,_),key,_) and pl::get_assoc(owner+'.'+key,callables,options))
-            pl::set_(typed,'$call_'+name,options,after)
+        choose(known_table(value,schemas,env,tableEntries))
+            pl::set_(typed,'$table_'+name,tableEntries,withTable)
         else
-            after=typed
+            withTable=typed
+        choose(value=VarExpr(source,_) and (pl::get_assoc('$call_'+source,env,options) or pl::get_assoc(source,callables,options)))
+            pl::set_(withTable,'$call_'+name,options,after)
+        elseif(value=ClosureExpr(_,params,_,_))
+            pl::set_(withTable,'$call_'+name,[params],after)
+        elseif(value=FieldExpr(VarExpr(owner,_),key,_) and pl::get_assoc(owner+'.'+key,callables,options))
+            pl::set_(withTable,'$call_'+name,options,after)
+        else
+            after=withTable
         choose(value=LiteralExpr(_,_) or value=DictExpr(_,_) or value=ListExpr(_,_,_) or value=ClosureExpr(_,_,_,_) or (value=VarExpr(other,_) and other in bound))
             pl::subtract(bound,['$fresh_'+name],clean)
             known=[name|clean]
@@ -666,6 +698,14 @@ rel schema_nodes([pair|pairs],nodes)
         nodes=tail
     else
         nodes=[FunctorDecl(name,[spec.parent|spec.fields],spec.location)|tail]
+rel known_table(DictExpr(entries,_),schemas,env,entries) true
+rel known_table(VarExpr(name,_),schemas,env,entries)
+    choose(pl::get_assoc('$table_'+name,env,known))
+        entries=known
+    else
+        pl::get_assoc(name,schemas,spec)
+        pl::get_assoc('kind',spec,'constructor')
+        entries=spec.fields
 rel string_operand(typeName,schemas,loc)
     choose(typeName='Any' or typeName='String' or subtype(typeName,'Number',schemas))
         true

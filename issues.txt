@@ -1,0 +1,43 @@
+Core IR is not yet a backend boundary: expressions, fields, indexes, tables, and arithmetic are still lowered during Prolog emission.
+Name resolution still infers bindings from spelling during capture analysis instead of marking references local/captured/global/builtin.
+Protocol method bodies support opt-in debug postconditions on typed views, as described below.
+V2 imported constructors/protocols await the multi-file interface resolver; `new T` currently proves `T.new` only for visible table definitions.
+
+`some` semantics: `some(value in collection) goal` is an existential iterator.
+It tries `goal` for every collection item and succeeds once for every matching
+item; it fails only when no item matches. It does not carry loop state or
+produce a loop-result value. Thus a successful `some` program evaluated with
+no requested exports returns `[]`, which means success with no bindings, not
+failure. Use `for` when iteration must carry state forward.
+
+
+- Implemented: known incompatible `is` tests (such as move is Number) and
+  missing fields in known literal tables now report static errors.
+
+Protocol behavioral checking is restored for debug mode (`cosmos -d -l program`,
+or `nb_setval(cosmos_debug_contracts,true)` in Prolog). `o is Moving` checks
+interface/type conformance only, in every mode. Calls through typed protocol
+views check protocol bodies after successful execution in debug mode only.
+Bodies run once on copied arguments/captures; failure raises
+cosmos_protocol_behavior, exceptions propagate, and external effects remain.
+`rel read(Out Number result) true` is accepted and its condition always passes.
+`Relation Number read` remains the body-free type-declaration form.
+Still on hold: stronger behavioral verification, effect isolation, and checks
+of failed executions or all behavioral alternatives. Structural `is`
+conformance must remain separate from per-call behavioral checking.
+Remaining interface limitation: runtime conformance checks field types and
+method arity, but does not inspect closure parameter type/mode annotations;
+those signatures are compared statically only for known method definitions.
+
+Error messages:
+
+- cosmos -l test5
+> false
+
+update=object.update //'field X does not exist in table T' existence Error
+
+-	t = { 'new'=new }
+Parse error at 27:2: Unexpected token (expected ID) //'new is a reserved token'
+Implemented: malformed bare `new` expressions report that `new` is a reserved
+keyword for `new Type(...)`, at the offending token. Quoted 'new' field keys
+and named constructor methods remain valid.

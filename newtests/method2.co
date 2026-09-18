@@ -1,0 +1,5 @@
+rel ! move(this,x,y)
+	//!this = this:{'x'=x and 'y'=y}
+	!this.x=x
+	!this.y=y
+	

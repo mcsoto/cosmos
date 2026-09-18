@@ -1,0 +1,11 @@
+rel p()
+	case
+		x=1
+	case
+		y=2
+	case
+		y=2
+	case
+		//desc.
+		y=2
+	

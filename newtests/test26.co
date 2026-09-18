@@ -1,0 +1,40 @@
+//board={' ',' ',' ',' ',' ',' ',' ',' ',' '}
+print(board)
+
+//print(get(board,1,1))
+init i=0
+while(i<3)
+	print(i)/*
+	init j=1
+	while(j<4)
+		next j=j+1
+		print([i,j])*/
+	next i=i+1
+	
+/*
+rel display(board)
+	init i=0
+	while(i<3)
+		print(board[i])
+		init j=1
+		_get=get//tile=get(board,i,1)
+		while(j<4)
+			print([i,j])
+			tile=_get(board,i,j)
+			next j=j+1
+		next i=i+1
+display(board)
+*/
+//print(board[0][0])
+/*
+o=Object.create(p)
+print(o)
+o2=Object.createFrom({x=3},o)
+print(o2)
+Object.get(o2,'x',x2)
+print(x2)
+Object.get(o2,'y',z2)
+print(z2)
+print(o)
+Object.get(o,1,x2)
+print(x2)*/

@@ -1,0 +1,152 @@
+/*
+
+rel p2(c)
+	true
+	choose(z=1)
+		c=1
+		y=2
+	elseif(c=3)
+		true
+	elseif(true)
+		true
+		c=4
+	else
+		print('2')
+		c=2
+	print([c,'2'])
+rel p(c)
+	true
+	if(z=1)
+		c=1
+	elseif(c=3)
+		true
+	else
+		print('2')
+		c=2
+	print([c,'2'])
+rel fn(i)
+	print('--')
+	
+fn(1)
+rel delay(x,p)
+	pl::freeze(x,p)
+delay(x,fn)
+print(s)
+t={0=1}
+print(t[0])
+*/
+require('string', string)
+
+//s='ad'
+//print(s[0])
+//print(#s)
+
+//string.length(s,n)
+string.size(s,n)
+
+rel q(x)
+	x=2
+
+rel p(x,y)
+	x=y
+
+require('list2', list)
+//not list.has([1],1)
+//throw(1)
+
+list.size(l,2)
+
+rel size(l, n)
+	if(l=[])
+		n=0
+	else
+		l=Cons(_,tail)
+		size(tail,j)
+		n=j+1
+/*
+rel size(l, n)
+	pl::length(l,int(n))*/
+list.size(l,2)
+print(l)
+
+print('--')
+
+require('table', table)
+set=table.set
+
+rel next(t,t2,k,v)
+	pl::next_pair(t,t2,k,v)
+
+rel concat_(t,t2,t3)
+	when(next(t,t1,k,v))
+		true
+		print([k,v])
+		print(['-',t1])
+		print(t2)
+		set(t2,k,v,t_)
+		concat_(t1,t_,t3)
+	else
+		t3=t2
+rel concat(t,t2,t3)
+	pl::assoc_to_list(t,l)
+	concat_(l,t2,t3)
+	
+rel it(t)
+	when(next(t,t1,k,v))
+		true
+		print(t1)
+		it(t1)
+	else
+		print('end')
+	
+print(table.toList({1=2 and 'y'=1}))
+//concat({1=2},y,{1=2 and 'y'=1})
+table.concat({1=2 and 'y'=1},{2=1},x)
+//it({1=2 and 'y'=1})
+print(x)
+t={x={1}}
+print(t)
+print(t.x)
+
+//print(string.split('a;b',';'))
+require('mutable', m)
+m.assert('x',2)
+m.ask('x',y2)
+print(y2)
+rel fn(l)
+	when(next(k,v,l,l2))
+		true
+	else
+		true
+//print(logic.forAll(p,[x],
+/*
+rel has(l, Any e)
+	pl::memberd_t(e,l,_)
+require('logic', l)
+
+l2=[2]
+l=[1,2]
+has(l2,e)
+print(['l',e])
+l.forEach(x,has,[l,e])
+
+rel apply(q,l)
+	pl::apply2(q,l)
+print(z)
+//pl::reif(x,2,q,[z2],q,3)
+print(z2)
+if(list.has([1],x))
+	print('1')
+	false
+else
+	print('2')
+x=1
+print(x)
+if(x=1)
+	print('1')
+	false
+else
+	print('2')
+false*/
+//!x=2
+//p(!x)

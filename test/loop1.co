@@ -1,0 +1,35 @@
+//test 1-3, while
+/*
+for(x in l2)
+	print(x.lexeme)
+function main()
+	init x=0
+	init dir='right'
+	while(true)
+		//sp.get(l)
+		l=[]
+		for(x in l)
+			print(x)
+			if(x=keyDown(key))
+				print(['-',y])
+				if(key='Escape')
+					pl::halt()
+				elseif(key='right')
+					next dir='right'
+				else
+					true
+		//update
+		if(dir='right')
+			next x=x+1
+		else
+			next x=x+1
+		true*/
+functor(keyDown)
+
+init x=0
+//init dir='right'
+while(true)
+	next x=2
+	x=0
+	true
+		

@@ -1,0 +1,40 @@
+list={
+	rel next(l,l2,k,v,i)
+		if(l=[])
+			i=0
+		else
+			l=[v|l2]
+			k=0
+			i=1
+	rel it(l,l)
+		true
+}
+l=[1,2,3]
+/*
+for(init it=list.it(l);i!=0;next it=l1;)
+	list.next(it,l1,k,v,i)
+	print([k,v,i])
+	
+init it=list.it(l)
+while(i!=0)
+	list.next(it,l1,k,v,i)
+	print([k,v])
+	next it=l1
+	
+print('-')*/
+rel pairs(t,l)
+	init it=t.it(l)
+	while(i!=0)
+		t.next(it,l1,k,v,i)
+		print([k,v])
+		next it=l1
+pairs(list,l)
+
+rel each(k,v,t,l,p)
+	init it=t.it(l)
+	while(i!=0)
+		t.next(it,l1,k,v,i)
+		call p
+		next it=l1
+		
+//todo each(k,v,list,l,quote print([k,v]);)

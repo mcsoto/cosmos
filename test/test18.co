@@ -1,0 +1,7 @@
+init x=2
+while(x<3)
+	if(x=2)
+		next x=1+x
+	else
+		true
+print(x)

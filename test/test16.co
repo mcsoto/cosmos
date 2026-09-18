@@ -1,0 +1,199 @@
+//22
+functor(T,Functor)
+functor(Pair,Functor)
+/*x=1
+while(x<13)
+	print(x)
+	!x=x+1//!x+=1
+print(x)
+
+for(i=0;i<5;!i=i+1;)
+	print(i)
+foreach(i,k, [1,2,3])
+	print([i,k])
+for(i,k in [1,2,3])
+	print([i,k])
+e in [1,2]
+print(e)*/
+/*
+
+l=[1,2,3]
+
+for(list.it(l,it);i<5 and i!=0;true;)
+	list.next(it,l1,k,v,i)
+	print([k,v,i])
+	!it=l1
+
+rel f(list)
+	list={
+		rel next(l,l2,k,v,i)
+			if(l=[])
+				i=0
+			else
+				l=[v|l2]
+				//k=0
+				i=1
+		rel iter(l,l)
+			true
+	}*/
+list2={
+	rel next(l,l2,k,v,i)
+		if(l=[])
+			i=0
+		else
+			l=[v|l2]
+			//k=0
+			i=1
+	rel iter(l,l)
+		true
+}
+
+/*l={x=1 and 1=2}
+
+iterable={
+	rel next(l,l2,k,v,i)
+		if(l=[])
+			i=0
+		else
+			l=[_|l2]
+			v=1
+			i=1
+	rel iter(l,l)
+		true
+}
+o=[1,6]
+range2={
+	rel next(l,l2,k,v,i)
+		l=T(v,b)
+		if(v>b)
+			i=0
+		else
+			l2=T(v+1,b)
+			//k=0
+			i=1
+	rel iter(l,t)
+		l=[a,b]
+		t=T(a,b)
+}
+rel range(x,y,z)
+	z=Pair(T(x,y),it)
+	it={
+		rel next(l,l2,k,v,i)
+			l=T(v,b)
+			if(v>b)
+				i=0
+			else
+				l2=T(v+1,b)
+				i=1
+		rel iter(pair,l)
+			pair=Pair(l,_)
+	}
+	
+init it=list.iter([1,2])
+while(list.next(it,it2,k,v,i) and i=1)
+	print([k,v])
+	next it=it2
+	
+x=2
+init it=list.iter([1,1,2,4])
+init halt=0
+while(list.next(it,it2,k,v,i) and i=1 and halt=0)
+	if(print([x,v]) and x=v)
+		next halt=1//halted once
+	else
+		true
+		print('-')
+		next halt=0//
+	next it=it2
+halt=1
+print(T(halt,found))
+array={
+	rel it(t,l)//todo prbly legacy code
+		l=[t,0]
+		
+	rel next(l,l2,k,v,i)
+		l=[t,i]
+		if(e=t[i])
+			i=1
+			l2=[t,i+1]//table.set(t,'i',t.i+1,t2)
+		else
+			i=0
+		true
+		
+}
+l={1,2}
+//l=[1,2,3]
+some(i,x in array(l))
+	print([i,x])
+	x=2
+	*/
+//find([1,2,3],0)
+/*
+for(x in l)
+	print(x)
+	
+l=[1,2,3]
+//l={1,2}
+some(x in l)
+	print(x)
+	x=1
+	//true
+	
+for(k,v in l)
+	print([k,v])
+	true
+	
+next=list.next
+rel find(l, x)
+	next(l,l1,k,v,i)
+	if(i=0)
+		false
+	else
+		print(v)
+		if(x=v)
+			true
+		else
+			find(l1, x)
+	
+next it=it2 until (list.next(it,it2,k,v,i) and i=0)
+
+for(init it=list.iter([1,2]);list.next(it,it2,k,v,1);true;)
+	print([k,v])
+	next it=it2
+	
+for(list.it(l,it);i<5 and i!=0;true;)
+	list.next(it,l1,k,v,i)
+	print([k,v,i])
+	!it=l1
+//for(k,v in [1,2])
+for(x in range(1,6))
+	print(x)
+
+for(k,v in range(1,6))
+	print([k,v])
+
+o=range(0,1)
+l=[1,2]
+fun p()
+	//list.iter(l,it)
+	//print([l,it])
+	for(init it=list.iter(l);list.next(it,it2,k,v,1);true;)
+		print([k,v])
+		next it=it2
+p()
+rel q(x)
+	true
+	
+rel p(x)
+	for(true;print(x) and i=1.1 or print(i) and not q(x) and i<5;true;)
+		false
+p(1)
+
+while(i<5 and i!=0)
+	true
+list.it(l,it)
+while(i<5 and i!=0)
+	list.next(it,l1,k,v,i)
+	print([k,v,i])
+	!it=l1
+*/

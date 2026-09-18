@@ -1,0 +1,7 @@
+y=1
+rel p(x)
+	x=2
+	rel q1(x)
+		print(y)
+	q1(x)
+p(x)

@@ -1,0 +1,36 @@
+//x=1
+//while(x<2) !x=1 and x=2 and print(x);
+//for(true;true;x=2;) !x=1 and print(x);
+//for(x=1;x<=2;!x=1+x;) print(x);// and !x=1+x;// and print(x);
+print('-'+x)/*
+//x=1 and !x=1+x and print(x)
+for(x=1;x<=2;!x=x+1;)
+	print(x)
+*/
+
+
+//require('math', math)
+/* */
+
+rel get(String s,x,String c)
+	pl::s_get(s,x,c)//pl::sub_string(s,num(x),1,_,c)
+
+rel size(String s, n)
+	pl::s_size(s,n)
+
+rel length(String s, n)
+	pl::s_size(s,n)
+
+t= {
+	'get'=get
+	'size'=size
+	'length'=size
+	'at'=get
+	'lessOrEqual'=lessOrEqual
+}
+
+length('s',n)
+print(n)/*
+t.length('s',n)
+s='s'
+print(s)*/

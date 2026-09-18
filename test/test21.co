@@ -1,0 +1,48 @@
+
+if(y=1)
+	a=2
+else
+	x=3
+//x upval?
+rel p(y)
+	if(y=1)
+		true
+	elseif(y=3)
+		true
+	elseif(y=2)
+		true
+	else
+		x=3
+	a=10
+	
+p(4)
+
+
+/*
+rel p2(y)
+	case
+		y=1
+	case
+		x=3
+	case
+		a=4
+	case
+		a=4
+
+p2(2)
+
+require('gen', gen)
+
+rel p()
+	if(x=1)
+		true
+		if(true)
+			if(true)
+				if(true)
+					true
+
+case
+	a2=1
+case
+	x2=3
+*/

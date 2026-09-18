@@ -1,0 +1,9 @@
+//22
+functor(T,Functor)
+print(T(2))
+t={1}
+t2={}+t
+print(t2)
+l=[1,2]
+l2=[]+l
+print(l2)

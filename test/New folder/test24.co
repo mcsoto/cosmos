@@ -1,0 +1,74 @@
+require('list',list)
+
+rel debug(s)
+	true
+	print(s)
+/*
+export(t)
+
+s='a=2'+'2'
+print(x)
+rel p(Number x)
+	print(x)
+//x=2+3
+p(x+2)
+debug(x)
+print(1+2)
+
+table.new(t)
+table.set(t,1,2,t2)
+
+t={true and 1=2 and x=1 and y=i}
+print(t[1])
+rel fn(code)
+	sa='string'
+	//string.size(str(s0),n)
+	//string.slice(str(s0),1,n-1,sa)
+	//io.readFile(sa+'.type',module) //todo adjust for name='.co'
+	//module=sa //do not randomize
+	print(['req',sa,module])
+	//code='ensure_loaded("'+sa+'"),'
+	code='a\"'+sa+'b'
+	//code='true'
+fn(code)
+print(str(code))
+export(code)*/
+rel p2(c)
+	true
+	choose(z=1)
+		c=1
+		y=2
+	elseif(c=3)
+		true
+	elseif(true)
+		true
+		c=4
+	else
+		print('2')
+		c=2
+	print([c,'2'])
+rel p(c)
+	true
+	if(z=1)
+		c=1
+	elseif(c=3)
+		true
+	else
+		print('2')
+		c=2
+	print([c,'2'])
+rel fn(i)
+	case
+		i=2
+		//p2(i)
+	case
+		print('--')
+	case
+		true
+	/*
+fn(1)
+*/
+x=1
+while(x<13)
+	print(x)
+	!x=x+1//!x+=1

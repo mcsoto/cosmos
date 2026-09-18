@@ -1,0 +1,19 @@
+functor(T,Functor)
+functor(Pair,Functor)
+//require('list', list)
+require('table', table)
+
+list={
+	'next'=rel (l,l2,k,v,i) //todo
+		if(l=[])
+			i=0
+		else
+			l=[v|l2]
+			//k=0
+			i=1
+	rel iter(l,l)
+		true
+}
+
+pl::setmeta('list',list)
+pl::setmeta('table',table)

@@ -1,0 +1,54 @@
+
+/*
+for(x in l2)
+	print(x.lexeme)*/
+functor(keyDown)
+/*
+fun main()
+	init x=0
+	while(x=0)
+		//sp.get(l)
+		print(x)
+		init y=2
+		while(y=2)//while(true)
+			next x=5
+			next y=1
+			print(x)
+			print(y)
+		
+		l=['right']
+		for(key in l)//while(true)
+			next x=5
+			print(key)
+			print(x)
+		while(y=2)//while(true)
+			next x=5
+			next y=1
+			print(x)
+			print(y)
+			print(next x)
+		for(key in l)
+			//print(key)//if(key='right')
+			next x=1
+		//update
+		//false
+
+main()
+*/
+init x=0
+while(x=0)
+	//next x=1 or next x=2
+	init y=2
+	//init z=0
+	//next x=5
+	while(y=2)//while(true)
+		next x=5
+		next y=1
+		print('|')
+		print(x)
+		print(y)//0,2
+	print('-')
+	print(x)
+	
+//x=2
+print(x)

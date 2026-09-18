@@ -1,0 +1,55 @@
+//elseifs
+require('list5.bc', list)
+cut
+functor(Cons, Functor)
+functor(Person, Functor)
+c::p(1)//make parser functional?
+x=1
+print(x)
+rel p2(c)
+	true
+	if(z=1)
+		c=1
+	elseif(false)
+		true
+	elseif(c=3)
+		true
+	else
+		c=2/*
+
+rel p(c)
+	true
+	if(z=1 and z=2)
+		c=1
+	else
+		c=2
+rel p(c) 
+	true
+	z=1*/
+	
+
+when(z=1)
+	c=1
+elseif(false)
+	true
+else
+	c=2
+	
+i=2+1
+p(i+1)
+print(i)
+l=[1]
+n=#l
+s='s'
+t={}
+t2={1=2}
+print([l,t,t2])
+//print({1=2})
+x2=p()
+x!=2
+2!=x
+1!=2
+c=Cons(1,Cons)
+o=Person
+o=Person(1)
+//print(Person(1))

@@ -1,0 +1,231 @@
+// Cosmos CLI chess. Enter moves as: e2 e4
+// This compact ruleset validates piece movement and blocking/capture rules.
+// It intentionally omits check, checkmate, castling, en passant, and promotion.
+
+rel piece_at(board,x,y,piece)
+    index=y*8+x
+    pl::int(index,host_index)
+    pl::nth0(host_index,board,piece)
+
+rel replace([head|tail],index,value,result)
+    if(index=0)
+        result=[value|tail]
+    else
+        index2=index-1
+        replace(tail,index2,value,rest)
+        result=[head|rest]
+
+rel put_piece(board,x,y,piece,result)
+    index=y*8+x
+    replace(board,index,piece,result)
+
+rel move_piece(board,x,y,to_x,to_y,result)
+    piece_at(board,x,y,piece)
+    put_piece(board,x,y,'.',cleared)
+    put_piece(cleared,to_x,to_y,piece,result)
+
+rel white(piece)
+    piece in ['P','N','B','R','Q','K']
+
+rel black(piece)
+    piece in ['p','n','b','r','q','k']
+
+rel own_piece('white',piece)
+    white(piece)
+rel own_piece('black',piece)
+    black(piece)
+
+rel opponent('white','black')
+    true
+rel opponent('black','white')
+    true
+
+rel on_board(x,y)
+    x>=0
+    x<8
+    y>=0
+    y<8
+
+rel sign(value,step)
+    if(value>0)
+        step=1
+    else
+        step=-1
+
+rel clear_between(board,x,y,to_x,to_y,step_x,step_y)
+    next_x=x+step_x
+    next_y=y+step_y
+    if(next_x=to_x and next_y=to_y)
+        true
+    else
+        piece_at(board,next_x,next_y,'.')
+        clear_between(board,next_x,next_y,to_x,to_y,step_x,step_y)
+
+rel rook_move(board,x,y,to_x,to_y)
+    choose(x=to_x and y!=to_y)
+        delta_y=to_y-y
+        sign(delta_y,step_y)
+        clear_between(board,x,y,to_x,to_y,0,step_y)
+    elseif(y=to_y and x!=to_x)
+        delta_x=to_x-x
+        sign(delta_x,step_x)
+        clear_between(board,x,y,to_x,to_y,step_x,0)
+
+rel bishop_move(board,x,y,to_x,to_y)
+    delta_x=to_x-x
+    delta_y=to_y-y
+    choose(delta_x=delta_y and delta_x!=0)
+        sign(delta_x,step_x)
+        clear_between(board,x,y,to_x,to_y,step_x,step_x)
+    elseif(delta_x=-delta_y and delta_x!=0)
+        sign(delta_x,step_x)
+        step_y=-step_x
+        clear_between(board,x,y,to_x,to_y,step_x,step_y)
+
+rel knight_move(x,y,to_x,to_y)
+    delta_x=to_x-x
+    delta_y=to_y-y
+    [delta_x,delta_y] in [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]]
+
+rel king_move(x,y,to_x,to_y)
+    delta_x=to_x-x
+    delta_y=to_y-y
+    [delta_x,delta_y] in [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+
+rel white_pawn_move(board,x,y,to_x,to_y)
+    choose(to_x=x and to_y=y-1)
+        piece_at(board,to_x,to_y,'.')
+    elseif(to_x=x and y=6 and to_y=4)
+        piece_at(board,x,5,'.')
+        piece_at(board,to_x,to_y,'.')
+    else
+        (to_x=x-1 or to_x=x+1)
+        to_y=y-1
+        piece_at(board,to_x,to_y,target)
+        black(target)
+
+rel black_pawn_move(board,x,y,to_x,to_y)
+    choose(to_x=x and to_y=y+1)
+        piece_at(board,to_x,to_y,'.')
+    elseif(to_x=x and y=1 and to_y=3)
+        piece_at(board,x,2,'.')
+        piece_at(board,to_x,to_y,'.')
+    else
+        (to_x=x-1 or to_x=x+1)
+        to_y=y+1
+        piece_at(board,to_x,to_y,target)
+        white(target)
+
+rel legal_piece_move(board,piece,x,y,to_x,to_y)
+    choose(piece='P')
+        white_pawn_move(board,x,y,to_x,to_y)
+    elseif(piece='p')
+        black_pawn_move(board,x,y,to_x,to_y)
+    elseif(piece='R' or piece='r')
+        rook_move(board,x,y,to_x,to_y)
+    elseif(piece='B' or piece='b')
+        bishop_move(board,x,y,to_x,to_y)
+    elseif(piece='Q' or piece='q')
+        rook_move(board,x,y,to_x,to_y) or bishop_move(board,x,y,to_x,to_y)
+    elseif(piece='N' or piece='n')
+        knight_move(x,y,to_x,to_y)
+    else
+        king_move(x,y,to_x,to_y)
+
+rel file_index(file,index)
+    choose(file='a') index=0
+    elseif(file='b') index=1
+    elseif(file='c') index=2
+    elseif(file='d') index=3
+    elseif(file='e') index=4
+    elseif(file='f') index=5
+    elseif(file='g') index=6
+    else index=7
+
+rel rank_index(rank,index)
+    choose(rank='1') index=7
+    elseif(rank='2') index=6
+    elseif(rank='3') index=5
+    elseif(rank='4') index=4
+    elseif(rank='5') index=3
+    elseif(rank='6') index=2
+    elseif(rank='7') index=1
+    else index=0
+
+rel parse_move(line,x,y,to_x,to_y)
+    pl::s_size(line,5)
+    pl::s_get(line,0,file)
+    pl::s_get(line,1,rank)
+    pl::s_get(line,2,' ')
+    pl::s_get(line,3,to_file)
+    pl::s_get(line,4,to_rank)
+    file in ['a','b','c','d','e','f','g','h']
+    to_file in ['a','b','c','d','e','f','g','h']
+    rank in ['1','2','3','4','5','6','7','8']
+    to_rank in ['1','2','3','4','5','6','7','8']
+    file_index(file,x)
+    rank_index(rank,y)
+    file_index(to_file,to_x)
+    rank_index(to_rank,to_y)
+
+rel legal_move(board,side,x,y,to_x,to_y)
+    on_board(x,y)
+    on_board(to_x,to_y)
+    piece_at(board,x,y,piece)
+    own_piece(side,piece)
+    piece_at(board,to_x,to_y,target)
+    unsafeNot own_piece(side,target)
+    legal_piece_move(board,piece,x,y,to_x,to_y)
+
+rel write_cell(board,x,y)
+    piece_at(board,x,y,piece)
+    c::write(piece)
+    c::write(' ')
+
+rel write_row(board,y)
+    rank=8-y
+    c::write(rank)
+    c::write('  ')
+    init x=0
+    while(x<8)
+        write_cell(board,x,y)
+        next x=x+1
+    c::write('\n')
+
+rel draw_board(board)
+    c::write('\n')
+    init y=0
+    while(y<8)
+        write_row(board,y)
+        next y=y+1
+    c::write('\n')
+    c::write('   a b c d e f g h\n\n')
+
+rel game(board,side)
+    draw_board(board)
+    c::write(side)
+    c::write(" to move. Enter e2 e4, or quit:\n")
+    c::ioread(line)
+    if(line='quit')
+        c::write('Thanks for playing.\n')
+    elseif(parse_move(line,x,y,to_x,to_y) and legal_move(board,side,x,y,to_x,to_y))
+        move_piece(board,x,y,to_x,to_y,next_board)
+        opponent(side,next_side)
+        game(next_board,next_side)
+    else
+        c::write('Illegal move. Use lowercase algebraic coordinates, e.g. e2 e4.\n')
+        game(board,side)
+
+rel main(args)
+    board=['r','n','b','q','k','b','n','r',
+           'p','p','p','p','p','p','p','p',
+           '.','.','.','.','.','.','.','.',
+           '.','.','.','.','.','.','.','.',
+           '.','.','.','.','.','.','.','.',
+           '.','.','.','.','.','.','.','.',
+           'P','P','P','P','P','P','P','P',
+           'R','N','B','Q','K','B','N','R']
+    c::write('Cosmos Chess - movement rules, captures, and blocked paths.\n')
+    c::write('This simple version does not enforce check or special moves.\n')
+    game(board,'white')
+//main([])

@@ -1,0 +1,42 @@
+
+//game=[[0,0,0],[0,0,0],[0,0,0]]
+//map={0={},1={},2={}}
+
+//p={x:1,y:1}
+require('io',io)
+require('table',table)
+require('list',list)
+require('math',math)
+
+/*
+range=math.range
+not for(y in range(0,3))
+	y!=3
+for(init x=1;x<5;next x=x+1;)
+	for(y in range(0,3))
+		//print(['-',x,y])
+		print(x)
+		true
+
+init x=1
+while(x<5)
+	next x=x+1
+	for(y in range(0,3))
+		//print(['-',x,y])
+		print(x)
+		true
+
+for(x in range(0,3))
+	for(y in range(0,3))
+		//print(['-',x,y])
+		print(x)
+		true
+print(math.floor(0.5))
+
+not y=1
+assert y=1
+once y=1
+*/
+require('mutable',mutable)
+print(mutable)
+//mutable.assert(['bool','name'])

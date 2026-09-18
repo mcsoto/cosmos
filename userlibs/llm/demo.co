@@ -1,0 +1,11 @@
+// Set OPENAI_API_KEY or MISTRAL_API_KEY before running this program.
+// Example:
+//   cosmos.bat -l userlibs/llm/demo.co
+
+require('llm', llm)
+
+rel main()
+	llm.openai('gpt-5','Reply with exactly one short Cosmos greeting.',reply)
+	print(reply)
+
+main()

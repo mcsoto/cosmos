@@ -1,0 +1,76 @@
+Compiler type/mode inference review (2026-09-10)
+
+2026-09-17 compiler-selection milestone: `compiler/` now uses the lighter
+pre-MetaDecl parser/normalizer. The independent newer checker, `.cif`
+interfaces, lexical-scope query support, `--main`, `--exe`, SWI-WASM host path,
+and diagnostics remain current. Added arbitrary undeclared functor expressions:
+`x=:F(1,2)` and `x=:Empty`. Their arguments are checked normally, while the
+result has type Functor and intentionally bypasses declaration, parent, field,
+and arity checks. MetaDecl source is intentionally rejected. The only source
+relations present in compiler-0.8.43 but absent from the active compiler are the
+MetaDecl parser and expansion relations. Lua/Wasmoon compiler support and
+fallback paths have been removed; native and browser compilation both use SWI.
+The active compiler suite passes 23/23 and the broader
+Space/events/Canvas/runtime selection passes 10/10.
+
+2026-09-13 milestone: added located undeclared-call diagnostics, arithmetic
+expression type checking, and interface types for exported table data fields,
+including nested fields and tables exported through local variables. Native
+cross-file regressions cover data fields, method signatures, callback aliases,
+missing members, noncallable fields, and renamed copies of the test3 source.
+Interfaces use .cif; dependencies still need to be compiled explicitly.
+Milestone verification: all six compiler modules rebuild identically without
+Lua; all 17 compiler tests pass, including native cross-file checks, renamed
+source diagnostics, SWI-WASM execution, and synchronous Canvas host dispatch.
+
+Implemented in this pass
+
+- Made type compatibility directional. A value of a declared subtype may flow
+  into a parent type, but a parent value can no longer satisfy a child-type
+  parameter merely because the two types are related. The former behavior
+  compiled programs that then failed the generated runtime input contract.
+- Classify parsed numeric literals as Real, matching the SWI-Prolog value emitted
+  by the parser. Real remains assignable to Number, so existing Number contracts
+  continue to work while Real contracts can be checked directionally.
+- Treat a typed declaration without an initializer as definitely fresh. It is
+  rejected as an In argument and accepted as an Out argument.
+- Stop treating In arguments as values produced by a call. Only Out and inferred
+  produced positions change the bound-variable state.
+- Added regression coverage for nominal subtype direction and typed fresh output
+  variables, then regenerated the self-hosted compiler.
+
+Confirmed current implementation
+
+- The checker already performs fixed-point call-contract inference, conservative
+  forward flow analysis, imported callable lookup, imported schema merging,
+  interface emission, and conflict checking for imported types.
+- compiler/platform/driver.pl reads available dependency interface artifacts and
+  supplies them to compile_unit. This is partial imported-interface support; the
+  guide's blanket statement that imported type interfaces are unsupported is now
+  too broad.
+
+Still to implement
+
+1. Complete whole-program inference across branches, loops, recursion, closures,
+   aliases, and unannotated relation bodies. Compute stable joined type and mode
+   facts instead of falling back to Any at uncertain joins.
+2. Infer and validate success and determinism properties, including propagation
+   through the call graph and enforcement for exported interfaces.
+3. Make dependency compilation recursive: resolve require paths, compile stale or
+   missing dependencies, detect import cycles, and cache/version interface files.
+4. Export only public/reachable schemas rather than copying every local schema
+   into each interface; qualify names to avoid unrelated modules colliding.
+5. Carry constructor/class/protocol member interfaces through imports so imported
+   constructor arity, method mode/type, and protocol conformance can be checked.
+6. Define conservative behavior for missing, incompatible, or newer interface
+   formats and report the importing source location in diagnostics.
+7. Add multi-module tests covering imported relations and nominal types,
+   conflicting names, stale/missing interfaces, cycles, and recursive builds.
+
+Verification
+
+- node compiler/build.mjs
+  Verified all six Cosmos compiler modules rebuild identically without Lua.
+- node --test tests/compiler/compiler.test.mjs
+  23 tests passed, including native CLI/REPL, application entry modes, imported
+  interface checks, shipped SWI-WASM coverage, and arbitrary functors.

@@ -1,0 +1,54 @@
+/*
+rel args(l)
+	print(args)
+	//print(['args',args,_args])//?
+	
+args(l)
+
+for(x in l2)
+	print(x.lexeme)
+function main()
+	init x=0
+	init dir='right'
+	while(true)
+		//sp.get(l)
+		l=[]
+		for(x in l)
+			print(x)
+			if(x=keyDown(key))
+				print(['-',y])
+				if(key='Escape')
+					pl::halt()
+				elseif(key='right')
+					next dir='right'
+				else
+					true
+		//update
+		if(dir='right')
+			next x=x+1
+		else
+			next x=x+1
+		true
+functor(keyDown)
+*/
+function main()
+	//init x=0
+	init dir='right'
+	while(true)
+		print(dir)
+		next dir='left'
+		print(next dir)
+		//sp.get(l)
+		while(true)//for(x in l)
+			//if(true)
+				//print(['-',y])
+				next dir='right'/*
+				if(key='right')
+					next dir='right'
+				else
+					true*/
+				print(dir)
+				false
+		false//update
+		true
+main()

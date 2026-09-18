@@ -8,20 +8,22 @@
 
 compiler_session_compile(Stage, Source, Prefix, Code) :-
     compiler_load(Stage),
+    cc_query_text(Source, Text),
     compiler_session_prefix(Prefix, Name),
     system:atom_string(Name, Module),
-    compiler_compile(Source, Module, Code).
+    compiler_compile(Text, Module, Code).
 
 % Compile a goal fragment with an explicit, ordered set of result variables.
 % Query remains the compiler's metadata table: module, entry, variables,
 % source, and generated Prolog.  The session owns only its generated prefix.
 compiler_session_compile_query(Stage, Source, Variables, Prefix, Query) :-
     compiler_load(Stage),
+    cc_query_text(Source, Text),
     compiler_session_prefix(Prefix, Name),
     system:atom_string(Name, Module),
     compiler(Api),
     get_(Api, "compile_query", CompileQuery),
-    ( once(call_cl(CompileQuery, [Source, Variables, Module, Query])) -> true
+    ( once(call_cl(CompileQuery, [Text, Variables, Module, Query])) -> true
     ; throw(error(compilation_failed, _))
     ).
 

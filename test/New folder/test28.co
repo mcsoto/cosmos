@@ -1,0 +1,15 @@
+
+//x='1'
+t={
+	x=1
+	y=[]
+}
+//t=y
+//t2=t
+require('test27',x)
+//require('list',list)
+//list=2
+x=1
+//Relation Any Any t1
+//t1=rel(x,y)true;//{1,2}
+export(t)

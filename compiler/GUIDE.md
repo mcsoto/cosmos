@@ -236,31 +236,71 @@ constructor or callable expression.
 Protocols describe structural fields and methods:
 
 ```cosmos
-protocol(Counter,{
-    Number value
-    rel read(Out Number result) det
+Protocol(Moving,{
+    Number x
+    rel p(Number x)
+        x>2
 })
 
-Counter counter={
-    value=3
-    rel read(Out Number result) det
-        result=3
+o={
+    x=3
+    rel p(Number value)
+        true
 }
 
-counter.read(value)
-counter is Counter
+o is Moving
+o.p(1)
 ```
 
-The typed declaration validates visible fields and method signatures. Protocol
-values are views: calls go through the checked interface. Values that cannot be
-proven statically are checked at runtime.
+`o is Moving` checks interface/type conformance: the object must provide a
+numeric `x` field and a compatible `p` method. It does not execute `p` or its
+protocol body. Known table shapes and incompatible types are checked statically;
+values whose shape is unknown are checked at runtime. Both `Protocol` and
+`protocol` spellings are accepted.
 
-A method body in a protocol is a behavioral postcondition, not its
-implementation. It runs after a successful implementation call when debug
-contracts are enabled. Known literal implementations are checked for conflicting
-input/output modes and incompatible types; dynamic implementations retain
-runtime validation. Merely testing a raw value with `is` does not retroactively
-turn every other reference to it into a checked protocol view.
+Runtime conformance checks field types and method arity. Comparing a method's
+parameter type/mode annotations is currently a static check for known method
+definitions; runtime closure-signature inspection is not yet supported.
+
+Behavioral checking separately asks whether a method execution satisfies `x>2`.
+It is available as an opt-in debug postcondition on a typed protocol view:
+declare `Moving checked=o`, then call `checked.p(1)`. With debug mode enabled,
+this call raises `cosmos_protocol_behavior("Moving","p")`; without debug mode,
+it succeeds. The raw `o.p(1)` above succeeds in either mode. Testing `o is Moving`
+always checks only the interface and never executes protocol bodies.
+
+Enable debug contracts with `cosmos -d -l program` (Windows:
+`cosmos.bat -d -l program`), placing `-d` before the load/run arguments.
+For Prolog embeddings, use `nb_setval(cosmos_debug_contracts,true)` before
+running the program. The flag also enables the existing determinism checks.
+Recompile older generated programs that omitted protocol bodies; `-l` does
+this automatically.
+After a method succeeds through a typed view, its protocol body is checked
+once on copied arguments and captures, so check bindings do not constrain
+the caller. A failed check raises an error; exceptions propagate. External
+effects are not isolated, so use pure predicates for protocol conditions.
+
+Protocol methods reuse existing declaration syntax. A relation declaration has
+a body, including `true` when there is no behavioral condition. Type-declaration
+syntax can describe the method without a relation body:
+
+```cosmos
+Protocol(Readable,{
+    rel read(Out Number result) true
+})
+Protocol(NumberReader,{
+    Relation Number read
+})
+reader={rel read(result) result=3}
+reader is Readable
+reader is NumberReader
+```
+
+A body-free method declaration has no behavioral check. A `true` body always
+passes. A typed binding such as `Moving object=o` provides parameter type/mode
+checks in normal execution and behavioral postconditions in debug mode.
+Testing `o is Moving` does not change other references to `o` or install
+behavioral monitoring.
 
 ## Classes and constructors
 

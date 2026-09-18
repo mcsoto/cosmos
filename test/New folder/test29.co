@@ -1,0 +1,6 @@
+require('test28',t)
+require('test22',t2)
+//t=1
+t2=t
+//print(t)
+export(t)

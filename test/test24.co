@@ -1,0 +1,8 @@
+fun istwo(x)
+	x=1 or x=2
+
+fun p(x)
+	for (i in math.range(1,2))
+		print(i)
+		istwo(x)
+p(3)

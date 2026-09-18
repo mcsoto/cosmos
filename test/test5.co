@@ -1,0 +1,39 @@
+//testing obj
+functor(Info, Functor)
+
+//rel print(i) c::print(i);
+
+p=rel() true and print(2);
+p()
+/*t={1=2 and x=1 and y=i}
+t1={
+	1=2
+	x=1
+	y=print
+}
+t1={
+	true
+	1=2
+	x=1
+	y=print
+}*/
+t={true and 1=2 and x=1 and y=i}
+print(t)
+print(t.y)
+b=t[1]
+print(t[1])
+print(t['y'])
+/*
+rel p(y)
+	case
+		y=1
+	case
+		y=2
+		a=6
+	z=4
+
+//x=p()
+p(p())
+c::print(x)
+*/
+//print(t.y:2)

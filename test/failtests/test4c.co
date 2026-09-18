@@ -1,0 +1,18 @@
+//recursion
+
+rel q(x)
+	print(x)
+	print(q)
+	x<2
+	q(x-1)
+	
+print(q)
+q(3)
+
+rel q3(x,f)
+	//x=2
+	print('q2')
+	pl::writeln(f)
+	q(2)
+	f(2)
+q3(x,q)//fail?

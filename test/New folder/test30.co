@@ -1,0 +1,60 @@
+require('table', table)
+require('list', list)
+require('io', io)
+require('math', math)
+functor(Pair, Functor)
+set=table.set
+concat=table.concat
+array={
+	rel iter(t,l)
+		l=[t.data,0]
+		
+	rel next(l,l2,k,v,switch)
+		l=[t,i]
+		if(v=t[i])
+			switch=1
+			k=i
+			l2=[t,i+1]//table.set(t,'i',t.i+1,t2)
+		else
+			switch=0
+		true
+
+	rel pairs(arr,o)
+		table.set(array,'data',arr,o)
+				
+}
+t={1,2,3,4}
+print(t[1])
+
+rel map_(o,t,p,l)
+	o.next(t,t1,k,v,i)
+	if(i=1)
+		//print([k,v])
+		p(v,x)
+		l=[x|l2]
+		map_(o,t1,p,l2)
+	else
+		print(['end',i,k,v])
+		l=[]
+	/*
+fn={
+		
+	rel map(t,p,l)
+		//map_(t,t.iter(t),p,l)
+		it=t.iter(t)
+		print(it)
+		while(i=1)
+			//o.next(!it,k,v,i)
+			print(i)
+			!i=2
+		
+}
+it=array.pairs(t)
+print(it)
+fn.map(it,math.inc,l)
+print(l)
+*/
+while(i=1)
+	//o.next(!it,k,v,i)
+	print(i)
+	!i=2

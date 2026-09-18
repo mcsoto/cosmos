@@ -1,0 +1,9 @@
+
+write=rel () true;
+
+t={
+	rel p(f)
+		true
+		write(f)
+	length=2
+}

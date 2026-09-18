@@ -9,7 +9,8 @@ compiler_load(Stage) :-
     compiler_platform(Here),
     directory_file_path(Stage,'?',Template),
     directory_file_path(Here,'../../libs/?',Libraries),
-    atomic_list_concat([Template,Libraries],';',Path),nb_setval(path,Path),
+    directory_file_path(Here,'../../userlibs/?',UserLibraries),
+    atomic_list_concat([Template,Libraries,UserLibraries],';',Path),nb_setval(path,Path),
     crequire("compiler",_,_).
 compiler_load_runtime :- compiler_platform_runtime_loaded, !.
 compiler_load_runtime :-
@@ -40,6 +41,70 @@ compiler_compile_file(Stage,Input,Output,Module) :-
         file_name_extension(Base,_,Output),file_name_extension(Base,cif,InterfaceFile),
         setup_call_cleanup(open(InterfaceFile,write,Stream2,[encoding(utf8),newline(posix)]),
             write_term(Stream2,Interface,[quoted(true),fullstop(true),nl(true)]),close(Stream2))).
+
+% Command-line launch support is deliberately appended after ordinary code
+% generation.  It does not inspect application source: every program with a
+% relation named main/1 receives the same argv-list adapter.
+compiler_add_main_entry(Output, Module) :-
+    atom_concat(Module, '::main', Predicate),
+    compiler_platform(PlatformDirectory),
+    directory_file_path(PlatformDirectory, '../../src/swi.pl', Runtime),
+    directory_file_path(PlatformDirectory, 'runtime.pl', Operations),
+    setup_call_cleanup(
+        open(Output, append, Stream, [encoding(utf8), newline(posix)]),
+        ( format(Stream, '~ncosmos_entry_load_runtime :-~n', []),
+          format(Stream, '    ( current_predicate(cosmos_get/3) -> true~n', []),
+          format(Stream, '    ; ensure_loaded(~q),~n', [Runtime]),
+          format(Stream, '      ensure_loaded(~q)~n', [Operations]),
+          format(Stream, '    ).~n', []),
+          format(Stream, ':- initialization(cosmos_entry_load_runtime, now).~n', []),
+          format(Stream, ':- initialization(cosmos_entry_main, main).~n', []),
+          format(Stream, 'cosmos_entry_main :-~n', []),
+          format(Stream, '    ( nb_current(cosmos_building_exe, true) -> true~n', []),
+          format(Stream, '    ; nb_current(cosmos_entry_ran, true) -> true~n', []),
+          format(Stream, '    ; nb_setval(cosmos_entry_ran, true),~n', []),
+          % Preserve the conventional argv[0] slot. Cosmos lists use
+          % zero-based indexing, so main(args) can use args[1] for the first
+          % user-supplied argument, as command-line programs normally do.
+          format(Stream, '      current_prolog_flag(executable, Executable), current_prolog_flag(argv, RawArguments),~n', []),
+          format(Stream, '      Arguments = [Executable|RawArguments], ~q(Arguments)~n', [Predicate]),
+          format(Stream, '    ).~n', [])
+        ),
+        close(Stream)).
+
+compiler_executable_file(Output, Executable) :-
+    file_name_extension(Base, _, Output),
+    file_name_extension(Base, exe, Executable).
+
+compiler_make_executable(Output, Executable) :-
+    compiler_load_runtime,
+    nb_setval(cosmos_building_exe, true),
+    setup_call_cleanup(
+        true,
+        ( consult(Output),
+          nb_delete(cosmos_building_exe),
+          qsave_program(Executable, [goal(cosmos_entry_main), stand_alone(true), toplevel(halt)])
+        ),
+        ( nb_current(cosmos_building_exe, _) -> nb_delete(cosmos_building_exe) ; true )).
+
+compiler_compile_application(Stage, Input, Output, Module, Main, Executable) :-
+    compiler_compile_file(Stage, Input, Output, Module),
+    ( Main == true -> compiler_add_main_entry(Output, Module) ; true ),
+    ( Executable == true -> compiler_executable_file(Output, Exe), compiler_make_executable(Output, Exe) ; true ).
+
+% Options accepted by both command-line front ends.  --exe always creates a
+% main wrapper because a standalone image must have a predictable entry.
+compiler_cli_options(Options, DefaultModule, Module, Main, Executable) :-
+    compiler_cli_options(Options, DefaultModule, DefaultModule, false, false, Module, Main, Executable).
+compiler_cli_options([], _, Module, Main, Executable, Module, Main, Executable).
+compiler_cli_options(['--main'|Rest], Default, Current, _, Executable, Module, Main, FinalExecutable) :- !,
+    compiler_cli_options(Rest, Default, Current, true, Executable, Module, Main, FinalExecutable).
+compiler_cli_options(['--exe'|Rest], Default, Current, _, _, Module, Main, FinalExecutable) :- !,
+    compiler_cli_options(Rest, Default, Current, true, true, Module, Main, FinalExecutable).
+compiler_cli_options(['--module', Name|Rest], Default, _, Main, Executable, Module, FinalMain, FinalExecutable) :- !,
+    compiler_cli_options(Rest, Default, Name, Main, Executable, Module, FinalMain, FinalExecutable).
+compiler_cli_options([Name|Rest], Default, _, Main, Executable, Module, FinalMain, FinalExecutable) :-
+    compiler_cli_options(Rest, Default, Name, Main, Executable, Module, FinalMain, FinalExecutable).
 
 % Data-only sidecars. No consult/1, directives, or imported application execution.
 compiler_read_interfaces(Names,Directory,Pairs) :-
