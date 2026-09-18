@@ -7,13 +7,15 @@ version :-
 	writeln("0.851").
 
 main :-
-    current_prolog_flag(argv, Arguments),
+    current_prolog_flag(argv, RawArguments),
+    cosmos_runtime_options(RawArguments,Arguments),
     catch((cosmos_main(Arguments), halt), Error, (compiler_report(Error), halt(1))).
 
 cosmos_main([]) :- !, cosmos_repl.
 cosmos_main(['-i']) :- !, cosmos_repl.
 cosmos_main(['-t'|Arguments]) :- !,
-    format(user_error, 'Cosmos trace mode is not implemented by the self-hosted core.~n', []),
+    nb_setval(cosmos_trace_requested,true),
+    nb_setval(cosmos_debug_contracts,true),
     cosmos_main(Arguments).
 cosmos_main(['-d'|Arguments]) :- !,
     nb_setval(cosmos_debug_contracts,true),
@@ -91,7 +93,28 @@ cosmos_help :-
     format('  cosmos.bat -r program.pl [module]     Run generated Prolog (-b is an alias).~n', []),
     format('  cosmos.bat -q "Cosmos source" [--vars x,y]~n', []),
     format('                                        Compile a query with selected results.~n', []),
-    format('  cosmos.bat -d [arguments]             Enable debug contract checks.~n', []).
+    format('  cosmos.bat -d [arguments]             Enable debug contract checks.~n', []),
+    format('  cosmos.bat -l name -t                 Trace calls; also enables debug checks.~n', []).
+
+% Preserve option operands (in particular query text), while allowing runtime
+% switches before or after the command and its file argument.
+cosmos_runtime_options([],[]).
+cosmos_runtime_options([Flag,Value|Rest],[Flag,Value|Options]) :-
+    memberchk(Flag,['-l','-c','-r','-b','-f','-o','-q','--module','--vars']),!,
+    cosmos_runtime_options(Rest,Options).
+cosmos_runtime_options(['-t'|Rest],Options) :- !,
+    nb_setval(cosmos_trace_requested,true),nb_setval(cosmos_debug_contracts,true),
+    cosmos_runtime_options(Rest,Options).
+cosmos_runtime_options(['-d'|Rest],Options) :- !,
+    nb_setval(cosmos_debug_contracts,true),cosmos_runtime_options(Rest,Options).
+cosmos_runtime_options([Arg|Rest],[Arg|Options]) :- cosmos_runtime_options(Rest,Options).
+
+:- meta_predicate cosmos_execute(0).
+cosmos_execute(Goal) :-
+    (nb_current(cosmos_trace_requested,true)->
+        b_setval(cosmos_trace_enabled,true),b_setval(cosmos_trace_depth,0),
+        call(Goal),b_setval(cosmos_trace_enabled,false)
+    ;call(Goal)).
 
 cosmos_query_variables([], none) :- !.
 cosmos_query_variables(['--vars', Spec], Variables) :- !,
@@ -145,7 +168,7 @@ cosmos_run(File, Module) :-
     nb_setval(path, Path),
     consult(Absolute),
     Goal =.. [Module, Output],
-    ( once(call(Goal)) -> repl_print_result(Output)
+    ( once(cosmos_execute(Goal)) -> repl_print_result(Output)
     ; writeln(false)
     ).
 
@@ -189,7 +212,7 @@ repl_execute(Source, Selected) :-
             ( write(Stream, Code),
               close(Stream),
               consult(File),
-              repl_run(Prefix)
+              cosmos_execute(repl_run(Prefix))
             ),
             ( catch(close(Stream), _, true),
               catch(delete_file(File), _, true)

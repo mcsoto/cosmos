@@ -27,6 +27,36 @@ Compile and immediately run:
 cosmos.bat -l hello.co
 ```
 
+Add `-t` to trace calls and enable debug contracts:
+
+```powershell
+cosmos.bat -l hello.co -t
+```
+
+`-t` and `-d` can appear before or after the command and its file argument.
+Tracing prints `::main()` for the program entry, then each source-level call
+with one `|` per nesting level, including built-ins such as `print`. For example:
+
+```text
+::main()
+|p(#var1234)
+||q(#var1234)
+||print(1)
+1.0
+[]
+```
+
+`#var...` denotes an unbound runtime variable; its identifier is not stable
+across runs. Trace lines share standard output with program output; `[]` is
+the normal successful result when the program exports nothing. This is a call
+entry trace, not an interactive debugger: it does not print exit/fail/redo
+events or individual unifications. Calls reached again during backtracking
+are printed again. Complex arguments use bounded Prolog representations.
+Both file runs and `-q`/interactive queries support tracing. Recompile older
+generated files to include trace instrumentation; `-l` does so automatically.
+The CLI traces program execution, not its compilation. Debug checks enabled
+by `-t` have the same effects and limitations as `-d`.
+
 Run an already generated module:
 
 ```powershell
@@ -270,7 +300,7 @@ it succeeds. The raw `o.p(1)` above succeeds in either mode. Testing `o is Movin
 always checks only the interface and never executes protocol bodies.
 
 Enable debug contracts with `cosmos -d -l program` (Windows:
-`cosmos.bat -d -l program`), placing `-d` before the load/run arguments.
+`cosmos.bat -d -l program`); `cosmos.bat -l program -d` also works.
 For Prolog embeddings, use `nb_setval(cosmos_debug_contracts,true)` before
 running the program. The flag also enables the existing determinism checks.
 Recompile older generated programs that omitted protocol bodies; `-l` does

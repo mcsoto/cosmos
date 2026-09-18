@@ -3,6 +3,14 @@
 cc_atom(Text,Atom) :- system:atom_string(Atom,Text).
 cc_term(Name,Args,Term) :- system:atom_string(Atom,Name),
     (Args=[] -> Term=Atom ; compound_name_arguments(Term,Atom,Args)).
+% Keep native built-ins native when instrumentation calls them through a
+% meta-predicate. A loaded Cosmos module can otherwise shadow e.g. string/1.
+% Meta-predicates retain the caller's context for their own goal arguments.
+cc_host_goal(Name,Args,Goal) :-
+    cc_term(Name,Args,Plain),
+    (predicate_property(system:Plain,built_in),
+     \+predicate_property(system:Plain,meta_predicate(_))->Goal=system:Plain
+    ;Goal=Plain).
 cc_parts(Term,Name,Args) :- compound(Term),!,compound_name_arguments(Term,Atom,Args),system:atom_string(Atom,Name).
 cc_parts(Term,Name,[]) :- atom(Term),system:atom_string(Term,Name).
 cc_cell(Value,cell(Value)).

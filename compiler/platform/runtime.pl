@@ -1,6 +1,27 @@
 % Runtime operations used by generated programs. No parsing/lowering policy.
 % Embeddings implement cosmos_host_op/3; native compilation needs no host.
 :- multifile cosmos_host_op/3.
+% Trace source-level calls, never the compiler's generated helper predicates.
+% Backtrackable depth restores nesting on success, redo, failure and exceptions.
+:- meta_predicate cosmos_trace_call(+,?,0).
+cosmos_trace_call(Name,Args,Goal) :-
+    (nb_current(cosmos_trace_enabled,true)->
+        (nb_current(cosmos_trace_depth,Depth)->true;Depth=0),
+        forall(between(1,Depth,_),put_char('|')),
+        format('~s(',[Name]),cosmos_trace_args(Args),writeln(')'),flush_output,
+        Next is Depth+1,b_setval(cosmos_trace_depth,Next),
+        call(Goal),b_setval(cosmos_trace_depth,Depth)
+    ;call(Goal)).
+cosmos_trace_args([]).
+cosmos_trace_args([Value|Values]) :-
+    cosmos_trace_value(Value),
+    (Values=[]->true;write(','),cosmos_trace_args(Values)).
+cosmos_trace_value(Value) :- number(Value),!,format('~g',[Value]).
+cosmos_trace_value(Value) :- var(Value),!,
+    term_to_atom(Value,Raw),atom_concat('_',Id,Raw),format('#var~w',[Id]).
+cosmos_trace_value(Value) :-
+    write_term(Value,[quoted(true),max_depth(8)]).
+
 % SWI-WASM returns JavaScript text as atoms. Use printable reserved tokens:
 % embedded NULs cannot survive the reverse Prolog-to-JavaScript call.
 % Cosmos code consistently sees host(Id), including returned get/method values.
