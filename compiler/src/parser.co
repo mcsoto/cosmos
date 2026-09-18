@@ -1,0 +1,1416 @@
+// Bootstrapped Cosmos lexer and parser.
+//
+// The parser deliberately represents its AST with Cosmos functors instead of
+// backend-specific tables.  Every syntax node that originates at a token has
+// a Loc(line, column) value.  Public entry points are exported at the end.
+
+functor(Token, Functor)
+functor(Loc, Functor)
+functor(Program, Functor)
+functor(RelationDecl, Functor)
+functor(MetaDecl, Functor)
+functor(MetaParam, Functor)
+functor(FunctorDecl, Functor)
+functor(ExportDecl, Functor)
+functor(TypedDecl, Functor)
+functor(TypedParam, Functor)
+functor(AndGoal, Functor)
+functor(OrGoal, Functor)
+functor(UnaryGoal, Functor)
+functor(AssertGoal, Functor)
+functor(IsGoal, Functor)
+functor(StateExpr, Functor)
+functor(ProtocolDecl, Functor)
+functor(ClassDecl, Functor)
+functor(NewExpr, Functor)
+functor(TrueGoal, Functor)
+functor(FalseGoal, Functor)
+functor(CutGoal, Functor)
+functor(UnifyGoal, Functor)
+functor(HasGoal, Functor)
+functor(CompareGoal, Functor)
+functor(CallGoal, Functor)
+functor(MetaApplyGoal, Functor)
+functor(MetaRefGoal, Functor)
+functor(TemporalGoal, Functor)
+functor(ControlGoal, Functor)
+functor(ForGoal, Functor)
+functor(ForInGoal, Functor)
+functor(CaseGoal, Functor)
+functor(VarExpr, Functor)
+functor(LiteralExpr, Functor)
+functor(CallExpr, Functor)
+functor(BinaryExpr, Functor)
+functor(UnaryExpr, Functor)
+functor(MetaUnaryExpr, Functor)
+functor(MetaBinaryExpr, Functor)
+functor(SizeExpr, Functor)
+functor(NextExpr, Functor)
+functor(FieldExpr, Functor)
+functor(IndexExpr, Functor)
+functor(SetFieldExpr, Functor)
+functor(ListExpr, Functor)
+functor(DictExpr, Functor)
+functor(Entry, Functor)
+functor(ClosureExpr, Functor)
+functor(None, Functor)
+functor(ParseError, Functor)
+
+// -------------------------------------------------------------------------
+// Lexer
+
+rel char_at(source, length, index, char)
+    index < length
+    string.at(source, index, char)
+
+rel two_at(source, length, index, pair)
+    index + 1 < length
+    string.slice(source, index, index + 2, pair)
+
+rel char_code_between(char, low, high)
+    string.code(char, code)
+    code >= low
+    code <= high
+
+rel digit(char)
+    char_code_between(char, 48, 57)
+
+rel letter(char)
+    char_code_between(char, 65, 90) or char_code_between(char, 97, 122) or char = '_'
+
+rel identifier_char(char)
+    letter(char) or digit(char)
+
+rel horizontal_space(char)
+    char = ' ' or char = '\t'
+
+rel opening(char)
+    char = '(' or char = '[' or char = '{'
+
+rel closing(char)
+    char = ')' or char = ']' or char = '}'
+
+rel punctuation(char)
+    char in ['(',')','[',']','{','}',',',';','|','.','+','-','*','/','%','=','<','>','!','#',':']
+
+rel scan_indent(source, length, index, column, next_index, next_column, indent)
+    choose(char_at(source, length, index, char) and char = ' ')
+        scan_indent(source, length, index + 1, column + 1, next_index, next_column, tail_indent)
+        indent = tail_indent + 1
+    elseif(char_at(source, length, index, char) and char = '\t')
+        scan_indent(source, length, index + 1, column + 4, next_index, next_column, tail_indent)
+        indent = tail_indent + 4
+    else
+        next_index = index
+        next_column = column
+        indent = 0
+
+rel skip_line_comment(source, length, index, next_index)
+    choose(char_at(source, length, index, char) and char != '\n')
+        skip_line_comment(source, length, index + 1, next_index)
+    else
+        next_index = index
+
+rel escaped_char(code, value)
+    choose(code = 'n')
+        value = '\n'
+    elseif(code = 'r')
+        value = '\r'
+    elseif(code = 't')
+        value = '\t'
+    else
+        value = code
+
+rel scan_string(source, length, index, line, column, quote, acc, next_index, next_line, next_column, value)
+    choose(index >= length)
+        throw('Unclosed string')
+    else
+        string.at(source, index, char)
+        choose(char = quote)
+            next_index = index + 1
+            next_line = line
+            next_column = column + 1
+            value = acc
+        elseif(char = '\\')
+            choose(index + 1 < length)
+                string.at(source, index + 1, escaped)
+                escaped_char(escaped, decoded)
+                string.concat(acc, decoded, acc2)
+                scan_string(source, length, index + 2, line, column + 2, quote, acc2, next_index, next_line, next_column, value)
+            else
+                throw('Unclosed string escape')
+        elseif(char = '\n')
+            string.concat(acc, char, acc2)
+            scan_string(source, length, index + 1, line + 1, 1, quote, acc2, next_index, next_line, next_column, value)
+        else
+            string.concat(acc, char, acc2)
+            scan_string(source, length, index + 1, line, column + 1, quote, acc2, next_index, next_line, next_column, value)
+
+rel scan_number(source, length, index, next_index)
+    choose(char_at(source, length, index, char) and (digit(char) or char = '.'))
+        scan_number(source, length, index + 1, next_index)
+    else
+        next_index = index
+
+rel scan_identifier(source, length, index, next_index)
+    choose(char_at(source, length, index, char) and identifier_char(char))
+        scan_identifier(source, length, index + 1, next_index)
+    else
+        next_index = index
+
+rel scan_block_comment(source, length, index, line, column, depth, next_index, next_line, next_column)
+    choose(index >= length)
+        throw('Unclosed block comment')
+    elseif(two_at(source, length, index, pair) and pair = '/*')
+        scan_block_comment(source, length, index + 2, line, column + 2, depth + 1, next_index, next_line, next_column)
+    elseif(two_at(source, length, index, pair) and pair = '*/')
+        choose(depth = 1)
+            next_index = index + 2
+            next_line = line
+            next_column = column + 2
+        else
+            scan_block_comment(source, length, index + 2, line, column + 2, depth - 1, next_index, next_line, next_column)
+    else
+        string.at(source, index, char)
+        choose(char = '\n')
+            scan_block_comment(source, length, index + 1, line + 1, 1, depth, next_index, next_line, next_column)
+        else
+            scan_block_comment(source, length, index + 1, line, column + 1, depth, next_index, next_line, next_column)
+
+rel line_starts_comment(source, length, index)
+    two_at(source, length, index, pair)
+    pair = '//' or pair = '--'
+
+rel layout_tokens(indent, [level|levels], tokens, new_levels)
+    choose(indent > level)
+        tokens = [Token('INDENT', 'INDENT', 0, 0)]
+        new_levels = [indent,level|levels]
+    elseif(indent = level)
+        tokens = []
+        new_levels = [level|levels]
+    elseif(level = 0)
+        throw('Invalid dedent')
+    else
+        layout_tokens(indent, levels, tail_tokens, new_levels)
+        tokens = [Token('DEDENT', 'DEDENT', 0, 0)|tail_tokens]
+
+rel eof_dedents(levels, line, column, tokens)
+    choose(levels = [0])
+        tokens = [Token('EOF', 'EOF', line, column)]
+    else
+        levels = [_|tail]
+        eof_dedents(tail, line, column, rest)
+        tokens = [Token('DEDENT', 'DEDENT', line, column)|rest]
+
+rel finish_lex(at_line, depth, levels, line, column, tokens)
+    choose(depth != 0)
+        throw('Unclosed delimiter')
+    elseif(at_line = 1)
+        eof_dedents(levels, line, column, tokens)
+    else
+        eof_dedents(levels, line, column, rest)
+        tokens = [Token('NEWLINE', 'NEWLINE', line, column)|rest]
+
+rel lex_line_start(source, length, index, line, column, depth, levels, tokens)
+    scan_indent(source, length, index, column, code_index, code_column, indent)
+    choose(code_index >= length)
+        finish_lex(1, depth, levels, line, code_column, tokens)
+    elseif(char_at(source, length, code_index, char) and char = '\n')
+        lex_loop(source, length, code_index, line, code_column, 0, depth, levels, tokens)
+    elseif(line_starts_comment(source, length, code_index))
+        lex_loop(source, length, code_index, line, code_column, 0, depth, levels, tokens)
+    elseif(two_at(source, length, code_index, pair) and pair = '/*')
+        lex_loop(source, length, code_index, line, code_column, 0, depth, levels, tokens)
+    else
+        layout_tokens(indent, levels, layout, levels2)
+        lex_loop(source, length, code_index, line, code_column, 0, depth, levels2, tail)
+        pl::append(layout, tail, tokens)
+
+rel lex_identifier(source, length, index, line, column, depth, levels, tokens)
+    scan_identifier(source, length, index, end_index)
+    string.slice(source, index, end_index, text)
+    choose(text = 'for' and end_index + 2 < length and string.slice(source, end_index, end_index + 3, '-in'))
+        token = Token('ID', 'for-in', line, column)
+        lex_loop(source, length, end_index + 3, line, column + end_index - index + 3, 0, depth, levels, rest)
+    else
+        token = Token('ID', text, line, column)
+        lex_loop(source, length, end_index, line, column + end_index - index, 0, depth, levels, rest)
+    tokens = [token|rest]
+
+rel lex_punctuation(source, length, index, line, column, depth, levels, tokens)
+    string.at(source, index, char)
+    choose(opening(char))
+        depth2 = depth + 1
+    elseif(closing(char))
+        choose(depth > 0)
+            depth2 = depth - 1
+        else
+            throw('Unexpected closing delimiter')
+    else
+        depth2 = depth
+    token = Token(char, char, line, column)
+    lex_loop(source, length, index + 1, line, column + 1, 0, depth2, levels, rest)
+    tokens = [token|rest]
+
+rel lex_loop(source, length, index, line, column, at_line, depth, levels, tokens)
+    choose(index >= length)
+        finish_lex(at_line, depth, levels, line, column, tokens)
+    elseif(at_line = 1 and depth = 0)
+        lex_line_start(source, length, index, line, column, depth, levels, tokens)
+    else
+        string.at(source, index, char)
+        choose(char = ' ' or char = '\t')
+            lex_loop(source, length, index + 1, line, column + 1, at_line, depth, levels, tokens)
+        elseif(char = '\n')
+            choose(depth = 0)
+                lex_loop(source, length, index + 1, line + 1, 1, 1, depth, levels, rest)
+                tokens = [Token('NEWLINE', 'NEWLINE', line, column)|rest]
+            else
+                lex_loop(source, length, index + 1, line + 1, 1, 1, depth, levels, tokens)
+        elseif(line_starts_comment(source, length, index))
+            skip_line_comment(source, length, index + 2, next_index)
+            lex_loop(source, length, next_index, line, column + next_index - index, at_line, depth, levels, tokens)
+        elseif(two_at(source, length, index, pair) and pair = '/*')
+            scan_block_comment(source, length, index + 2, line, column + 2, 1, next_index, next_line, next_column)
+            lex_loop(source, length, next_index, next_line, next_column, at_line, depth, levels, tokens)
+        elseif(char = "'" or char = '"')
+            scan_string(source, length, index + 1, line, column + 1, char, '', next_index, next_line, next_column, value)
+            lex_loop(source, length, next_index, next_line, next_column, 0, depth, levels, rest)
+            tokens = [Token('STRING', value, line, column)|rest]
+        elseif(digit(char))
+            scan_number(source, length, index, next_index)
+            string.slice(source, index, next_index, text)
+            lex_loop(source, length, next_index, line, column + next_index - index, 0, depth, levels, rest)
+            tokens = [Token('NUMBER', text, line, column)|rest]
+        elseif(letter(char))
+            lex_identifier(source, length, index, line, column, depth, levels, tokens)
+        else
+            choose(two_at(source, length, index, pair) and pair in ['<=','>=','!=','==','::','+=','-=','*=','/=','%='])
+                lex_loop(source, length, index + 2, line, column + 2, 0, depth, levels, rest)
+                tokens = [Token(pair, pair, line, column)|rest]
+            elseif(punctuation(char))
+                lex_punctuation(source, length, index, line, column, depth, levels, tokens)
+            else
+                throw('Unexpected character')
+
+rel lex(source, tokens)
+    string.size(source, length)
+    lex_loop(source, length, 0, 1, 1, 1, 0, [0], tokens)
+
+// -------------------------------------------------------------------------
+// Token stream helpers
+
+rel token_type([Token(type,_,_,_)|_], type)
+    true
+
+rel token_value([Token(_,value,_,_)|_], value)
+    true
+
+rel token_loc([Token(_,_,line,column)|_], Loc(line,column))
+    true
+
+rel token_position([Token(_,_,line,column)|_], line, column)
+    true
+
+rel is_token(tokens, expected)
+    tokens = [Token(type,value,_,_)|_]
+    type = expected or type = 'ID' and value = expected
+
+rel next_is_token([_|tail], expected)
+    is_token(tail, expected)
+
+rel eat(tokens, expected, rest, token)
+    choose(tokens = [head|tail] and is_token(tokens, expected))
+        token = head
+        rest = tail
+    else
+        throw(ParseError('Unexpected token', expected, tokens))
+
+rel skip_newlines(tokens, rest)
+    choose(is_token(tokens, 'NEWLINE'))
+        eat(tokens, 'NEWLINE', tail, _)
+        skip_newlines(tail, rest)
+    else
+        rest = tokens
+
+rel optional_token(tokens, expected, rest)
+    choose(is_token(tokens, expected))
+        eat(tokens, expected, rest, _)
+    else
+        rest = tokens
+
+rel make_and([], goal)
+    goal = TrueGoal
+
+rel make_and([goal], goal)
+    true
+
+rel make_and([head,second|tail], goal)
+    goal = AndGoal([head,second|tail])
+
+rel make_or([goal], goal)
+    true
+
+rel make_or([head,second|tail], goal)
+    goal = OrGoal([head,second|tail])
+
+// -------------------------------------------------------------------------
+// Program and declarations
+
+rel relation_keyword(value)
+    value in ['rel','fun','bool','function','void']
+
+rel type_keyword(value)
+    value in ['Any','Number','String','Functor','Relation','Integer','Real','List','Table','Host','In','Out','InOut']
+
+rel type_name(value)
+    choose(type_keyword(value))
+        true
+    else
+        string.slice(value,0,1,first)
+        pl::string_upper(first,first)
+        pl::string_lower(first,lower)
+        first!=lower
+
+rel starts_relation(tokens)
+    token_type(tokens, 'ID')
+    token_value(tokens, value)
+    relation_keyword(value)
+
+rel starts_typed_declaration(tokens)
+    token_type(tokens, 'ID')
+    token_value(tokens, value)
+    type_name(value)
+    next_is_token(tokens, 'ID')
+
+rel parse(source, program)
+    lex(source, tokens)
+    parseTokens(tokens, program)
+
+rel parseTokens(tokens, program)
+    skip_newlines(tokens, start)
+    parse_program_items(start, items, rest)
+    eat(rest, 'EOF', tail, _)
+    skip_newlines(tail, _)
+    program = Program(items)
+
+rel parse_program_items(tokens, items, rest)
+    skip_newlines(tokens, start)
+    choose(is_token(start, 'EOF'))
+        items = []
+        rest = start
+    else
+        parse_program_item(start, item, after_item)
+        skip_newlines(after_item, after_breaks)
+        choose(is_token(after_breaks, 'and'))
+            eat(after_breaks, 'and', after_and, _)
+        else
+            after_and = after_breaks
+        parse_program_items(after_and, tail, rest)
+        items = [item|tail]
+
+rel parse_program_item(tokens, item, rest)
+    choose(is_token(tokens,'meta'))
+        parse_meta_declaration(tokens,item,rest)
+    elseif(starts_relation(tokens))
+        parse_relation_declaration(tokens, item, rest)
+    elseif(is_token(tokens, 'functor'))
+        parse_functor_declaration(tokens, item, rest)
+    elseif(is_token(tokens,'protocol'))
+        parse_protocol(tokens,item,rest)
+    elseif(is_token(tokens,'class'))
+        token_loc(tokens,loc)
+        eat(tokens,'class',t1,_)
+        eat(t1,'(',t2,_)
+        eat(t2,'ID',t3,Token(_,name,_,_))
+        eat(t3,',',t4,_)
+        parse_term(t4,value,t5)
+        eat(t5,')',rest,_)
+        item=ClassDecl(name,value,loc)
+    elseif(is_token(tokens, 'export'))
+        parse_export_declaration(tokens, item, rest)
+    elseif(starts_typed_declaration(tokens))
+        parse_typed_declaration(tokens, item, rest)
+    else
+        parse_goal(tokens, item, rest)
+
+rel parse_meta_parameters(tokens,params,rest)
+    choose(is_token(tokens,')'))
+        params=[]
+        rest=tokens
+    else
+        token_loc(tokens,loc)
+        eat(tokens,'ID',t1,Token(_,category,_,_))
+        choose(category in ['Goal','Expr'])
+            true
+        else
+            throw(ParseError('Meta parameters must be Goal or Expr',tokens))
+        eat(t1,'ID',t2,Token(_,name,_,_))
+        choose(is_token(t2,','))
+            eat(t2,',',t3,_)
+            parse_meta_parameters(t3,tail,rest)
+            params=[MetaParam(category,name,loc)|tail]
+        else
+            params=[MetaParam(category,name,loc)]
+            rest=t2
+
+rel meta_goal_parameter([MetaParam(category,name,_)|params],name)
+    category='Goal'
+rel meta_goal_parameter([_|params],name)
+    meta_goal_parameter(params,name)
+
+rel meta_goal_start(tokens,params)
+    token_value(tokens,word)
+    word in ['assert','init','next','not','unsafeNot','once','if','when','choose','soft_if','while','for','for-in','some','case','true','false','fail','cut','temporal']
+rel meta_goal_start(tokens,params)
+    token_type(tokens,'ID')
+    token_value(tokens,name)
+    meta_goal_parameter(params,name)
+
+rel parse_meta_block(tokens,params,category,body,rest)
+    skip_newlines(tokens,t1)
+    eat(t1,'INDENT',t2,_)
+    skip_newlines(t2,start)
+    choose(meta_goal_start(start,params))
+        parse_body_items(start,goals,t3)
+        make_and(goals,body)
+        category='Goal'
+    else
+        parse_term(start,body,t3)
+        category='Expr'
+    skip_newlines(t3,t4)
+    eat(t4,'DEDENT',rest,_)
+
+rel parse_meta_template(tokens,params,category,body,rest)
+    choose(is_token(tokens,'NEWLINE'))
+        parse_meta_block(tokens,params,category,body,rest)
+    elseif(meta_goal_start(tokens,params))
+        parse_goal(tokens,body,t1)
+        optional_token(t1,';',t2)
+        skip_newlines(t2,rest)
+        category='Goal'
+    else
+        parse_term(tokens,body,t1)
+        optional_token(t1,';',t2)
+        skip_newlines(t2,rest)
+        category='Expr'
+
+rel parse_meta_declaration(tokens,declaration,rest)
+    token_loc(tokens,loc)
+    eat(tokens,'meta',t1,_)
+    eat(t1,'ID',t2,Token(_,name,_,_))
+    eat(t2,'(',t3,_)
+    parse_meta_parameters(t3,params,t4)
+    eat(t4,')',t5,_)
+    choose(is_token(t5,':'))
+        eat(t5,':',t6,_)
+        eat(t6,'ID',t7,Token(_,fixity,_,_))
+        choose(fixity in ['unary','binary'])
+            true
+        else
+            throw(ParseError('Meta fixity must be unary or binary',t6))
+    else
+        fixity='call'
+        t7=t5
+    parse_meta_template(t7,params,category,body,rest)
+    declaration=MetaDecl(name,params,fixity,category,body,loc)
+
+rel parse_id_words_until_paren(tokens, words, rest)
+    choose(is_token(tokens, ')'))
+        words = []
+        rest = tokens
+    else
+        eat(tokens, 'ID', after, Token(_,word,_,_))
+        parse_id_words_until_paren(after, tail, rest)
+        words = [word|tail]
+
+rel parse_protocol(tokens,result,rest)
+    token_loc(tokens,loc)
+    eat(tokens,'protocol',t1,_)
+    eat(t1,'(',t2,_)
+    eat(t2,'ID',t3,Token(_,name,_,_))
+    eat(t3,',',t4,_)
+    eat(t4,'{',t5,_)
+    protocol_members(t5,members,t6)
+    eat(t6,'}',t7,_)
+    eat(t7,')',rest,_)
+    result=ProtocolDecl(name,members,loc)
+rel protocol_words(tokens,line,words,rest)
+    choose(tokens=[Token('ID',word,line,_)|tail])
+        protocol_words(tail,line,others,rest)
+        words=[word|others]
+    else
+        words=[]
+        rest=tokens
+rel protocol_members(tokens,members,rest)
+    choose(is_token(tokens,'}'))
+        members=[]
+        rest=tokens
+    elseif(is_token(tokens,','))
+        eat(tokens,',',t1,_)
+        protocol_members(t1,members,rest)
+    elseif(starts_relation(tokens))
+        parse_table_closure(tokens,method,t1)
+        protocol_members(t1,tail,rest)
+        members=[method|tail]
+    else
+        token_loc(tokens,loc)
+        loc=Loc(line,_)
+        protocol_words(tokens,line,words,t1)
+        choose(pl::append(types,[name],words) and types!=[])
+            protocol_members(t1,tail,rest)
+            members=[TypedDecl(types,name,None,loc)|tail]
+        else
+            throw(ParseError('Expected protocol member declaration',tokens))
+
+rel parse_functor_declaration(tokens, declaration, rest)
+    token_loc(tokens, loc)
+    eat(tokens, 'functor', t1, _)
+    eat(t1, '(', t2, _)
+    eat(t2, 'ID', t3, Token(_,name,_,_))
+    choose(is_token(t3, ','))
+        eat(t3, ',', t4, _)
+        parse_id_words_until_paren(t4, types, t5)
+    else
+        types = []
+        t5 = t3
+    eat(t5, ')', rest, _)
+    declaration = FunctorDecl(name, types, loc)
+
+rel parse_export_declaration(tokens, declaration, rest)
+    token_loc(tokens, loc)
+    eat(tokens, 'export', t1, _)
+    eat(t1, '(', t2, _)
+    parse_term(t2, value, t3)
+    eat(t3, ')', rest, _)
+    declaration = ExportDecl(value, loc)
+
+rel parse_type_words(tokens, words, name, rest)
+    eat(tokens, 'ID', t1, Token(_,word,_,_))
+    choose(is_token(t1, 'ID'))
+        parse_type_words(t1, tail_words, name, rest)
+        words = [word|tail_words]
+    else
+        words = []
+        name = word
+        rest = t1
+
+rel parse_typed_declaration(tokens, declaration, rest)
+    token_loc(tokens, loc)
+    parse_type_words(tokens, words, name, t1)
+    choose(is_token(t1, '='))
+        eat(t1, '=', t2, _)
+        parse_term(t2, value, rest)
+    else
+        value = None
+        rest = t1
+    declaration = TypedDecl(words, name, value, loc)
+
+rel parse_relation_declaration(tokens, declaration, rest)
+    token_loc(tokens, loc)
+    eat(tokens, 'ID', t1, Token(_,kind,_,_))
+    eat(t1, 'ID', t2, Token(_,name,_,_))
+    eat(t2, '(', t3, _)
+    parse_parameters(t3, params, t4)
+    eat(t4, ')', t5, _)
+    choose(token_value(t5,determinism) and determinism in ['det','semidet','multi','nondet'])
+        eat(t5,'ID',t6,_)
+        annotation={category=kind,determinism=determinism}
+    else
+        t6=t5
+        annotation=kind
+    parse_body(t6, body, rest)
+    declaration = RelationDecl(annotation, name, params, body, loc)
+
+rel parse_parameters(tokens, params, rest)
+    choose(is_token(tokens, ')'))
+        params = []
+        rest = tokens
+    else
+        parse_parameter(tokens, param, t1)
+        choose(is_token(t1, ','))
+            eat(t1, ',', t2, _)
+            parse_parameters(t2, tail, rest)
+            params = [param|tail]
+        else
+            params = [param]
+            rest = t1
+
+rel parse_parameter(tokens, param, rest)
+    choose(token_type(tokens,'ID') and tokens=[Token(_,first_name,line,column),Token('ID',_,_,_)|_])
+        eat(tokens,'ID',typed,_)
+        loc=Loc(line,column)
+        parse_parameter_type_tail(typed,[first_name],words,name,rest)
+        param=TypedParam(words,name,loc)
+    else
+        parse_term(tokens, first, t1)
+        param = first
+        rest = t1
+
+rel parse_parameter_type_tail(tokens, prefix, words, name, rest)
+    eat(tokens, 'ID', t1, Token(_,word,_,_))
+    choose(is_token(t1, 'ID'))
+        pl::append(prefix, [word], prefix2)
+        parse_parameter_type_tail(t1, prefix2, words, name, rest)
+    else
+        words = prefix
+        name = word
+        rest = t1
+
+// -------------------------------------------------------------------------
+// Bodies and goals
+
+rel parse_body(tokens, body, rest)
+    choose(is_token(tokens, 'NEWLINE'))
+        skip_newlines(tokens, t1)
+        eat(t1, 'INDENT', t2, _)
+        skip_newlines(t2, t3)
+        parse_body_items(t3, goals, t4)
+        eat(t4, 'DEDENT', rest, _)
+        make_and(goals, body)
+    else
+        parse_goal(tokens, body, t1)
+        optional_token(t1, ';', t2)
+        skip_newlines(t2, rest)
+
+rel parse_body_items(tokens, goals, rest)
+    skip_newlines(tokens, start)
+    choose(is_token(start, 'DEDENT'))
+        goals = []
+        rest = start
+    elseif(is_token(start, 'case'))
+        parse_case_group(start, goal, t1)
+        skip_newlines(t1, t2)
+        parse_body_items(t2, tail, rest)
+        goals = [goal|tail]
+    elseif(starts_relation(start))
+        parse_closure(start, closure, t1)
+        closure = ClosureExpr(annotation,_,_,loc)
+        closure_name(annotation,name)
+        choose(name = '_')
+            throw('Nested relation needs a name')
+        else
+            goal = UnifyGoal(VarExpr(name,loc), closure, loc)
+            skip_newlines(t1, t2)
+            parse_body_items(t2, tail, rest)
+            goals = [goal|tail]
+    elseif(starts_typed_declaration(start))
+        parse_typed_declaration(start, goal, t1)
+        skip_newlines(t1, t2)
+        parse_body_items(t2, tail, rest)
+        goals = [goal|tail]
+    else
+        parse_goal(start, goal, t1)
+        skip_newlines(t1, t2)
+        parse_body_items(t2, tail, rest)
+        goals = [goal|tail]
+
+rel parse_goal(tokens, goal, rest)
+    parse_or_goal(tokens, goal, rest)
+
+rel parse_or_goal(tokens, goal, rest)
+    parse_and_goal(tokens, first, t1)
+    parse_or_tail(t1, tail, rest)
+    make_or([first|tail], goal)
+
+rel parse_or_tail(tokens, goals, rest)
+    choose(is_token(tokens, 'or'))
+        eat(tokens, 'or', t1, _)
+        skip_newlines(t1, t2)
+        parse_and_goal(t2, goal, t3)
+        parse_or_tail(t3, tail, rest)
+        goals = [goal|tail]
+    else
+        goals = []
+        rest = tokens
+
+rel parse_and_goal(tokens, goal, rest)
+    parse_unary_goal(tokens, first, t1)
+    parse_and_tail(t1, tail, rest)
+    make_and([first|tail], goal)
+
+rel parse_and_tail(tokens, goals, rest)
+    choose(is_token(tokens, 'and'))
+        eat(tokens, 'and', t1, _)
+        skip_newlines(t1, t2)
+        parse_unary_goal(t2, goal, t3)
+        parse_and_tail(t3, tail, rest)
+        goals = [goal|tail]
+    else
+        goals = []
+        rest = tokens
+
+rel prefix_goal_keyword(word)
+    word in ['not','unsafeNot','once']
+
+rel control_keyword(word)
+    word in ['if','when','choose','soft_if','while','for','for-in','some']
+
+rel parse_unary_goal(tokens, goal, rest)
+    choose(is_token(tokens,'temporal'))
+        token_loc(tokens,loc)
+        eat(tokens,'temporal',t1,_)
+        eat(t1,'(',t2,_)
+        eat(t2,'ID',t3,Token(_,kind,_,_))
+        eat(t3,',',t4,_)
+        parse_goal(t4,first,t5)
+        choose(is_token(t5,','))
+            eat(t5,',',t6,_)
+            parse_goal(t6,second,t7)
+            args=[first,second]
+        else
+            args=[first]
+            t7=t5
+        eat(t7,')',rest,_)
+        goal=TemporalGoal(kind,args,loc)
+    elseif(is_token(tokens,'assert'))
+        token_loc(tokens,loc)
+        eat(tokens,'assert',t1,_)
+        choose(is_token(t1,'('))
+            eat(t1,'(',t2,_)
+            parse_goal(t2,body,t3)
+            choose(is_token(t3,','))
+                eat(t3,',',t4,_)
+                parse_term(t4,message,t5)
+            else
+                message=LiteralExpr('assert error',loc)
+                t5=t3
+            eat(t5,')',rest,_)
+        else
+            parse_unary_goal(t1,body,rest)
+            message=LiteralExpr('assert error',loc)
+        goal=AssertGoal(body,message,loc)
+    elseif(token_type(tokens, 'ID') and token_value(tokens, word) and word in ['init','next'] and unsafeNot next_is_token(tokens, '('))
+        token_loc(tokens, loc)
+        eat(tokens, 'ID', t1, _)
+        parse_term(t1,target,t2)
+        choose(is_token(t2,'+='))
+            eat(t2,'+=',t3,_)
+            parse_term(t3,value,rest)
+            rhs=BinaryExpr('+',target,value,loc)
+        else
+            eat(t2,'=',t3,_)
+            parse_term(t3,rhs,rest)
+        choose(word='next' and target=FieldExpr(owner,key,_))
+            child=UnifyGoal(owner,SetFieldExpr(FieldExpr(owner,key,loc),rhs,loc),loc)
+        else
+            child=UnifyGoal(target,rhs,loc)
+        goal = UnaryGoal(word, child, loc)
+    elseif(token_type(tokens, 'ID') and token_value(tokens, word) and prefix_goal_keyword(word))
+        token_loc(tokens, loc)
+        eat(tokens, 'ID', t1, _)
+        parse_unary_goal(t1, child, rest)
+        goal = UnaryGoal(word, child, loc)
+    elseif(token_type(tokens, 'ID') and token_value(tokens, word) and control_keyword(word))
+        parse_control(tokens, goal, rest)
+    elseif(token_type(tokens,'ID') and unsafeNot next_is_token(tokens,'(') and tokens=[_|tail] and token_type(tail,'ID') and token_value(tail,operandWord) and meta_binary_word(operandWord))
+        token_loc(tokens,loc)
+        eat(tokens,'ID',t1,Token(_,name,_,_))
+        parse_unary_goal(t1,child,rest)
+        goal=MetaApplyGoal(name,[child],loc)
+    elseif(is_token(tokens, 'case'))
+        parse_case_group(tokens, goal, rest)
+    elseif(is_token(tokens, 'true'))
+        token_loc(tokens, loc)
+        eat(tokens, 'true', rest, _)
+        goal = TrueGoal(loc)
+    elseif(is_token(tokens, 'false') or is_token(tokens, 'fail'))
+        token_loc(tokens, loc)
+        eat(tokens, 'ID', rest, _)
+        goal = FalseGoal(loc)
+    elseif(is_token(tokens, 'cut'))
+        token_loc(tokens, loc)
+        eat(tokens, 'cut', rest, _)
+        goal = CutGoal(loc)
+    elseif(is_token(tokens, '('))
+        eat(tokens, '(', t1, _)
+        parse_goal(t1, goal, t2)
+        eat(t2, ')', rest, _)
+    else
+        parse_atomic_goal(tokens, goal, rest)
+
+rel parse_atomic_goal(tokens, goal, rest)
+    parse_term(tokens, left, t1)
+    choose(token_value(t1,assignment) and assignment in ['+=','-=','*=','/=','%='])
+        eat(t1,assignment,t2,_)
+        parse_term(t2,right,rest)
+        expression_loc(left,loc)
+        choose(left=StateExpr(current,_))
+            string.slice(assignment,0,1,op)
+            goal=UnifyGoal(left,BinaryExpr(op,current,right,loc),loc)
+        else
+            throw(ParseError('Compound assignment requires !',t1))
+    elseif(is_token(t1, '='))
+        eat(t1, '=', t2, _)
+        parse_term(t2, right, rest)
+        expression_loc(left, loc)
+        goal = UnifyGoal(left, right, loc)
+    elseif(is_token(t1, 'in'))
+        eat(t1, 'in', t2, _)
+        parse_term(t2, collection, rest)
+        expression_loc(left, loc)
+        goal = HasGoal(left, collection, loc)
+    elseif(is_comparison(t1, op))
+        eat(t1, op, t2, _)
+        parse_term(t2, right, rest)
+        expression_loc(left, loc)
+        goal = CompareGoal(op, left, right, loc)
+    elseif(is_token(t1,'is'))
+        eat(t1,'is',t2,_)
+        eat(t2,'ID',rest,Token(_,typeName,_,_))
+        expression_loc(left,loc)
+        goal=IsGoal(left,typeName,loc)
+    elseif(left = CallExpr(fn, args, loc))
+        goal = CallGoal(fn, args, loc)
+        rest = t1
+    elseif(left=MetaUnaryExpr(name,operand,loc))
+        syntax_goal(operand,child)
+        goal=MetaApplyGoal(name,[child],loc)
+        rest=t1
+    elseif(left=MetaBinaryExpr(name,a,b,loc))
+        syntax_goal(a,leftGoal)
+        syntax_goal(b,rightGoal)
+        goal=MetaApplyGoal(name,[leftGoal,rightGoal],loc)
+        rest=t1
+    elseif(left=VarExpr(name,loc))
+        goal=MetaRefGoal(name,loc)
+        rest=t1
+    else
+        throw(ParseError('Expected goal operator', t1))
+
+rel syntax_goal(CallExpr(fn,args,loc),CallGoal(fn,args,loc)) true
+rel syntax_goal(MetaUnaryExpr(name,operand,loc),MetaApplyGoal(name,[goal],loc))
+    syntax_goal(operand,goal)
+rel syntax_goal(MetaBinaryExpr(name,a,b,loc),MetaApplyGoal(name,[left,right],loc))
+    syntax_goal(a,left)
+    syntax_goal(b,right)
+rel syntax_goal(VarExpr(name,loc),MetaRefGoal(name,loc)) true
+rel syntax_goal(expression,goal)
+    throw(ParseError('Meta goal operand must be goal syntax',expression))
+
+rel is_comparison(tokens, op)
+    op in ['!=','<','<=','>','>=']
+    is_token(tokens, op)
+
+rel parse_case_group(tokens, goal, rest)
+    parse_case_branch(tokens, first, t1)
+    skip_newlines(t1, t2)
+    parse_more_cases(t2, tail, rest)
+    make_or([first|tail], branches)
+    token_loc(tokens, loc)
+    goal = CaseGoal(branches, loc)
+
+rel parse_more_cases(tokens, branches, rest)
+    choose(is_token(tokens, 'case'))
+        parse_case_branch(tokens, branch, t1)
+        skip_newlines(t1, t2)
+        parse_more_cases(t2, tail, rest)
+        branches = [branch|tail]
+    else
+        branches = []
+        rest = tokens
+
+rel parse_case_branch(tokens, branch, rest)
+    eat(tokens, 'case', t1, _)
+    eat(t1, 'NEWLINE', t2, _)
+    skip_newlines(t2, t3)
+    eat(t3, 'INDENT', t4, _)
+    skip_newlines(t4, t5)
+    parse_body_items(t5, goals, t6)
+    eat(t6, 'DEDENT', rest, _)
+    make_and(goals, branch)
+
+rel header_has_semicolon(tokens, depth)
+    tokens = [Token(type,_,_,_)|tail]
+    choose(type = ';' and depth = 0)
+        true
+    elseif(type in ['(','[','{'])
+        header_has_semicolon(tail, depth + 1)
+    elseif(type in [')',']','}'] and depth > 0)
+        header_has_semicolon(tail, depth - 1)
+    elseif(type = ')' and depth = 0)
+        false
+    else
+        header_has_semicolon(tail, depth)
+
+rel for_header_has_semicolon(tokens)
+    eat(tokens, '(', header, _)
+    header_has_semicolon(header, 0)
+
+rel parse_control(tokens, goal, rest)
+    token_loc(tokens, loc)
+    token_value(tokens, kind)
+    eat(tokens, 'ID', t1, _)
+    choose(kind = 'for' and is_token(t1, '(') and for_header_has_semicolon(t1))
+        parse_for_control(t1, loc, goal, rest)
+    elseif(kind in ['for','for-in','some'])
+        parse_for_in_control(kind, t1, loc, goal, rest)
+    else
+        choose(is_token(t1,'('))
+            eat(t1, '(', t2, _)
+            parse_goal(t2, condition, t3)
+            eat(t3, ')', t4, _)
+        else
+            parse_unary_goal(t1,condition,t4)
+        parse_body(t4, yes, t5)
+        parse_control_tail(kind, t5, no, rest)
+        goal = ControlGoal(kind, condition, yes, no, loc)
+
+rel parse_for_control(tokens, loc, goal, rest)
+    eat(tokens, '(', t1, _)
+    parse_goal(t1, initial, t2)
+    eat(t2, ';', t3, _)
+    parse_goal(t3, condition, t4)
+    eat(t4, ';', t5, _)
+    parse_goal(t5, advance, t6)
+    optional_token(t6, ';', t7)
+    eat(t7, ')', t8, _)
+    parse_body(t8, body, rest)
+    goal = ForGoal(initial, condition, advance, body, loc)
+
+rel parse_for_in_control(kind, tokens, loc, goal, rest)
+    eat(tokens, '(', t1, _)
+    parse_term(t1, first, t2)
+    choose(is_token(t2, ','))
+        eat(t2, ',', t3, _)
+        parse_term(t3, value, t4)
+        key = first
+    else
+        key = None
+        value = first
+        t4 = t2
+    eat(t4, 'in', t5, _)
+    parse_term(t5, collection, t6)
+    eat(t6, ')', t7, _)
+    parse_body(t7, body, rest)
+    goal = ForInGoal(kind, key, value, collection, body, loc)
+
+rel parse_control_tail(kind, tokens, no, rest)
+    skip_newlines(tokens, start)
+    choose(is_token(start, 'elseif'))
+        token_loc(start, loc)
+        eat(start, 'elseif', t1, _)
+        eat(t1, '(', t2, _)
+        parse_goal(t2, condition, t3)
+        eat(t3, ')', t4, _)
+        parse_body(t4, yes, t5)
+        parse_control_tail(kind, t5, nested_no, rest)
+        no = ControlGoal(kind, condition, yes, nested_no, loc)
+    elseif(is_token(start, 'else'))
+        eat(start, 'else', t1, _)
+        parse_body(t1, no, rest)
+    else
+        no = None
+        rest = start
+
+// -------------------------------------------------------------------------
+// Expressions
+
+rel expression_loc(VarExpr(_,loc), loc)
+    true
+rel expression_loc(LiteralExpr(_,loc), loc)
+    true
+rel expression_loc(CallExpr(_,_,loc), loc)
+    true
+rel expression_loc(BinaryExpr(_,_,_,loc), loc)
+    true
+rel expression_loc(UnaryExpr(_,_,loc), loc)
+    true
+rel expression_loc(SizeExpr(_,loc), loc)
+    true
+rel expression_loc(NextExpr(_,loc), loc)
+    true
+rel expression_loc(StateExpr(_,loc),loc)
+    true
+rel expression_loc(NewExpr(_,_,loc),loc)
+    true
+rel expression_loc(FieldExpr(_,_,loc), loc)
+    true
+rel expression_loc(IndexExpr(_,_,loc), loc)
+    true
+rel expression_loc(SetFieldExpr(_,_,loc), loc)
+    true
+rel expression_loc(ListExpr(_,_,loc), loc)
+    true
+rel expression_loc(DictExpr(_,loc), loc)
+    true
+rel expression_loc(ClosureExpr(_,_,_,loc), loc)
+    true
+
+rel parse_term(tokens, expression, rest)
+    parse_additive(tokens, first, t1)
+    parse_meta_binary_tail(t1,first,expression,rest)
+
+rel meta_binary_word(word)
+    unsafeNot word in ['and','or','in','is','else','elseif','det','semidet','multi','nondet']
+
+rel parse_meta_binary_tail(tokens,left,expression,rest)
+    choose(token_type(tokens,'ID') and token_value(tokens,name) and meta_binary_word(name) and expression_loc(left,Loc(line,_)) and token_loc(tokens,Loc(line,_)))
+        token_loc(tokens,loc)
+        eat(tokens,'ID',t1,_)
+        parse_additive(t1,right,t2)
+        parse_meta_binary_tail(t2,MetaBinaryExpr(name,left,right,loc),expression,rest)
+    else
+        expression=left
+        rest=tokens
+
+rel parse_additive(tokens, expression, rest)
+    parse_multiplicative(tokens, first, t1)
+    parse_additive_tail(t1, first, expression, rest)
+
+rel parse_additive_tail(tokens, left, expression, rest)
+    choose(is_token(tokens, '+') or is_token(tokens, '-'))
+        token_value(tokens, op)
+        eat(tokens, op, t1, _)
+        parse_multiplicative(t1, right, t2)
+        expression_loc(left, loc)
+        combined = BinaryExpr(op, left, right, loc)
+        parse_additive_tail(t2, combined, expression, rest)
+    else
+        expression = left
+        rest = tokens
+
+rel parse_multiplicative(tokens, expression, rest)
+    parse_prefix_expression(tokens, first, t1)
+    parse_multiplicative_tail(t1, first, expression, rest)
+
+rel parse_multiplicative_tail(tokens, left, expression, rest)
+    choose(is_token(tokens, '*') or is_token(tokens, '/') or is_token(tokens, '%'))
+        token_value(tokens, op)
+        eat(tokens, op, t1, _)
+        parse_prefix_expression(t1, right, t2)
+        expression_loc(left, loc)
+        combined = BinaryExpr(op, left, right, loc)
+        parse_multiplicative_tail(t2, combined, expression, rest)
+    else
+        expression = left
+        rest = tokens
+
+rel parse_prefix_expression(tokens, expression, rest)
+    choose(is_token(tokens,'new'))
+        token_loc(tokens,loc)
+        eat(tokens,'new',t1,_)
+        eat(t1,'ID',t2,Token(_,name,_,_))
+        eat(t2,'(',t3,_)
+        parse_arguments(t3,args,t4)
+        eat(t4,')',rest,_)
+        expression=NewExpr(VarExpr(name,loc),args,loc)
+    elseif(is_token(tokens,'!'))
+        token_loc(tokens,loc)
+        eat(tokens,'!',t1,_)
+        parse_prefix_expression(t1,child,rest)
+        expression=StateExpr(child,loc)
+    elseif(is_token(tokens, '+'))
+        eat(tokens, '+', t1, _)
+        parse_prefix_expression(t1, expression, rest)
+    elseif(is_token(tokens, '-'))
+        token_loc(tokens, loc)
+        eat(tokens, '-', t1, _)
+        parse_prefix_expression(t1, child, rest)
+        expression = UnaryExpr('-', child, loc)
+    elseif(is_token(tokens, '#'))
+        token_loc(tokens, loc)
+        eat(tokens, '#', t1, _)
+        parse_prefix_expression(t1, child, rest)
+        expression = SizeExpr(child, loc)
+    elseif(is_token(tokens, 'next') and unsafeNot next_is_token(tokens, '('))
+        token_loc(tokens, loc)
+        eat(tokens, 'next', t1, _)
+        parse_primary(t1, child, t2)
+        parse_postfix_tail(t2, NextExpr(child, loc), expression, rest)
+    elseif(token_type(tokens,'ID') and tokens=[_|tail] and prefix_meta_operand(tail) and unsafeNot next_is_token(tokens,'('))
+        token_loc(tokens,loc)
+        eat(tokens,'ID',t1,Token(_,name,_,_))
+        parse_prefix_expression(t1,operand,rest)
+        expression=MetaUnaryExpr(name,operand,loc)
+    else
+        parse_postfix(tokens, expression, rest)
+
+rel prefix_meta_operand(tokens)
+    token_type(tokens,type)
+    choose(type='ID')
+        token_value(tokens,word)
+        meta_binary_word(word)
+    else
+        type in ['NUMBER','STRING','{']
+
+rel parse_postfix(tokens, expression, rest)
+    parse_primary(tokens, first, t1)
+    parse_postfix_tail(t1, first, expression, rest)
+
+rel parse_postfix_tail(tokens, base, expression, rest)
+    choose(is_token(tokens, '('))
+        eat(tokens, '(', t1, _)
+        parse_arguments(t1, args, t2)
+        eat(t2, ')', t3, _)
+        expression_loc(base, loc)
+        combined = CallExpr(base, args, loc)
+        parse_postfix_tail(t3, combined, expression, rest)
+    elseif(is_token(tokens, '.'))
+        eat(tokens, '.', t1, _)
+        eat(t1, 'ID', t2, Token(_,name,line,column))
+        combined = FieldExpr(base, name, Loc(line,column))
+        parse_postfix_tail(t2, combined, expression, rest)
+    elseif(is_token(tokens, '['))
+        token_loc(tokens, loc)
+        eat(tokens, '[', t1, _)
+        parse_term(t1, index, t2)
+        eat(t2, ']', t3, _)
+        combined = IndexExpr(base, index, loc)
+        parse_postfix_tail(t3, combined, expression, rest)
+    elseif(is_token(tokens, ':'))
+        token_loc(tokens, loc)
+        eat(tokens, ':', t1, _)
+        parse_term(t1, value, t2)
+        combined = SetFieldExpr(base, value, loc)
+        parse_postfix_tail(t2, combined, expression, rest)
+    else
+        expression = base
+        rest = tokens
+
+rel parse_arguments(tokens, args, rest)
+    choose(is_token(tokens, ')'))
+        args = []
+        rest = tokens
+    else
+        parse_term(tokens, first, t1)
+        choose(is_token(t1, ','))
+            eat(t1, ',', t2, _)
+            parse_arguments(t2, tail, rest)
+            args = [first|tail]
+        else
+            args = [first]
+            rest = t1
+
+rel parse_primary(tokens, expression, rest)
+    choose(token_type(tokens, 'NUMBER'))
+        eat(tokens, 'NUMBER', rest, Token(_,text,line,column))
+        value = num(text)
+        expression = LiteralExpr(value, Loc(line,column))
+    elseif(token_type(tokens, 'STRING'))
+        eat(tokens, 'STRING', rest, Token(_,value,line,column))
+        expression = LiteralExpr(value, Loc(line,column))
+    elseif(starts_relation(tokens))
+        parse_closure(tokens, expression, rest)
+    elseif(token_type(tokens, 'ID'))
+        eat(tokens, 'ID', t1, Token(_,name,line,column))
+        choose(is_token(t1, '::'))
+            eat(t1, '::', t2, _)
+            eat(t2, 'ID', rest, Token(_,host_name,_,_))
+            expression = VarExpr(name + '::' + host_name, Loc(line,column))
+        else
+            expression = VarExpr(name, Loc(line,column))
+            rest = t1
+    elseif(is_token(tokens, '('))
+        eat(tokens, '(', t1, _)
+        parse_term(t1, expression, t2)
+        eat(t2, ')', rest, _)
+    elseif(is_token(tokens, '['))
+        parse_list(tokens, expression, rest)
+    elseif(is_token(tokens, '{'))
+        parse_dictionary(tokens, expression, rest)
+    else
+        throw(ParseError('Expected term', tokens))
+
+rel parse_list(tokens, expression, rest)
+    token_loc(tokens, loc)
+    eat(tokens, '[', t1, _)
+    choose(is_token(t1, ']'))
+        items = []
+        tail = None
+        t2 = t1
+    else
+        parse_list_items(t1, items, tail, t2)
+    eat(t2, ']', rest, _)
+    expression = ListExpr(items, tail, loc)
+
+rel parse_list_items(tokens, items, tail, rest)
+    parse_term(tokens, first, t1)
+    choose(is_token(t1, ','))
+        eat(t1, ',', t2, _)
+        parse_list_items(t2, more, tail, rest)
+        items = [first|more]
+    elseif(is_token(t1, '|'))
+        eat(t1, '|', t2, _)
+        parse_term(t2, tail, rest)
+        items = [first]
+    else
+        items = [first]
+        tail = None
+        rest = t1
+
+rel dictionary_key(expression, key)
+    choose(expression = VarExpr(name, loc))
+        key = LiteralExpr(name, loc)
+    else
+        key = expression
+
+rel parse_dictionary(tokens, expression, rest)
+    token_loc(tokens, loc)
+    eat(tokens, '{', t1, _)
+    parse_dictionary_entries(t1, 0, entries, t2)
+    eat(t2, '}', rest, _)
+    expression = DictExpr(entries, loc)
+
+rel parse_dictionary_entries(tokens, position, entries, rest)
+    choose(is_token(tokens, '}'))
+        entries = []
+        rest = tokens
+    elseif(starts_relation(tokens))
+        parse_table_closure(tokens, closure, t1)
+        closure = ClosureExpr(annotation,_,_,loc)
+        closure_name(annotation,name)
+        choose(name = '_')
+            throw('A relation inside a table needs a name')
+        else
+            key = LiteralExpr(name, loc)
+            choose(is_token(t1, ','))
+                eat(t1, ',', t2, _)
+            elseif(is_token(t1, 'and'))
+                eat(t1, 'and', t2, _)
+            else
+                t2 = t1
+            parse_dictionary_entries(t2, position, tail, rest)
+            entries = [Entry(key,closure)|tail]
+    else
+        parse_dictionary_head(tokens, first, t1)
+        choose(is_token(t1, '='))
+            eat(t1, '=', t2, _)
+            parse_term(t2, value, t3)
+            dictionary_key(first, key)
+            next_position = position
+        else
+            value = first
+            key = LiteralExpr(position, Loc(0,0))
+            next_position = position + 1
+            t3 = t1
+        choose(is_token(t3, ','))
+            eat(t3, ',', t4, _)
+        elseif(is_token(t3, 'and'))
+            eat(t3, 'and', t4, _)
+        else
+            t4 = t3
+        parse_dictionary_entries(t4, next_position, tail, rest)
+        entries = [Entry(key,value)|tail]
+
+rel parse_dictionary_head(tokens, expression, rest)
+    choose(token_type(tokens, 'ID') and next_is_token(tokens, '='))
+        eat(tokens, 'ID', rest, Token(_,name,line,column))
+        expression = VarExpr(name, Loc(line,column))
+    else
+        parse_term(tokens, expression, rest)
+
+rel table_outdented(tokens, start_line, start_column)
+    token_position(tokens, line, column)
+    line > start_line
+    column <= start_column
+
+rel parse_table_closure(tokens, expression, rest)
+    token_loc(tokens, loc)
+    loc = Loc(start_line,start_column)
+    eat(tokens, 'ID', t1, Token(_,kind,_,_))
+    eat(t1, 'ID', t2, Token(_,name,_,_))
+    eat(t2, '(', t3, _)
+    parse_parameters(t3, params, t4)
+    eat(t4, ')', t5, _)
+    closure_annotation(t5,name,kind,annotation,t6)
+    parse_table_relation_goals(t6, start_line, start_column, goals, rest)
+    make_and(goals, body)
+    expression = ClosureExpr(annotation, params, body, loc)
+
+rel parse_table_relation_goals(tokens, start_line, start_column, goals, rest)
+    choose(is_token(tokens, '}') or starts_relation(tokens) or table_outdented(tokens, start_line, start_column))
+        goals = []
+        rest = tokens
+    else
+        parse_table_goal(tokens, goal, t1)
+        parse_table_relation_goals(t1, start_line, start_column, tail, rest)
+        goals = [goal|tail]
+
+rel parse_table_goal(tokens, goal, rest)
+    choose(token_type(tokens, 'ID') and token_value(tokens, kind) and kind in ['if','when','choose','soft_if','while'])
+        parse_table_control(tokens, goal, rest)
+    else
+        parse_goal(tokens, goal, rest)
+
+rel parse_table_control(tokens, goal, rest)
+    token_loc(tokens, loc)
+    loc = Loc(start_line,start_column)
+    token_value(tokens, kind)
+    eat(tokens, 'ID', t1, _)
+    eat(t1, '(', t2, _)
+    parse_goal(t2, condition, t3)
+    eat(t3, ')', t4, _)
+    parse_table_branch_goals(t4, start_line, start_column, yes_goals, t5)
+    make_and(yes_goals, yes)
+    parse_table_control_tail(kind, t5, no, rest)
+    goal = ControlGoal(kind, condition, yes, no, loc)
+
+rel parse_table_branch_goals(tokens, start_line, start_column, goals, rest)
+    choose(is_token(tokens, '}') or starts_relation(tokens) or is_token(tokens, 'else') or is_token(tokens, 'elseif') or table_outdented(tokens, start_line, start_column))
+        goals = []
+        rest = tokens
+    else
+        parse_table_goal(tokens, goal, t1)
+        parse_table_branch_goals(t1, start_line, start_column, tail, rest)
+        goals = [goal|tail]
+
+rel parse_table_control_tail(kind, tokens, no, rest)
+    choose(is_token(tokens, 'elseif'))
+        token_loc(tokens, loc)
+        loc = Loc(start_line,start_column)
+        eat(tokens, 'elseif', t1, _)
+        eat(t1, '(', t2, _)
+        parse_goal(t2, condition, t3)
+        eat(t3, ')', t4, _)
+        parse_table_branch_goals(t4, start_line, start_column, yes_goals, t5)
+        make_and(yes_goals, yes)
+        parse_table_control_tail(kind, t5, nested_no, rest)
+        no = ControlGoal(kind, condition, yes, nested_no, loc)
+    elseif(is_token(tokens, 'else'))
+        token_loc(tokens, Loc(start_line,start_column))
+        eat(tokens, 'else', t1, _)
+        parse_table_branch_goals(t1, start_line, start_column, no_goals, rest)
+        make_and(no_goals, no)
+    else
+        no = None
+        rest = tokens
+
+rel parse_closure(tokens, expression, rest)
+    token_loc(tokens, loc)
+    eat(tokens, 'ID', t1, Token(_,kind,_,_))
+    choose(token_type(t1, 'ID'))
+        eat(t1, 'ID', t2, Token(_,name,_,_))
+    else
+        name = '_'
+        t2 = t1
+    eat(t2, '(', t3, _)
+    parse_parameters(t3, params, t4)
+    eat(t4, ')', t5, _)
+    closure_annotation(t5,name,kind,annotation,t6)
+    parse_body(t6, body, rest)
+    expression = ClosureExpr(annotation, params, body, loc)
+
+rel closure_name(annotation,name)
+    choose(pl::is_assoc(annotation))
+        name=annotation.name
+    else
+        name=annotation
+rel closure_annotation(tokens,name,kind,annotation,rest)
+    choose(token_value(tokens,det) and det in ['det','semidet','multi','nondet'])
+        eat(tokens,'ID',rest,_)
+        annotation={name=name,category=kind,determinism=det}
+    elseif(kind='rel')
+        annotation=name
+        rest=tokens
+    else
+        annotation={name=name,category=kind,determinism='nondet'}
+        rest=tokens
+
+api = {
+    lex = lex,
+    parseTokens = parseTokens,
+    parse = parse
+}
+
+export(api)

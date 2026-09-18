@@ -1,0 +1,719 @@
+// Prolog term emitter. Expression lowering, call resolution, capture transport,
+// and control semantics are readable Cosmos code. terms.pl only builds terms.
+functor(Program,Functor)
+functor(RelationDecl,Functor)
+functor(ExportDecl,Functor)
+functor(TypedDecl,Functor)
+functor(TypedParam,Functor)
+functor(VarExpr,Functor)
+functor(LiteralExpr,Functor)
+functor(BinaryExpr,Functor)
+functor(UnaryExpr,Functor)
+functor(SizeExpr,Functor)
+functor(FieldExpr,Functor)
+functor(IndexExpr,Functor)
+functor(SetFieldExpr,Functor)
+functor(ListExpr,Functor)
+functor(DictExpr,Functor)
+functor(Entry,Functor)
+functor(ClosureExpr,Functor)
+functor(CallExpr,Functor)
+functor(TrueGoal,Functor)
+functor(FalseGoal,Functor)
+functor(CutGoal,Functor)
+functor(AndGoal,Functor)
+functor(OrGoal,Functor)
+functor(CaseGoal,Functor)
+functor(UnifyGoal,Functor)
+functor(CompareGoal,Functor)
+functor(HasGoal,Functor)
+functor(CallGoal,Functor)
+functor(UnaryGoal,Functor)
+functor(ControlGoal,Functor)
+functor(AssertGoal,Functor)
+functor(IsGoal,Functor)
+functor(ForInGoal,Functor)
+functor(ProtocolDecl,Functor)
+functor(ClassDecl,Functor)
+functor(NewExpr,Functor)
+functor(Signature,Functor)
+functor(None,Functor)
+functor(CompileError,Functor)
+functor(Loc,Functor)
+
+rel unsupported(message,node)
+    pl::cc_parts(node,_,args)
+    choose(pl::last(args,Loc(line,column)))
+        throw(CompileError(message,Loc(line,column)))
+    else
+        throw(message)
+
+rel term(name,args,value)
+    pl::cc_term(name,args,value)
+rel atom(name,value)
+    pl::cc_atom(name,value)
+rel join(groups,flat)
+    pl::append(groups,flat)
+rel sequence([],resultGoal)
+    atom('true',resultGoal)
+rel sequence([one],one)
+    true
+rel sequence([one,two|rest],resultGoal)
+    sequence([two|rest],tail)
+    term(',',[one,tail],resultGoal)
+rel alternatives([],resultGoal)
+    atom('fail',resultGoal)
+rel alternatives([one],one)
+    true
+rel alternatives([one,two|rest],resultGoal)
+    alternatives([two|rest],tail)
+    term(';',[one,tail],resultGoal)
+
+rel environment([],[])
+    true
+rel environment([name|names],[Pair(name,value)|tail])
+    pl::cc_variable(value)
+    environment(names,tail)
+rel lookup(name,env,value)
+    choose(name='_')
+        pl::cc_variable(value)
+    elseif(pl::member(Pair(name,found),env))
+        value=found
+    else
+        throw('Unknown variable: '+name)
+rel values([],env,[])
+    true
+rel values([name|names],env,[value|tail])
+    lookup(name,env,value)
+    values(names,env,tail)
+
+rel fresh(c,name)
+    pl::cc_cell_get(c.counter,n)
+    pl::cc_cell_set(c.counter,n+1)
+    name='$closure_'+str(n)
+rel helper(c,head,body)
+    term(':-',[head,body],clause)
+    pl::cc_cell_get(c.helpers,old)
+    pl::cc_cell_set(c.helpers,[clause|old])
+rel qualify(c,name,args,call)
+    term(c.module+'::'+name,args,call)
+rel signature(c,name,arity,captures)
+    pl::member(Signature(name,arity,captures,_,_),c.signatures)
+
+rel pattern(node,c,env,value)
+    choose(node=VarExpr(name,_) and name in c.functors)
+        functor_value(name,[],value)
+    elseif(node=VarExpr(name,_) or node=TypedParam(_,name,_))
+        lookup(name,env,value)
+    elseif(node=LiteralExpr(literal,_))
+        value=literal
+    elseif(node=ListExpr(items,tail,_))
+        patterns(items,c,env,heads)
+        choose(tail=None)
+            end=[]
+        else
+            pattern(tail,c,env,end)
+        pl::append(heads,end,value)
+    elseif(node=CallExpr(VarExpr(name,_),items,_))
+        patterns(items,c,env,args)
+        functor_value(name,args,value)
+    else
+        throw('Unsupported parameter pattern')
+rel patterns([],c,env,[])
+    true
+rel patterns([node|nodes],c,env,[value|rest])
+    pattern(node,c,env,value)
+    patterns(nodes,c,env,rest)
+rel fresh_parameters([],[])
+    true
+rel fresh_parameters([_|tail],[value|rest])
+    pl::cc_variable(value)
+    fresh_parameters(tail,rest)
+rel functor_value(name,args,value)
+    choose(name='Cons' and args=[])
+        value=[]
+    elseif(name='Cons' and args=[head])
+        value=[head]
+    elseif(name='Cons' and args=[head,tail])
+        value=[head|tail]
+    else
+        term('fc_'+name,args,value)
+
+rel expressions([],c,env,[],[])
+    true
+rel expressions([node|nodes],c,env,[value|rest],goals)
+    expression(node,c,env,value,first)
+    expressions(nodes,c,env,rest,tail)
+    pl::append(first,tail,goals)
+
+rel receiver(node,c,env,value,goals)
+    choose(node=VarExpr(name,_) and name in ['canvas','io','list','table','math','string','debug','logic','mutable','object'])
+        choose(pl::member(Pair(name,existing),env))
+            value=existing
+        else
+            pl::cc_variable(value)
+        term('cosmos_receiver',[name,value],g)
+        goals=[g]
+    else
+        expression(node,c,env,value,goals)
+
+rel expression(node,c,env,value,goals)
+    choose(node=NewExpr(VarExpr(name,loc),args,_))
+        expression(VarExpr(name,loc),c,env,prototype,pre)
+        expressions(args,c,env,actual,argGoals)
+        term('cosmos_new',[prototype,name,actual,value],construct)
+        join([pre,argGoals,[construct]],goals)
+    elseif(node=LiteralExpr(literal,_))
+        value=literal
+        goals=[]
+    elseif(node=VarExpr(name,_))
+        variable_expression(name,c,env,value,goals)
+    elseif(node=TypedParam(_,name,_))
+        lookup(name,env,value)
+        goals=[]
+    elseif(node=BinaryExpr(op,left,right,_))
+        expression(left,c,env,a,ga)
+        expression(right,c,env,b,gb)
+        arithmetic(op,predicate)
+        term(predicate,[a,b,value],g)
+        join([ga,gb,[g]],goals)
+    elseif(node=UnaryExpr(op,operand,_))
+        expression(operand,c,env,a,ga)
+        choose(op='-')
+            term('r_sub',[0,a,value],g)
+        elseif(op='+')
+            term('=',[a,value],g)
+        else
+            throw('Unsupported expression operator: '+op)
+        pl::append(ga,[g],goals)
+    elseif(node=SizeExpr(operand,_))
+        expression(operand,c,env,a,ga)
+        term('size_',[a,value],g)
+        pl::append(ga,[g],goals)
+    elseif(node=FieldExpr(owner,key,_))
+        receiver(owner,c,env,object,ga)
+        term('cosmos_get',[object,key,value],g)
+        pl::append(ga,[g],goals)
+    elseif(node=IndexExpr(owner,key,_))
+        expression(owner,c,env,object,ga)
+        expression(key,c,env,k,gb)
+        term('cosmos_get',[object,k,value],g)
+        join([ga,gb,[g]],goals)
+    elseif(node=SetFieldExpr(FieldExpr(owner,key,_),rhs,_))
+        expression(owner,c,env,object,ga)
+        expression(rhs,c,env,v,gb)
+        term('cosmos_update',[object,key,v,value],g)
+        join([ga,gb,[g]],goals)
+    elseif(node=ListExpr(items,tail,_))
+        expressions(items,c,env,heads,ga)
+        choose(tail=None)
+            end=[]
+            gb=[]
+        else
+            expression(tail,c,env,end,gb)
+        pl::append(heads,end,value)
+        pl::append(ga,gb,goals)
+    elseif(node=DictExpr(entries,_))
+        term('new',[initial],start)
+        dictionary(entries,c,env,initial,value,rest)
+        goals=[start|rest]
+    elseif(node=ClosureExpr(annotation,params,body,_))
+        closure_info(annotation,_,kind,det)
+        annotated_closure(kind,det,params,body,c,env,value)
+        goals=[]
+    elseif(node=CallExpr(fn,args,_))
+        expressions(args,c,env,actual,ga)
+        choose(fn=VarExpr(name,_) and name in c.functors)
+            functor_value(name,actual,value)
+            choose(pl::get_assoc(name,c.schemas,spec) and pl::get_assoc('open',spec,0))
+                term('cosmos_type_constraint',[value,name,c.schemas],guard)
+                pl::append(ga,[guard],goals)
+            else
+                goals=ga
+        else
+            value_call(fn,actual,c,env,value,call)
+            pl::append(ga,[call],goals)
+    else
+        unsupported('Unsupported expression in bootstrap compiler',node)
+
+rel variable_expression(name,c,env,value,goals)
+    choose(pl::split_string(name,':','',[domain,'',property]) and domain in ['js','lua'])
+        term('cosmos_host_root',[domain,property,value],g)
+        goals=[g]
+    elseif(name in c.locals)
+        lookup(name,env,value)
+        goals=[]
+    elseif(signature(c,name,_,captures))
+        values(captures,env,captured)
+        term('upvals',[captured],upvals)
+        atom(c.module+'::$value_'+name,predicate)
+        term('clos',[upvals,predicate],value)
+        goals=[]
+    elseif(name in c.functors)
+        atom('fc_'+name,value)
+        goals=[]
+    else
+        lookup(name,env,value)
+        goals=[]
+
+rel dictionary([],c,env,value,value,[])
+    true
+rel dictionary([Entry(key,node)|entries],c,env,before,after,goals)
+    expression(key,c,env,k,gk)
+    expression(node,c,env,v,gv)
+    term('set_',[before,k,v,following],put)
+    dictionary(entries,c,env,following,after,rest)
+    join([gk,gv,[put],rest],goals)
+
+rel retained([],env,[])
+    true
+rel retained([name|names],env,out)
+    retained(names,env,tail)
+    choose(pl::member(Pair(name,_),env))
+        out=[name|tail]
+    else
+        out=tail
+rel closure(params,body,c,env,value)
+    annotated_closure('rel','nondet',params,body,c,env,value)
+rel annotated_closure(kind,det,params,body,c,env,value)
+    c.analysis.variables(params,parameters)
+    c.analysis.variables(body,direct)
+    c.analysis.captures(direct,c.signatures,transitive)
+    pl::append(direct,transitive,combined)
+    pl::sort(combined,used)
+    pl::subtract(used,parameters,free)
+    retained(free,env,captures)
+    values(captures,env,outer)
+    c.analysis.scopeVariables(body,localNames)
+    join([parameters,localNames,captures],all)
+    pl::sort(all,names)
+    environment(names,inner)
+    patterns(params,c,inner,args)
+    values(captures,inner,inside)
+    term('upvals',[inside],last)
+    pl::append(args,[last],headArgs)
+    fresh(c,name)
+    qualify(c,name,headArgs,head)
+    pl::set_(c,'locals',parameters,localContext)
+    pl::set_(localContext,'mode',kind,closureContext)
+    goal(body,closureContext,inner,bodyTerm)
+    parameter_contracts(params,specs)
+    options=[{parameters=specs,determinism=det}]
+    choose(required_contract(options))
+        term('cosmos_checked_call',[kind,name,options,args,c.schemas,bodyTerm],checkedBody)
+    elseif(kind!='rel')
+        term('cosmos_callable',[kind,name,bodyTerm],checkedBody)
+    else
+        checkedBody=bodyTerm
+    helper(c,head,checkedBody)
+    term('upvals',[outer],captureTerm)
+    atom(c.module+'::'+name,predicate)
+    term('clos',[captureTerm,predicate],value)
+
+rel arithmetic('+','add_') true
+rel arithmetic('-','r_sub') true
+rel arithmetic('*','r_mul') true
+rel arithmetic('/','r_div') true
+rel arithmetic('%','r_mod') true
+rel comparison('!=','dif') true
+rel comparison('<','r_lt') true
+rel comparison('<=','r_le') true
+rel comparison('>','r_gt') true
+rel comparison('>=','r_ge') true
+rel opposite('<','>=') true
+rel opposite('<=','>') true
+rel opposite('>','<=') true
+rel opposite('>=','<') true
+
+rel goal(node,c,env,result)
+    choose(node=TrueGoal or node=TrueGoal(_))
+        atom('true',result)
+    elseif(node=FalseGoal(_))
+        atom('fail',result)
+    elseif(node=CutGoal(_))
+        atom('!',result)
+    elseif(node=TypedDecl(words,name,value,loc))
+        choose(value=None)
+            atom('true',result)
+        else
+            pl::last(words,typeName)
+            lookup(name,env,bound)
+            choose(protocol_type(c,typeName))
+                expression(value,c,env,raw,pre)
+                lookup(typeName,env,protocol)
+                term('cosmos_protocol_view',[raw,protocol,c.schemas,bound],check)
+                pl::append(pre,[check],all)
+                sequence(all,result)
+            else
+                goal(UnifyGoal(VarExpr(name,loc),value,loc),c,env,binding)
+                term('cosmos_require_type',[bound,typeName,c.schemas],check)
+                sequence([binding,check],result)
+    elseif(node=IsGoal(value,typeName,_))
+        expression(value,c,env,bound,pre)
+        choose(protocol_type(c,typeName))
+            lookup(typeName,env,protocol)
+            term('cosmos_conforms',[bound,protocol,c.schemas],check)
+        else
+            term('cosmos_is',[bound,typeName,c.schemas],check)
+        pl::append(pre,[check],all)
+        sequence(all,result)
+    elseif(node=ProtocolDecl(name,members,_))
+        protocol_members(members,c,env,fields,methods)
+        term('protocol',[name,fields,methods],descriptor)
+        lookup(name,env,bound)
+        term('=',[bound,descriptor],result)
+    elseif(node=ClassDecl(name,value,_))
+        expression(value,c,env,prototype,pre)
+        term('cosmos_class',[name,prototype],descriptor)
+        lookup(name,env,bound)
+        term('=',[bound,descriptor],binding)
+        pl::append(pre,[binding],all)
+        sequence(all,result)
+    elseif(node=AndGoal(nodes))
+        emit_goals(nodes,c,env,terms)
+        sequence(terms,result)
+    elseif(node=OrGoal(nodes))
+        emit_goals(nodes,c,env,terms)
+        alternatives(terms,result)
+    elseif(node=CaseGoal(body,_))
+        goal(body,c,env,result)
+    elseif(node=UnifyGoal(FieldExpr(owner,key,_),rhs,_))
+        receiver(owner,c,env,object,ga)
+        expression(rhs,c,env,value,gb)
+        term('cosmos_set_or_unify',[object,key,value],g)
+        join([ga,gb,[g]],all)
+        sequence(all,result)
+    elseif(node=UnifyGoal(left,right,_))
+        expression(left,c,env,a,ga)
+        expression(right,c,env,b,gb)
+        term('=',[a,b],g)
+        join([ga,gb,[g]],all)
+        sequence(all,result)
+    elseif(node=CompareGoal(op,left,right,_))
+        expression(left,c,env,a,ga)
+        expression(right,c,env,b,gb)
+        comparison(op,predicate)
+        term(predicate,[a,b],g)
+        join([ga,gb,[g]],all)
+        sequence(all,result)
+    elseif(node=HasGoal(item,collection,_))
+        expression(item,c,env,value,ga)
+        expression(collection,c,env,items,gb)
+        term('has_',[items,value],g)
+        join([ga,gb,[g]],all)
+        sequence(all,result)
+    elseif(node=CallGoal(fn,args,_))
+        expressions(args,c,env,actual,ga)
+        call_goal(fn,actual,c,env,g)
+        pl::append(ga,[g],all)
+        sequence(all,result)
+    elseif(node=AssertGoal(body,message,_))
+        goal(body,c,env,test)
+        expression(message,c,env,text,pre)
+        term('cosmos_assert',[test,text],assertion)
+        pl::append(pre,[assertion],all)
+        sequence(all,result)
+    elseif(node=ForInGoal('some',key,item,collection,body,_))
+        expression(collection,c,env,items,pre)
+        pattern(item,c,env,value)
+        choose(key=None)
+            pl::cc_variable(index)
+        else
+            pattern(key,c,env,index)
+        term('cosmos_each',[items,index,value],iterate)
+        goal(body,c,env,bodyTerm)
+        pl::append(pre,[iterate,bodyTerm],all)
+        sequence(all,result)
+    elseif(node=UnaryGoal(op,body,_))
+        unary_goal(op,body,c,env,result)
+    elseif(node=ControlGoal(kind,condition,yes,no,_))
+        control(kind,condition,yes,no,c,env,result)
+    else
+        unsupported('Unsupported goal in bootstrap compiler',node)
+
+rel emit_goals([],c,env,[])
+    true
+rel emit_goals([node|nodes],c,env,[g|rest])
+    goal(node,c,env,g)
+    emit_goals(nodes,c,env,rest)
+
+rel unary_goal(op,body,c,env,result)
+    choose(op='not' and body=UnifyGoal(a,b,loc))
+        goal(CompareGoal('!=',a,b,loc),c,env,result)
+    elseif(op='not' and body=CompareGoal(old,a,b,loc) and opposite(old,inverse))
+        goal(CompareGoal(inverse,a,b,loc),c,env,result)
+    elseif(op='not')
+        goal(body,c,env,g)
+        term('\\+',[g],result)
+    elseif(op='once' or op='unsafeNot')
+        goal(body,c,env,g)
+        choose(op='once')
+            term('once',[g],result)
+        else
+            term('\\+',[g],result)
+    else
+        throw('Cannot lower goal operator: '+op)
+
+rel control(kind,condition,yes,no,c,env,result)
+    goal(condition,c,env,a)
+    goal(yes,c,env,b)
+    choose(no=None)
+        atom('true',d)
+    else
+        goal(no,c,env,d)
+    choose(kind='choose' or (kind='if' and c.mode in ['fun','function','void','bool']))
+        term('->',[a,b],branch)
+        term(';',[branch,d],result)
+    elseif(kind='soft_if')
+        term('*->',[a,b],branch)
+        term(';',[branch,d],result)
+    elseif(kind='when')
+        term(',',[a,b],branch)
+        term(';',[branch,d],result)
+    elseif(kind='if')
+        unary_goal('not',condition,c,env,complement)
+        term(',',[a,b],first)
+        term(',',[complement,d],second)
+        term(';',[first,second],result)
+    else
+        throw('Unsupported control form: '+kind)
+
+rel call_goal(fn,args,c,env,result)
+    choose(fn=VarExpr(name,_))
+        named_call(name,args,c,env,result)
+    elseif(fn=FieldExpr(owner,key,_))
+        receiver(owner,c,env,object,pre)
+        term('cosmos_method',[object,key,args],g)
+        pl::append(pre,[g],all)
+        sequence(all,result)
+    elseif(fn=IndexExpr(owner,key,_))
+        expression(owner,c,env,object,ga)
+        expression(key,c,env,k,gb)
+        term('cosmos_method',[object,k,args],g)
+        join([ga,gb,[g]],all)
+        sequence(all,result)
+    else
+        expression(fn,c,env,value,pre)
+        term('call_cl',[value,args],g)
+        pl::append(pre,[g],all)
+        sequence(all,result)
+
+rel named_call(name,args,c,env,result)
+    choose(pl::split_string(name,':','',[domain,'',predicate]) and domain in ['pl','c'])
+        term(predicate,args,result)
+    elseif(name='require' and args=[module,value])
+        term('cosmos_require',[module,value],result)
+    elseif(name in c.locals)
+        lookup(name,env,value)
+        term('call_cl',[value,args],result)
+    elseif(signature(c,name,arity,captures))
+        choose(#args=arity)
+            values(captures,env,extra)
+            pl::append(args,extra,actual)
+            qualify(c,name,actual,result)
+        else
+            throw('Wrong arity for '+name)
+    elseif(name in ['print','write','writeln','throw','str','num','int','real'])
+        term(name,args,result)
+    else
+        lookup(name,env,value)
+        term('call_cl',[value,args],result)
+
+rel value_call(fn,args,c,env,value,result)
+    choose(fn=FieldExpr(owner,key,_))
+        receiver(owner,c,env,object,pre)
+        term('cosmos_method_value',[object,key,args,value],g)
+        pl::append(pre,[g],all)
+        sequence(all,result)
+    else
+        pl::append(args,[value],actual)
+        call_goal(fn,actual,c,env,result)
+
+rel parameter_contracts([],[])
+    true
+rel parameter_contracts([node|nodes],[spec|specs])
+    choose(node=TypedParam(words,_,_))
+        choose(words=[first|_] and first in ['In','Out','InOut'])
+            mode=first
+        else
+            mode='Unspecified'
+        pl::subtract(words,['In','Out','InOut'],types)
+        choose(types=[])
+            typeName='Any'
+        elseif(types=['Relation'|_])
+            typeName='Relation'
+        else
+            pl::last(types,typeName)
+    else
+        mode='Unspecified'
+        typeName='Any'
+    spec={mode=mode,type=typeName}
+    parameter_contracts(nodes,specs)
+rel protocol_type(c,name)
+    pl::get_assoc(name,c.schemas,spec)
+    pl::get_assoc('kind',spec,'protocol')
+rel interface_parameters([],loc,[])
+    true
+rel interface_parameters([word|words],loc,[TypedParam([word],name,loc)|params])
+    name='$interface_'+str(#words)
+    interface_parameters(words,loc,params)
+rel contract_parameters([],[])
+    true
+rel contract_parameters([param|params],[plain|rest])
+    choose(param=TypedParam(_,name,loc))
+        plain=VarExpr(name,loc)
+    else
+        plain=param
+    contract_parameters(params,rest)
+rel protocol_members([],c,env,[],[])
+    true
+rel protocol_members([member|members],c,env,fields,methods)
+    protocol_members(members,c,env,fs,ms)
+    choose(member=TypedDecl(['Relation'|types],name,_,loc))
+        interface_parameters(types,loc,params)
+        parameter_contracts(params,specs)
+        contract_parameters(params,plain)
+        closure(plain,TrueGoal(loc),c,env,contract)
+        term('method',[name,specs,contract],method)
+        fields=fs
+        methods=[method|ms]
+    elseif(member=TypedDecl(types,name,_,_))
+        pl::last(types,typeName)
+        term('field',[name,typeName],field)
+        fields=[field|fs]
+        methods=ms
+    elseif(member=ClosureExpr(annotation,params,body,_))
+        closure_info(annotation,name,kind,det)
+        parameter_contracts(params,specs)
+        contract_parameters(params,plain)
+        closure(plain,body,c,env,behavior)
+        term('contract',[kind,det,behavior],contract)
+        term('method',[name,specs,contract],method)
+        fields=fs
+        methods=[method|ms]
+    else
+        unsupported('Unsupported protocol member',member)
+rel contract_options([],name,[])
+    true
+rel contract_options([r|rs],name,options)
+    contract_options(rs,name,tail)
+    choose(r=RelationDecl(annotation,name,params,_,_))
+        parameter_contracts(params,parameters)
+        callable_annotation(annotation,_,determinism)
+        choose(pl::is_assoc(annotation) and pl::get_assoc('contracts',annotation,contracts))
+            declared_options(contracts,determinism,first)
+            pl::append(first,tail,options)
+        else
+            first={parameters=parameters,determinism=determinism}
+            options=[first|tail]
+    else
+        options=tail
+rel declared_options([],det,[]) true
+rel declared_options([params|rest],det,[option|options])
+    parameter_contracts(params,specs)
+    option={parameters=specs,determinism=det}
+    declared_options(rest,det,options)
+rel required_contract(options)
+    pl::member(option,options)
+    (option.determinism!='nondet' or
+        (pl::member(spec,option.parameters) and (spec.mode!='Unspecified' or spec.type!='Any')))
+rel callable_annotation(annotation,kind,determinism)
+    choose(pl::is_assoc(annotation))
+        kind=annotation.category
+        determinism=annotation.determinism
+    else
+        kind=annotation
+        determinism='nondet'
+
+rel closure_info(annotation,name,kind,det)
+    choose(pl::is_assoc(annotation))
+        name=annotation.name
+        kind=annotation.category
+        det=annotation.determinism
+    else
+        name=annotation
+        kind='rel'
+        det='nondet'
+
+rel emit_relation(RelationDecl(annotation,name,params,body,_),c,clause)
+    callable_annotation(annotation,kind,_)
+    signature(c,name,_,captures)
+    c.analysis.scopeVariables([params,body],locals)
+    pl::append(locals,captures,all)
+    pl::sort(all,names)
+    environment(names,env)
+    patterns(params,c,env,parameters)
+    values(captures,env,extra)
+    pl::append(parameters,extra,args)
+    qualify(c,'$impl_'+name,args,head)
+    c.analysis.variables(params,parameterNames)
+    pl::set_(c,'locals',parameterNames,localContext)
+    pl::set_(localContext,'mode',kind,bodyContext)
+    goal(body,bodyContext,env,bodyTerm)
+    term(':-',[head,bodyTerm],clause)
+    fresh_parameters(params,wrapperParameters)
+    fresh_parameters(captures,wrapperCaptures)
+    term('upvals',[wrapperCaptures],upvals)
+    pl::append(wrapperParameters,[upvals],wrapperArgs)
+    qualify(c,'$value_'+name,wrapperArgs,wrapperHead)
+    pl::append(wrapperParameters,wrapperCaptures,wrapperCallArgs)
+    qualify(c,name,wrapperCallArgs,wrapperBody)
+    pl::cc_cell_get(c.wrappers,seen)
+    choose(name in seen)
+        true
+    else
+        qualify(c,name,wrapperCallArgs,publicHead)
+        qualify(c,'$impl_'+name,wrapperCallArgs,implementation)
+        contract_options(c.relations,name,options)
+        choose(required_contract(options))
+            term('cosmos_checked_call',[kind,name,options,wrapperParameters,c.schemas,implementation],publicBody)
+        elseif(kind!='rel')
+            term('cosmos_callable',[kind,name,implementation],publicBody)
+        else
+            publicBody=implementation
+        helper(c,publicHead,publicBody)
+        helper(c,wrapperHead,wrapperBody)
+        pl::cc_cell_set(c.wrappers,[name|seen])
+
+rel emit_relations([],c,[])
+    true
+rel emit_relations([r|rs],c,[clause|rest])
+    emit_relation(r,c,clause)
+    emit_relations(rs,c,rest)
+rel top_level([],c,env,[],[])
+    true
+rel top_level([node|nodes],c,env,all,exports)
+    choose(node=ExportDecl(expressionNode,_))
+        expression(expressionNode,c,env,value,first)
+        top_level(nodes,c,env,rest,tail)
+        exports=[value|tail]
+        pl::append(first,rest,all)
+    else
+        goal(node,c,env,g)
+        top_level(nodes,c,env,rest,exports)
+        all=[g|rest]
+
+rel generate(program,module,analysis,text)
+    pl::cc_cell(0,counter)
+    pl::cc_cell([],helpers)
+    pl::cc_cell([],wrappers)
+    c={module=module,signatures=program.signatures,functors=program.functors,
+       analysis=analysis,counter=counter,helpers=helpers,wrappers=wrappers,locals=[],mode='rel',
+       schemas=program.schemas,relations=program.relations}
+    emit_relations(program.relations,c,relations)
+    environment(program.globals,env)
+    top_level(program.top,c,env,bodyGoals,exports)
+    choose(exports=[])
+        output=[]
+    else
+        pl::last(exports,output)
+    sequence(bodyGoals,body)
+    term(module,[output],entryHead)
+    term(':-',[entryHead,body],entry)
+    pl::cc_cell_get(helpers,reversed)
+    pl::reverse(reversed,generated)
+    join([relations,[entry],generated],clauses)
+    pl::cc_write_clauses(clauses,code)
+    text=':- style_check(-singleton).\n'+code
+
+export({generate=generate})

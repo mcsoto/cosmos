@@ -1,0 +1,815 @@
+// Semantic nodes remain functors. Extensible declaration facts are tables.
+functor(FunctorDecl,Functor)
+functor(RelationDecl,Functor)
+functor(TypedParam,Functor)
+functor(TypedDecl,Functor)
+functor(VarExpr,Functor)
+functor(LiteralExpr,Functor)
+functor(CallExpr,Functor)
+functor(ListExpr,Functor)
+functor(DictExpr,Functor)
+functor(CompileError,Functor)
+functor(ProtocolDecl,Functor)
+functor(ClassDecl,Functor)
+functor(NewExpr,Functor)
+functor(UnifyGoal,Functor)
+functor(Entry,Functor)
+functor(ClosureExpr,Functor)
+functor(CallGoal,Functor)
+functor(AndGoal,Functor)
+functor(OrGoal,Functor)
+functor(ControlGoal,Functor)
+functor(None,Functor)
+functor(Fact,Functor)
+functor(ExportDecl,Functor)
+functor(FieldExpr,Functor)
+functor(TrueGoal,Functor)
+functor(BinaryExpr,Functor)
+functor(UnaryExpr,Functor)
+functor(SizeExpr,Functor)
+
+rel builtin(name)
+    name in ['Any','Functor','String','Number','Integer','Real','List','Table','Relation','Host']
+rel declarations([],schemas,schemas)
+    true
+rel declarations([node|nodes],before,after)
+    choose(node=FunctorDecl(name,types,loc))
+        choose(types=[])
+            parent='Functor'
+            fields=[]
+            open=1
+        else
+            types=[parent|fields]
+            choose(types=['Functor'])
+                open=1
+            else
+                open=0
+        spec={parent=parent,fields=fields,open=open,location=loc}
+        choose(pl::get_assoc(name,before,old))
+            choose(old.parent=parent and old.fields=fields and old.open=open)
+                following=before
+            else
+                throw(CompileError('Conflicting functor declaration: '+name,loc))
+        else
+            pl::set_(before,name,spec,following)
+    elseif(node=ProtocolDecl(name,members,loc))
+        spec={kind='protocol',fields=members,location=loc}
+        pl::set_(before,name,spec,following)
+    elseif(node=ClassDecl(name,DictExpr(entries,_),loc))
+        spec={kind='class',fields=entries,location=loc}
+        pl::set_(before,name,spec,following)
+    elseif(node=UnifyGoal(VarExpr(name,_),DictExpr(entries,_),loc))
+        spec={kind='constructor',fields=entries,location=loc}
+        pl::set_(before,name,spec,following)
+    else
+        following=before
+    declarations(nodes,following,after)
+
+rel ancestry(name,schemas,seen,loc)
+    choose(name='Functor')
+        true
+    elseif(name in seen)
+        throw(CompileError('Cyclic functor subtype: '+name,loc))
+    elseif(pl::get_assoc(name,schemas,spec))
+        ancestry(spec.parent,schemas,[name|seen],loc)
+    else
+        throw(CompileError('Unknown functor subtype: '+name,loc))
+rel field_types([],schemas,loc) true
+rel field_types([name|names],schemas,loc)
+    choose(builtin(name) or pl::get_assoc(name,schemas,_))
+        true
+    else
+        throw(CompileError('Unknown field type: '+name,loc))
+    field_types(names,schemas,loc)
+rel validate_specs([],schemas) true
+rel validate_specs([name|names],schemas)
+    pl::get_assoc(name,schemas,spec)
+    choose(pl::get_assoc('kind',spec,_))
+        true
+    else
+        ancestry(name,schemas,[],spec.location)
+        field_types(spec.fields,schemas,spec.location)
+    validate_specs(names,schemas)
+
+rel subtype(actual,expected,schemas)
+    choose(expected='Any' or actual=expected)
+        true
+    elseif(actual in ['Integer','Real'] and expected='Number')
+        true
+    elseif(pl::get_assoc(actual,schemas,spec) and unsafeNot(pl::get_assoc('kind',spec,_)))
+        subtype(spec.parent,expected,schemas)
+    else
+        false
+rel compatible(actual,expected,schemas,loc)
+    choose(actual='Any' or subtype(actual,expected,schemas) or
+        (pl::get_assoc(expected,schemas,spec) and pl::get_assoc('kind',spec,'protocol')))
+        true
+    else
+        throw(CompileError('Expected '+expected+', got '+actual,loc))
+
+rel parameter_env([],env,env) true
+rel parameter_env([node|nodes],before,after)
+    choose(node=TypedParam(words,name,_))
+        pl::subtract(words,['In','Out','InOut'],types)
+        choose(types=[])
+            typeName='Any'
+        elseif(types=['Relation'|_])
+            typeName='Relation'
+        else
+            pl::last(types,typeName)
+        pl::set_(before,name,typeName,following)
+    else
+        following=before
+    parameter_env(nodes,following,after)
+rel arguments([],[],schemas,env,loc) true
+rel arguments([node|nodes],[expected|types],schemas,env,loc)
+    expression_type(node,schemas,env,actual)
+    compatible(actual,expected,schemas,loc)
+    arguments(nodes,types,schemas,env,loc)
+rel expression_type(node,schemas,env,typeName)
+    choose(node=BinaryExpr(op,left,right,loc))
+        expression_type(left,schemas,env,a)
+        expression_type(right,schemas,env,b)
+        choose(op='+' and (a='String' or b='String'))
+            string_operand(a,schemas,loc)
+            string_operand(b,schemas,loc)
+            typeName='String'
+        elseif(op='+' and (a='List' or b='List'))
+            compatible(a,'List',schemas,loc)
+            compatible(b,'List',schemas,loc)
+            typeName='List'
+        elseif(op='+' and (a='Table' or b='Table'))
+            compatible(a,'Table',schemas,loc)
+            compatible(b,'Table',schemas,loc)
+            typeName='Table'
+        elseif(a='Any' and b='Any' and op='+')
+            typeName='Any'
+        else
+            compatible(a,'Number',schemas,loc)
+            compatible(b,'Number',schemas,loc)
+            typeName='Real'
+    elseif(node=UnaryExpr(_,child,loc))
+        expression_type(child,schemas,env,actual)
+        compatible(actual,'Number',schemas,loc)
+        typeName='Real'
+    elseif(node=SizeExpr(child,_))
+        walk(child,schemas,env)
+        typeName='Real'
+    elseif(node=FieldExpr(_,_,loc) and field_path(node,path) and pl::get_assoc('$imports',schemas,metadata) and pl::get_assoc(path,metadata.fields,fieldType))
+        typeName=fieldType
+    elseif(node=FieldExpr(_,_,loc) and field_path(node,path) and imported_path(path,schemas))
+        throw(CompileError('Unknown imported member: '+path,loc))
+    elseif(node=NewExpr(VarExpr(name,_),args,loc))
+        choose(pl::get_assoc(name,schemas,spec) and
+            pl::member(Entry(LiteralExpr('new',_),constructor),spec.fields))
+            choose(constructor=ClosureExpr(_,params,_,_))
+                choose(spec.kind='class')
+                    expected=#args+2
+                else
+                    expected=#args+1
+                choose(#params=expected)
+                    true
+                else
+                    throw(CompileError('Wrong constructor arity: '+name,loc))
+            elseif(constructor=LiteralExpr(_,_))
+                throw(CompileError('Constructor is not callable: '+name,loc))
+            else
+                true
+            walk(args,schemas,env)
+            typeName=name
+        else
+            throw(CompileError('Cannot resolve constructor '+name+'.new',loc))
+    elseif(node=LiteralExpr(value,_))
+        choose(pl::string(value))
+            typeName='String'
+        elseif(pl::number(value))
+            typeName='Real'
+        else
+            typeName='Any'
+    elseif(node=VarExpr(name,_))
+        choose(pl::get_assoc(name,env,known))
+            typeName=known
+        elseif(pl::get_assoc(name,schemas,spec))
+            choose(pl::get_assoc('kind',spec,_))
+                typeName='Any'
+            elseif(spec.open=1 or spec.fields=[])
+                typeName=name
+            else
+                throw(CompileError('Functor needs arguments: '+name,spec.location))
+        else
+            typeName='Any'
+    elseif(node=CallExpr(VarExpr(name,_),args,loc)
+        and pl::get_assoc(name,schemas,spec) and unsafeNot(pl::get_assoc('kind',spec,_)))
+        choose(spec.open=1)
+            walk(args,schemas,env)
+        else
+            choose(#args=#spec.fields)
+                true
+            else
+                throw(CompileError('Wrong functor arity: '+name,loc))
+            arguments(args,spec.fields,schemas,env,loc)
+        typeName=name
+    elseif(node=ListExpr(items,tail,_))
+        walk([items,tail],schemas,env)
+        typeName='List'
+    elseif(node=DictExpr(entries,_))
+        walk(entries,schemas,env)
+        typeName='Table'
+    elseif(node=ClosureExpr(_,_,_,_))
+        walk(node,schemas,env)
+        typeName='Relation'
+    else
+        children(node,schemas,env)
+        typeName='Any'
+
+rel children(node,schemas,env)
+    choose(pl::is_list(node))
+        walk_list(node,schemas,env)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,args)
+        walk_list(args,schemas,env)
+    else
+        true
+rel walk_list([],schemas,env) true
+rel walk_list([node|nodes],schemas,env)
+    walk(node,schemas,env)
+    walk_list(nodes,schemas,env)
+rel protocol_entry(name,entries,loc,value)
+    choose(pl::member(Entry(LiteralExpr(name,_),found),entries))
+        value=found
+    else
+        throw(CompileError('Missing protocol member: '+name,loc))
+rel protocol_shape([],entries,schemas,env,loc)
+    true
+rel protocol_shape([member|members],entries,schemas,env,loc)
+    choose(member=TypedDecl(['Relation'|types],name,_,_))
+        protocol_entry(name,entries,loc,value)
+        method_shape(value,#types,loc)
+    elseif(member=TypedDecl(types,name,_,_))
+        protocol_entry(name,entries,loc,value)
+        pl::last(types,expected)
+        expression_type(value,schemas,env,actual)
+        compatible(actual,expected,schemas,loc)
+    elseif(member=ClosureExpr(annotation,params,_,_))
+        choose(pl::is_assoc(annotation))
+            name=annotation.name
+        else
+            name=annotation
+        protocol_entry(name,entries,loc,value)
+        method_shape(value,#params,loc)
+        method_modes(value,params,schemas,loc)
+    else
+        true
+    protocol_shape(members,entries,schemas,env,loc)
+rel method_shape(value,arity,loc)
+    choose(value=ClosureExpr(_,params,_,_))
+        choose(#params=arity)
+            true
+        else
+            throw(CompileError('Wrong protocol method arity',loc))
+    elseif(value=LiteralExpr(_,_))
+        throw(CompileError('Protocol method is not callable',loc))
+    else
+        true
+rel parameter_spec(param,mode,typeName)
+    choose(param=TypedParam(words,_,_))
+        annotation_type(words,typeName)
+        choose(words=[word|_] and word in ['In','Out','InOut'])
+            mode=word
+        else
+            mode='Unspecified'
+    else
+        mode='Unspecified'
+        typeName='Any'
+rel method_modes(value,expected,schemas,loc)
+    choose(value=ClosureExpr(_,actual,_,_))
+        compatible_parameters(expected,actual,schemas,loc)
+    else
+        true
+rel compatible_parameters([],[],schemas,loc) true
+rel compatible_parameters([expected|es],[actual|as],schemas,loc)
+    parameter_spec(expected,em,et)
+    parameter_spec(actual,am,at)
+    choose((em='In' and am='Out') or (em='Out' and am='In') or (em in ['InOut','Unspecified'] and am in ['In','Out']))
+        throw(CompileError('Incompatible protocol method mode: '+em+' versus '+am,loc))
+    else
+        true
+    choose(em='Out')
+        compatible(at,et,schemas,loc)
+    else
+        compatible(et,at,schemas,loc)
+    compatible_parameters(es,as,schemas,loc)
+rel walk(node,schemas,env)
+    choose(node=RelationDecl(_,_,params,body,_) or node=ClosureExpr(_,params,body,_))
+        pl::new(empty)
+        parameter_env(params,empty,locals)
+        walk(params,schemas,locals)
+        walk(body,schemas,locals)
+    elseif(node=TypedParam(words,_,loc))
+        pl::subtract(words,['In','Out','InOut','$Produced'],types)
+        field_types(types,schemas,loc)
+    elseif(node=TypedDecl(words,_,value,loc))
+        pl::last(words,expected)
+        expression_type(value,schemas,env,actual)
+        compatible(actual,expected,schemas,loc)
+        choose(value=DictExpr(entries,_) and pl::get_assoc(expected,schemas,spec) and pl::get_assoc('kind',spec,'protocol'))
+            protocol_shape(spec.fields,entries,schemas,env,loc)
+        else
+            true
+    elseif(node=NewExpr(_,_,_) or node=CallExpr(_,_,_)
+        or node=VarExpr(_,_))
+        expression_type(node,schemas,env,_)
+    else
+        children(node,schemas,env)
+
+rel check(items,schemas)
+    pl::new(empty)
+    analyze(items,empty,schemas,_)
+rel analyze(items,interfaces,schemas,inferred)
+    pl::new(empty)
+    pl::assoc_to_values(interfaces,units)
+    imported_schemas(units,empty,imported)
+    declarations(items,imported,declared)
+    import_field_info(items,interfaces,empty,[],fields,modules)
+    pl::set_(declared,'$imports',{kind='metadata',fields=fields,modules=modules},schemas)
+    pl::assoc_to_keys(schemas,names)
+    validate_specs(names,schemas)
+    binding_names(items,bindings)
+    require('resolve',resolver)
+    resolver.builtin_functors(builtins)
+    pl::append(bindings,builtins,knownCalls)
+    validate_calls(items,knownCalls,schemas)
+    walk(items,schemas,empty)
+    imported_calls(items,interfaces,empty,base)
+    callable_specs(items,base,callables)
+    walk(callables,schemas,empty)
+    infer_fixed(items,schemas,base,callables,inferred)
+    flow(items,schemas,inferred,empty,[],_,_)
+
+// Conservative forward analysis. Unknown dynamic values remain runtime checks;
+// only facts established on this path justify rejecting a call statically.
+rel callable_specs([],specs,specs) true
+rel callable_specs([node|nodes],before,after)
+    choose(node=RelationDecl(annotation,name,params,_,_))
+        choose(pl::is_assoc(annotation) and pl::get_assoc('contracts',annotation,contracts))
+            current=contracts
+        else
+            current=[params]
+        choose(pl::get_assoc(name,before,old))
+            pl::append(current,old,entries)
+        else
+            entries=current
+        pl::set_(before,name,entries,middle)
+    else
+        middle=before
+    callable_specs(nodes,middle,after)
+rel annotation_type(words,typeName)
+    pl::subtract(words,['In','Out','InOut','$Produced'],types)
+    choose(types=[])
+        typeName='Any'
+    elseif(types=['Relation'|_])
+        typeName='Relation'
+    else
+        pl::last(types,typeName)
+rel entry_bound([],[])
+    true
+rel entry_bound([p|ps],bound)
+    entry_bound(ps,tail)
+    choose(p=TypedParam(['In'|_],name,_))
+        bound=[name|tail]
+    elseif(p=TypedParam(['Out'|_],name,_))
+        bound=['$fresh_'+name|tail]
+    else
+        bound=tail
+rel fits([],[],schemas,env,bound) true
+rel fits([p|ps],[arg|args],schemas,env,bound)
+    choose(p=TypedParam(words,_,_))
+        annotation_type(words,expected)
+        expression_type(arg,schemas,env,actual)
+        (actual='Any' or subtype(actual,expected,schemas) or (pl::get_assoc(expected,schemas,spec) and pl::get_assoc('kind',spec,'protocol')))
+        choose(words=['Out'|_])
+            arg=VarExpr(name,_)
+            unsafeNot(name in bound)
+        elseif(words=['In'|_] and arg=VarExpr(name,_))
+            unsafeNot('$fresh_'+name in bound)
+        else
+            true
+    else
+        true
+    fits(ps,args,schemas,env,bound)
+rel outputs([],[],env,bound,env,bound) true
+rel outputs([p|ps],[arg|args],schemasBefore,before,schemasAfter,after)
+    choose(p=TypedParam(words,_,_) and arg=VarExpr(name,_))
+        annotation_type(words,typeName)
+        choose(typeName='Any')
+            middle=schemasBefore
+        else
+            pl::set_(schemasBefore,name,typeName,middle)
+        choose(words=['Out'|_] or words=['$Produced'|_])
+            pl::subtract(before,['$fresh_'+name],clean)
+            bound=[name|clean]
+        else
+            bound=before
+    else
+        middle=schemasBefore
+        bound=before
+    outputs(ps,args,middle,bound,schemasAfter,after)
+rel flow_call(name,args,loc,schemas,callables,env,bound,after,known)
+    choose(pl::get_assoc('$call_'+name,env,options) or pl::get_assoc(name,callables,options))
+        choose(pl::member(candidate,options) and #candidate=#args)
+            true
+        else
+            throw(CompileError('Wrong arity for '+name,loc))
+        choose(pl::member(params,options) and fits(params,args,schemas,env,bound))
+            viable_outputs(options,args,schemas,env,bound,after,known)
+        else
+            throw(CompileError('No matching type/mode signature for '+name,loc))
+    else
+        choose(pl::get_assoc(name,env,localType) and localType!='Relation' and localType!='Any')
+            throw(CompileError('Value is not callable: '+name,loc))
+        elseif(pl::get_assoc('$imports',schemas,metadata) and pl::get_assoc(name,metadata.fields,fieldType) and fieldType!='Relation' and fieldType!='Any')
+            throw(CompileError('Exported field is not callable: '+name,loc))
+        elseif(imported_path(name,schemas) and pl::get_assoc('$imports',schemas,info) and unsafeNot(pl::get_assoc(name,info.fields,_)))
+            throw(CompileError('Unknown imported member: '+name,loc))
+        else
+            after=env
+            known=bound
+rel flow_list([],schemas,callables,env,bound,env,bound) true
+rel flow_list([x|xs],schemas,callables,env,bound,after,known)
+    flow(x,schemas,callables,env,bound,middle,partial)
+    flow_list(xs,schemas,callables,middle,partial,after,known)
+rel flow(node,schemas,callables,env,bound,after,known)
+    choose(node=RelationDecl(_,_,params,body,_) or node=ClosureExpr(_,params,body,_))
+        pl::new(empty)
+        parameter_env(params,empty,locals)
+        entry_bound(params,inputs)
+        flow(body,schemas,callables,locals,inputs,_,_)
+        after=env
+        known=bound
+    elseif(node=AndGoal(nodes) or pl::is_list(node) and node=nodes)
+        flow_list(nodes,schemas,callables,env,bound,after,known)
+    elseif(node=CallGoal(VarExpr(name,_),args,loc))
+        flow_call(name,args,loc,schemas,callables,env,bound,after,known)
+    elseif(node=CallGoal(fn,args,loc) and fn=FieldExpr(_,_,_) and field_path(fn,path))
+        flow_call(path,args,loc,schemas,callables,env,bound,after,known)
+    elseif(node=TypedDecl(words,name,value,loc))
+        annotation_type(words,typeName)
+        pl::set_(env,name,typeName,typed)
+        choose(value=None)
+            after=typed
+            fresh='$fresh_'+name
+            pl::subtract(bound,[name,fresh],clean)
+            known=[fresh|clean]
+        else
+            flow(UnifyGoal(VarExpr(name,loc),value,loc),schemas,callables,typed,bound,after,known)
+    elseif(node=UnifyGoal(VarExpr(name,_),value,loc))
+        expression_type(value,schemas,env,typeName)
+        choose(pl::get_assoc(name,env,previous))
+            compatible(typeName,previous,schemas,loc)
+        else
+            true
+        choose(typeName='Any')
+            typed=env
+        else
+            pl::set_(env,name,typeName,typed)
+        choose(value=VarExpr(source,_) and (pl::get_assoc('$call_'+source,env,options) or pl::get_assoc(source,callables,options)))
+            pl::set_(typed,'$call_'+name,options,after)
+        elseif(value=ClosureExpr(_,params,_,_))
+            pl::set_(typed,'$call_'+name,[params],after)
+        elseif(value=FieldExpr(VarExpr(owner,_),key,_) and pl::get_assoc(owner+'.'+key,callables,options))
+            pl::set_(typed,'$call_'+name,options,after)
+        else
+            after=typed
+        choose(value=LiteralExpr(_,_) or value=DictExpr(_,_) or value=ListExpr(_,_,_) or value=ClosureExpr(_,_,_,_) or (value=VarExpr(other,_) and other in bound))
+            pl::subtract(bound,['$fresh_'+name],clean)
+            known=[name|clean]
+        else
+            pl::subtract(bound,['$fresh_'+name],known)
+        flow(value,schemas,callables,env,bound,_,_)
+    elseif(node=ControlGoal(_,condition,yes,no,_))
+        flow(condition,schemas,callables,env,bound,test,testBound)
+        flow(yes,schemas,callables,test,testBound,left,leftBound)
+        flow(no,schemas,callables,env,bound,right,rightBound)
+        merge_facts(left,leftBound,right,rightBound,after,known)
+    elseif(node=OrGoal(nodes))
+        flow_alternatives(nodes,schemas,callables,env,bound,after,known)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,args)
+        flow_branches(args,schemas,callables,env,bound)
+        after=env
+        known=bound
+    else
+        after=env
+        known=bound
+rel flow_branches([],schemas,callables,env,bound) true
+rel flow_branches([x|xs],schemas,callables,env,bound)
+    flow(x,schemas,callables,env,bound,_,_)
+    flow_branches(xs,schemas,callables,env,bound)
+rel merge_facts(left,lb,right,rb,env,bound)
+    pl::assoc_to_list(left,pairs)
+    pl::new(empty)
+    shared_facts(pairs,right,empty,env)
+    pl::intersection(lb,rb,both)
+    pl::sort(both,bound)
+rel shared_facts([],right,env,env) true
+rel shared_facts([pair|pairs],right,before,after)
+    pl::cc_parts(pair,_,[key,value])
+    choose(pl::get_assoc(key,right,value))
+        pl::set_(before,key,value,middle)
+    else
+        middle=before
+    shared_facts(pairs,right,middle,after)
+rel flow_alternatives([],schemas,callables,env,bound,env,bound) true
+rel flow_alternatives([node],schemas,callables,env,bound,after,known)
+    flow(node,schemas,callables,env,bound,after,known)
+rel flow_alternatives([node,other|nodes],schemas,callables,env,bound,after,known)
+    flow(node,schemas,callables,env,bound,left,lb)
+    flow_alternatives([other|nodes],schemas,callables,env,bound,right,rb)
+    merge_facts(left,lb,right,rb,after,known)
+rel viable_outputs(options,args,schemas,env,bound,after,known)
+    matching_outputs(options,args,schemas,env,bound,facts)
+    facts=[Fact(first,fb)|rest]
+    merge_output_facts(rest,first,fb,after,known)
+rel matching_outputs([],args,schemas,env,bound,[]) true
+rel matching_outputs([params|options],args,schemas,env,bound,facts)
+    matching_outputs(options,args,schemas,env,bound,tail)
+    choose(fits(params,args,schemas,env,bound))
+        outputs(params,args,env,bound,after,known)
+        facts=[Fact(after,known)|tail]
+    else
+        facts=tail
+rel merge_output_facts([],env,bound,env,bound) true
+rel merge_output_facts([Fact(right,rb)|rest],left,lb,after,known)
+    merge_facts(left,lb,right,rb,middle,mb)
+    merge_output_facts(rest,middle,mb,after,known)
+rel inferred_parameters([],env,bound,[]) true
+rel inferred_parameters([p|ps],env,bound,[result|rest])
+    choose(p=VarExpr(name,loc) and pl::get_assoc(name,env,typeName) and typeName!='Any')
+        choose(name in bound)
+            words=['$Produced',typeName]
+        else
+            words=[typeName]
+        result=TypedParam(words,name,loc)
+    else
+        result=p
+    inferred_parameters(ps,env,bound,rest)
+rel infer_round([],schemas,previous,updated,updated) true
+rel infer_round([node|nodes],schemas,previous,before,after)
+    choose(node=RelationDecl(annotation,name,params,body,_))
+        pl::new(empty)
+        parameter_env(params,empty,locals)
+        entry_bound(params,inputs)
+        flow(body,schemas,previous,locals,inputs,result,bound)
+        choose(pl::is_assoc(annotation) and pl::get_assoc('contracts',annotation,contracts))
+            current=contracts
+        else
+            inferred_parameters(params,result,bound,inferred)
+            current=[inferred]
+        choose(pl::get_assoc(name,before,old))
+            pl::append(old,current,entries)
+        else
+            entries=current
+        pl::set_(before,name,entries,middle)
+    else
+        middle=before
+    infer_round(nodes,schemas,previous,middle,after)
+rel infer_fixed(items,schemas,base,previous,result)
+    infer_round(items,schemas,previous,base,updated)
+    choose(updated=previous)
+        result=updated
+    else
+        infer_fixed(items,schemas,base,updated,result)
+
+rel imported_schemas([],schemas,schemas) true
+rel imported_schemas([unit|units],before,after)
+    pl::assoc_to_list(unit.schemas,pairs)
+    schema_pairs(pairs,before,middle)
+    imported_schemas(units,middle,after)
+rel schema_pairs([],schemas,schemas) true
+rel schema_pairs([pair|pairs],before,after)
+    pl::cc_parts(pair,_,[name,spec])
+    choose(pl::get_assoc(name,before,old) and old!=spec)
+        throw(CompileError('Conflicting imported type: '+name,spec.location))
+    else
+        pl::set_(before,name,spec,middle)
+    schema_pairs(pairs,middle,after)
+rel imported_calls([],interfaces,calls,calls) true
+rel imported_calls([node|nodes],interfaces,before,after)
+    choose(node=CallGoal(VarExpr('require',_),[LiteralExpr(module,_),VarExpr(alias,_)],_) and pl::get_assoc(module,interfaces,unit))
+        pl::assoc_to_list(unit.exports,pairs)
+        import_members(pairs,alias,before,middle)
+    else
+        middle=before
+    imported_calls(nodes,interfaces,middle,after)
+rel import_members([],alias,calls,calls) true
+rel import_members([pair|pairs],alias,before,after)
+    pl::cc_parts(pair,_,[name,spec])
+    choose(name='$call')
+        key=alias
+    else
+        key=alias+'.'+name
+    pl::set_(before,key,spec,middle)
+    import_members(pairs,alias,middle,after)
+rel public_callable(VarExpr(name,_),calls,params)
+    pl::get_assoc(name,calls,params)
+rel public_callable(ClosureExpr(_,params,_,_),calls,[params]) true
+rel public_members([],calls,exports,exports) true
+rel public_members([Entry(LiteralExpr(key,_),value)|rest],calls,before,after)
+    choose(public_callable(value,calls,spec))
+        pl::set_(before,key,spec,middle)
+    elseif(value=DictExpr(entries,_))
+        pl::new(empty)
+        public_members(entries,calls,empty,nested)
+        pl::assoc_to_list(nested,pairs)
+        import_members(pairs,key,before,middle)
+    else
+        middle=before
+    public_members(rest,calls,middle,after)
+rel public_exports([],calls,exports,exports) true
+rel public_exports([node|nodes],calls,before,after)
+    choose(node=ExportDecl(DictExpr(entries,_),_))
+        public_members(entries,calls,before,middle)
+    elseif(node=ExportDecl(value,_) and public_callable(value,calls,spec))
+        pl::set_(before,'$call',spec,middle)
+    else
+        middle=before
+    public_exports(nodes,calls,middle,after)
+rel interface(items,module,schemas,calls,result)
+    pl::new(empty)
+    export_bindings(items,empty,bindings)
+    expanded_exports(items,bindings,expanded)
+    public_exports(expanded,calls,empty,exports)
+    flow(items,schemas,calls,empty,[],env,_)
+    pl::assoc_to_keys(calls,callNames)
+    callable_types(callNames,env,typed)
+    exported_fields(expanded,schemas,typed,empty,fields)
+    pl::del_assoc('$imports',schemas,_,publicSchemas)
+    result={format=1,module=module,schemas=publicSchemas,exports=exports,fields=fields}
+rel import_names([],[]) true
+rel import_names([node|nodes],names)
+    import_names(nodes,tail)
+    choose(node=CallGoal(VarExpr('require',_),[LiteralExpr(module,_),_],_))
+        names=[module|tail]
+    else
+        names=tail
+rel imported_functors(interfaces,nodes)
+    pl::new(empty)
+    pl::assoc_to_values(interfaces,units)
+    imported_schemas(units,empty,schemas)
+    pl::assoc_to_list(schemas,pairs)
+    schema_nodes(pairs,nodes)
+rel schema_nodes([],[]) true
+rel schema_nodes([pair|pairs],nodes)
+    pl::cc_parts(pair,_,[name,spec])
+    schema_nodes(pairs,tail)
+    choose(pl::get_assoc('kind',spec,_))
+        nodes=tail
+    else
+        nodes=[FunctorDecl(name,[spec.parent|spec.fields],spec.location)|tail]
+rel string_operand(typeName,schemas,loc)
+    choose(typeName='Any' or typeName='String' or subtype(typeName,'Number',schemas))
+        true
+    else
+        throw(CompileError('Expected String or Number, got '+typeName,loc))
+rel field_path(VarExpr(name,_),name) true
+rel field_path(FieldExpr(owner,key,_),path)
+    field_path(owner,prefix)
+    path=prefix+'.'+key
+rel imported_path(path,schemas)
+    pl::get_assoc('$imports',schemas,metadata)
+    pl::split_string(path,'.','',[root|_])
+    root in metadata.modules
+rel import_field_info([],interfaces,fields,modules,fields,modules) true
+rel import_field_info([node|nodes],interfaces,before,known,after,modules)
+    choose(node=CallGoal(VarExpr('require',_),[LiteralExpr(module,_),VarExpr(alias,_)],_) and pl::get_assoc(module,interfaces,unit) and pl::get_assoc('fields',unit,fields))
+        pl::assoc_to_list(fields,pairs)
+        import_members(pairs,alias,before,middle)
+        names=[alias|known]
+    else
+        middle=before
+        names=known
+    import_field_info(nodes,interfaces,middle,names,after,modules)
+rel exported_fields([],schemas,env,fields,fields) true
+rel exported_fields([node|nodes],schemas,env,before,after)
+    choose(node=ExportDecl(value,_))
+        export_value_fields(value,'',schemas,env,before,middle)
+    else
+        middle=before
+    exported_fields(nodes,schemas,env,middle,after)
+rel export_value_fields(DictExpr(entries,_),prefix,schemas,env,before,after)
+    choose(prefix='')
+        middle=before
+    else
+        pl::set_(before,prefix,'Table',middle)
+    export_entries(entries,prefix,schemas,env,middle,after)
+rel export_value_fields(value,prefix,schemas,env,before,after)
+    unsafeNot(value=DictExpr(_,_))
+    expression_type(value,schemas,env,typeName)
+    choose(prefix='')
+        key='$call'
+    else
+        key=prefix
+    pl::set_(before,key,typeName,after)
+rel export_entries([],prefix,schemas,env,fields,fields) true
+rel export_entries([Entry(LiteralExpr(key,_),value)|entries],prefix,schemas,env,before,after)
+    choose(prefix='')
+        path=key
+    else
+        path=prefix+'.'+key
+    export_value_fields(value,path,schemas,env,before,middle)
+    export_entries(entries,prefix,schemas,env,middle,after)
+rel callable_types([],env,env) true
+rel callable_types([name|names],before,after)
+    pl::set_(before,name,'Relation',middle)
+    callable_types(names,middle,after)
+rel export_bindings([],bindings,bindings) true
+rel export_bindings([node|nodes],before,after)
+    choose(node=UnifyGoal(VarExpr(name,_),value,_) or node=TypedDecl(_,name,value,_))
+        pl::set_(before,name,value,middle)
+    else
+        middle=before
+    export_bindings(nodes,middle,after)
+rel expand_export(value,bindings,seen,result)
+    choose(value=VarExpr(name,_) and unsafeNot(name in seen) and pl::get_assoc(name,bindings,definition))
+        expand_export(definition,bindings,[name|seen],result)
+    elseif(value=DictExpr(entries,loc))
+        expand_entries(entries,bindings,seen,expanded)
+        result=DictExpr(expanded,loc)
+    else
+        result=value
+rel expand_entries([],bindings,seen,[]) true
+rel expand_entries([Entry(key,value)|entries],bindings,seen,[Entry(key,result)|rest])
+    expand_export(value,bindings,seen,result)
+    expand_entries(entries,bindings,seen,rest)
+rel expanded_exports([],bindings,[]) true
+rel expanded_exports([node|nodes],bindings,[result|rest])
+    choose(node=ExportDecl(value,loc))
+        expand_export(value,bindings,[],expanded)
+        result=ExportDecl(expanded,loc)
+    else
+        result=node
+    expanded_exports(nodes,bindings,rest)
+rel value_names(node,names)
+    choose(node=VarExpr(name,_) or node=TypedParam(_,name,_))
+        names=[name]
+    elseif(node=ClosureExpr(_,_,_,_))
+        names=[]
+    elseif(node=CallExpr(_,args,_))
+        value_names(args,names)
+    elseif(pl::is_list(node))
+        value_name_list(node,names)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,args)
+        value_name_list(args,names)
+    else
+        names=[]
+rel value_name_list([],[]) true
+rel value_name_list([x|xs],names)
+    value_names(x,a)
+    value_name_list(xs,b)
+    pl::append(a,b,names)
+rel binding_names(node,names)
+    choose(node=RelationDecl(_,name,_,_,_) or node=TypedDecl(_,name,_,_) or node=ClassDecl(name,_,_) or node=ProtocolDecl(name,_,_))
+        names=[name]
+    elseif(node=ClosureExpr(_,_,_,_))
+        names=[]
+    elseif(node=UnifyGoal(left,right,_))
+        value_names([left,right],names)
+    elseif(node=CallGoal(_,args,_))
+        value_names(args,names)
+    elseif(pl::is_list(node))
+        binding_list(node,names)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,args)
+        binding_list(args,names)
+    else
+        names=[]
+rel binding_list([],[]) true
+rel binding_list([x|xs],names)
+    binding_names(x,a)
+    binding_list(xs,b)
+    pl::append(a,b,names)
+rel validate_calls(node,known,schemas)
+    choose(node=RelationDecl(_,_,params,body,_) or node=ClosureExpr(_,params,body,_))
+        value_names(params,parameters)
+        binding_names(body,locals)
+        pl::append(known,parameters,withParams)
+        pl::append(withParams,locals,scope)
+        validate_calls(body,scope,schemas)
+    elseif(node=CallGoal(VarExpr(name,_),args,loc) or node=CallExpr(VarExpr(name,_),args,loc))
+        choose(name in known or name in ['require','print','write','writeln','throw','str','num','int','real'] or pl::sub_string(name,_,_,_,'::') or pl::get_assoc(name,schemas,_))
+            validate_calls(args,known,schemas)
+        else
+            throw(CompileError('Cannot find relation '+name,loc))
+    elseif(pl::is_list(node))
+        validate_call_list(node,known,schemas)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,args)
+        validate_call_list(args,known,schemas)
+    else
+        true
+rel validate_call_list([],known,schemas) true
+rel validate_call_list([x|xs],known,schemas)
+    validate_calls(x,known,schemas)
+    validate_call_list(xs,known,schemas)
+export({check=check,analyze=analyze,interface=interface,imports=import_names,imported_functors=imported_functors})

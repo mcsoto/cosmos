@@ -1,0 +1,68 @@
++
++ Fix SWI error detection and the value/string codec.
+
+Implemented: platform/swi-result.mjs normalizes failure/error/success;
+platform/codec.pl and compiler_session_result/2 use explicit value tags.
+Compiler-side APIs only; editor integration remains deferred.
+
++ (Suggestion.) Functors describe what the program is; tables/maps describe compiler state and extensible metadata.
+
+I would use a hybrid
+
+Keep semantic AST structure as functors, but don't turn every compiler fact into another positional argument.
+
+For example:
+
+Binary("+", A, B)
+
+plus either a modest common wrapper:
+
+At(Position, Binary("+", A, B))
+
+or an annotation structure:
+
+Node(Binary("+", A, B), Meta)
+
+where Meta can be a table if needed.
+
++ Type annotation.
+
+functor(Binary, Op String Exp Exp) -- stronger than functor(Binary, Functor String Exp Exp)
+
+
+Op is declared explicitly as a subtype of Functor.
+
+Any
+└── Functor
+    └── Op
+        └── Binary(...)
+AST:
+functor(Binary, Op String Exp Exp)
+functor(Unary, Op String Exp)
+
+functor(Var, Exp String)
+functor(Call, Exp Exp List)
+
+Implemented: src/check.co validates declared subtype chains, constructor arity,
+and statically known field types. Schema metadata stays in tables; semantic AST
+nodes stay functors. Unknown constructor fields receive delayed runtime guards;
+imported types and full inference remain unsupported.
+See ../docs/compiler-v2-types.md for the exact support boundary.
+
+Implemented v2 compiler work: inline callable mode/type contracts, callable
+categories, assertions, debug determinism checks, explicit ! state threading,
+branch joins, loops and some, protocol views and debug behavioral checks,
+classes, constructors, explicit prototypes, and nominal type tests.
+The six readable src/*.co modules rebuild themselves into Prolog without Lua.
+See ../docs/compiler-v2.md for user examples and the remaining intended behavior.
+
+Implemented temporal loops: init inputs, simultaneous next assignments, next
+value expressions, branch carry-forward, field updates, nested while/for loops,
+and duplicate-assignment/scope diagnostics. This is iteration-based state;
+asynchronous/reactive temporal scheduling is not implemented.
+
+Further v2 work: anonymous/table callable categories and determinism, protocol
+method determinism, standalone alternative Relation signatures, conservative
+static type/mode checking through straight-line bindings and callback aliases,
+and known protocol implementation mode/type compatibility checks.
+Whole-program inference and imported interfaces remain incomplete.

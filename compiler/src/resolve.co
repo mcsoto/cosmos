@@ -1,0 +1,193 @@
+// Name collection and lexical capture analysis. No code generation happens here.
+functor(VarExpr,Functor)
+functor(TypedParam,Functor)
+functor(TypedDecl,Functor)
+functor(RelationDecl,Functor)
+functor(FunctorDecl,Functor)
+functor(Signature,Functor)
+functor(ClosureExpr,Functor)
+functor(ProtocolDecl,Functor)
+functor(IsGoal,Functor)
+functor(ClassDecl,Functor)
+rel type_references(words,names)
+    pl::subtract(words,['Any','Functor','Number','String','Integer','Real','List','Table','Host','Relation','In','Out','InOut'],names)
+
+rel variables(node,names)
+    variable_walk(node,found)
+    pl::sort(found,names)
+
+// A nested closure owns its local variables. Do not preallocate them in the
+// enclosing scope merely because they appear somewhere in its syntax tree.
+rel scope_variables(node,names)
+    scope_walk(node,found)
+    pl::sort(found,names)
+rel scope_walk(node,names)
+    choose(node=ClassDecl(name,value,_))
+        scope_walk(value,tail)
+        names=[name|tail]
+    elseif(node=ProtocolDecl(name,_,_))
+        names=[name]
+    elseif(node=ClosureExpr(_,_,_,_))
+        names=[]
+    elseif(node=VarExpr(name,_))
+        variable_walk(node,names)
+    elseif(node=TypedParam(_,name,_))
+        names=[name]
+    elseif(node=TypedDecl(words,name,value,_))
+        scope_walk(value,tail)
+        type_references(words,types)
+        pl::append([name|tail],types,names)
+    elseif(node=IsGoal(value,typeName,_))
+        scope_walk(value,tail)
+        type_references([typeName],types)
+        pl::append(tail,types,names)
+    elseif(pl::is_list(node))
+        scope_list(node,names)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,children)
+        scope_list(children,names)
+    else
+        names=[]
+rel scope_list([],[])
+    true
+rel scope_list([node|nodes],names)
+    scope_walk(node,first)
+    scope_list(nodes,tail)
+    pl::append(first,tail,names)
+
+rel variable_walk(node,names)
+    choose(node=ClassDecl(name,value,_))
+        variable_walk(value,tail)
+        names=[name|tail]
+    elseif(node=ProtocolDecl(name,_,_))
+        names=[name]
+    elseif(node=VarExpr(name,_))
+        choose(name='_' or pl::sub_string(name,_,_,_,'::'))
+            names=[]
+        else
+            names=[name]
+    elseif(node=TypedParam(_,name,_))
+        names=[name]
+    elseif(node=TypedDecl(words,name,value,_))
+        variable_walk(value,tail)
+        type_references(words,types)
+        pl::append([name|tail],types,names)
+    elseif(node=IsGoal(value,typeName,_))
+        variable_walk(value,tail)
+        type_references([typeName],types)
+        pl::append(tail,types,names)
+    elseif(pl::is_list(node))
+        variables_list(node,names)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,children)
+        variables_list(children,names)
+    else
+        names=[]
+
+rel variables_list([],[])
+    true
+rel variables_list([item|items],names)
+    variable_walk(item,first)
+    variables_list(items,rest)
+    pl::append(first,rest,names)
+
+rel partition([],[],[],[],[])
+    true
+rel partition([item|items],relations,top,names,functors)
+    partition(items,rs,ts,ns,fs)
+    choose(item=RelationDecl(_,name,_,_,_))
+        relations=[item|rs]
+        top=ts
+        names=[name|ns]
+        functors=fs
+    elseif(item=FunctorDecl(name,_,_))
+        relations=rs
+        top=ts
+        names=ns
+        functors=[name|fs]
+    else
+        relations=rs
+        top=[item|ts]
+        names=ns
+        functors=fs
+
+rel signatures([],globals,[])
+    true
+rel signatures([RelationDecl(kind,name,params,body,_)|rs],globals,[sig|rest])
+    variables(params,parameters)
+    variables(body,used)
+    pl::subtract(used,parameters,free)
+    pl::intersection(globals,free,captures)
+    arity=#params
+    sig=Signature(name,arity,captures,free,kind)
+    signatures(rs,globals,rest)
+
+rel inherited([],knownSignatures,[])
+    true
+rel inherited([name|names],knownSignatures,captures)
+    choose(pl::member(Signature(name,_,current,_,_),knownSignatures))
+        first=current
+    else
+        first=[]
+    inherited(names,knownSignatures,rest)
+    pl::append(first,rest,captures)
+
+rel expand([],all,[])
+    true
+rel expand([Signature(name,arity,captured,calls,kind)|xs],all,[updated|rest])
+    inherited(calls,all,extra)
+    pl::append(captured,extra,combined)
+    pl::sort(combined,following)
+    updated=Signature(name,arity,following,calls,kind)
+    expand(xs,all,rest)
+
+rel capture_fixpoint(before,after)
+    expand(before,before,following)
+    choose(following=before)
+        after=following
+    else
+        capture_fixpoint(following,after)
+
+// Clauses of one relation share one calling convention and capture list.
+rel merge_signature(sig,[],[sig])
+    true
+rel merge_signature(Signature(name,arity,caps,calls,kind),[head|tail],result)
+    choose(head=Signature(name,previous,oldCaps,oldCalls,oldKind))
+        category(kind,newCategory)
+        category(oldKind,oldCategory)
+        choose(arity=previous and newCategory=oldCategory)
+            pl::append(caps,oldCaps,combinedCaps)
+            pl::sort(combinedCaps,mergedCaps)
+            pl::append(calls,oldCalls,combinedCalls)
+            pl::sort(combinedCalls,mergedCalls)
+            result=[Signature(name,arity,mergedCaps,mergedCalls,kind)|tail]
+        else
+            throw('Inconsistent declaration for relation: '+name)
+    else
+        merge_signature(Signature(name,arity,caps,calls,kind),tail,rest)
+        result=[head|rest]
+rel category(kind,name)
+    choose(pl::is_assoc(kind))
+        name=kind.category
+    else
+        name=kind
+rel merge_signatures([],[])
+    true
+rel merge_signatures([head|tail],merged)
+    merge_signatures(tail,rest)
+    merge_signature(head,rest,merged)
+
+rel analyze(items,program)
+    partition(items,relations,top,names,declared)
+    scope_variables(top,used)
+    pl::append(names,declared,excluded)
+    pl::subtract(used,excluded,globals)
+    signatures(relations,globals,initial)
+    merge_signatures(initial,merged)
+    capture_fixpoint(merged,resolved)
+    builtin_functors(builtins)
+    pl::append(builtins,declared,functors)
+    program={relations=relations,top=top,globals=globals,signatures=resolved,functors=functors}
+
+rel builtin_functors(['Cons','T','Tuple','Pair','Some','None']) true
+export({variables=variables,scopeVariables=scope_variables,captures=inherited,analyze=analyze,builtin_functors=builtin_functors})

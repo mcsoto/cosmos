@@ -1,0 +1,40 @@
+// Public compiler entry. Each stage is Cosmos; only I/O and term operations
+// cross into Prolog. These sources are rebuilt by the generated Cosmos compiler.
+functor(Program,Functor)
+functor(Query,Functor)
+rel compile(source,module,text)
+    pl::new(interfaces)
+    compile_unit(source,module,interfaces,unit)
+    text=unit.prolog
+rel compile_unit(source,module,interfaces,unit)
+    require('parser',parser)
+    require('resolve',analysis)
+    require('emit_prolog',emitter)
+    require('check',checker)
+    require('normalize',normalizer)
+    parser.parse(source,Program(surface))
+    normalizer.normalize(surface,localItems)
+    checker.imported_functors(interfaces,imported)
+    pl::append(imported,localItems,items)
+    checker.analyze(items,interfaces,schemas,callables)
+    analysis.analyze(items,program)
+    pl::set_(program,'schemas',schemas,checked)
+    emitter.generate(checked,module,analysis,text)
+    checker.interface(items,module,schemas,callables,interface)
+    unit={prolog=text,interface=interface}
+
+rel imports(source,names)
+    require('parser',parser)
+    require('check',checker)
+    parser.parse(source,Program(items))
+    checker.imports(items,names)
+
+// Compile a goal-only Cosmos fragment as a query. `variables` is an ordered
+// list of variable names (strings); it becomes the fragment's export value.
+// The result is deliberately data, rather than just source text, so callers
+// can load the code and decode the answer without reconstructing its contract.
+rel compile_query(source,variables,module,query)
+    pl::cc_compile_query(source,variables,module,text)
+    query={module=module,entry=module,variables=variables,source=source,prolog=text}
+
+export({compile=compile,compile_query=compile_query,compile_unit=compile_unit,imports=imports})

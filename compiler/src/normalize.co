@@ -1,0 +1,644 @@
+// Surface ! syntax becomes fresh logical variables before checking/resolution.
+// Maps hold the current version; no mutable logical value reaches the backend.
+functor(VarExpr,Functor)
+functor(TypedParam,Functor)
+functor(StateExpr,Functor)
+functor(FieldExpr,Functor)
+functor(SetFieldExpr,Functor)
+functor(UnifyGoal,Functor)
+functor(AndGoal,Functor)
+functor(OrGoal,Functor)
+functor(ControlGoal,Functor)
+functor(TrueGoal,Functor)
+functor(RelationDecl,Functor)
+functor(MetaDecl,Functor)
+functor(MetaParam,Functor)
+functor(MetaApplyGoal,Functor)
+functor(MetaRefGoal,Functor)
+functor(TemporalGoal,Functor)
+functor(MetaUnaryExpr,Functor)
+functor(MetaBinaryExpr,Functor)
+functor(ClosureExpr,Functor)
+functor(CallGoal,Functor)
+functor(CallExpr,Functor)
+functor(CompileError,Functor)
+functor(None,Functor)
+functor(Loc,Functor)
+functor(ForInGoal,Functor)
+functor(UnaryGoal,Functor)
+functor(ForGoal,Functor)
+functor(ListExpr,Functor)
+functor(NextExpr,Functor)
+functor(TypedDecl,Functor)
+
+rel collect_metas([],metas,metas,[])
+    true
+rel collect_metas([node|nodes],before,after,items)
+    choose(node=MetaDecl(name,params,fixity,category,body,loc))
+        choose(pl::get_assoc(name,before,_))
+            throw(CompileError('Duplicate meta declaration: '+name,loc))
+        else
+            true
+        choose((fixity='unary' and #params=1) or (fixity='binary' and #params=2) or fixity='call')
+            true
+        else
+            throw(CompileError('Meta fixity does not match parameter count: '+name,loc))
+        pl::set_(before,name,node,middle)
+        items=rest
+    else
+        middle=before
+        items=[node|rest]
+    collect_metas(nodes,middle,after,rest)
+
+rel goal_from_expression(CallExpr(fn,args,loc),CallGoal(fn,args,loc)) true
+rel goal_from_expression(VarExpr(name,loc),MetaRefGoal(name,loc)) true
+rel goal_from_expression(MetaUnaryExpr(name,value,loc),MetaApplyGoal(name,[goal],loc))
+    goal_from_expression(value,goal)
+rel goal_from_expression(MetaBinaryExpr(name,a,b,loc),MetaApplyGoal(name,[left,right],loc))
+    goal_from_expression(a,left)
+    goal_from_expression(b,right)
+rel goal_from_expression(value,goal)
+    throw(CompileError('Expected goal syntax in meta argument',Loc(0,0)))
+
+rel bind_meta_args([],[],bindings,bindings)
+    true
+rel bind_meta_args([MetaParam(kind,name,loc)|params],[arg|args],before,after)
+    choose(kind='Goal')
+        choose(arg=CallExpr(_,_,_) or arg=VarExpr(_,_) or arg=MetaUnaryExpr(_,_,_) or arg=MetaBinaryExpr(_,_,_,_))
+            goal_from_expression(arg,value)
+        else
+            value=arg
+    else
+        value=arg
+    pl::set_(before,name,value,middle)
+    bind_meta_args(params,args,middle,after)
+rel bind_meta_args(params,args,before,after)
+    throw(CompileError('Wrong meta arity',Loc(0,0)))
+
+rel substitute_list([],bindings,[])
+    true
+rel substitute_list([node|nodes],bindings,[result|results])
+    substitute(node,bindings,result)
+    substitute_list(nodes,bindings,results)
+
+rel substitute(node,bindings,result)
+    choose(node=VarExpr(name,_) and pl::get_assoc(name,bindings,value))
+        result=value
+    elseif(node=MetaRefGoal(name,loc))
+        choose(pl::get_assoc(name,bindings,value))
+            result=value
+        else
+            throw(CompileError('Unknown meta template parameter: '+name,loc))
+    elseif(pl::is_list(node))
+        substitute_list(node,bindings,result)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,name,args)
+        substitute_list(args,bindings,values)
+        pl::cc_term(name,values,result)
+    else
+        result=node
+
+rel expand_meta(name,args,mode,metas,stack,result)
+    choose(name in stack)
+        throw(CompileError('Recursive meta expansion: '+name,Loc(0,0)))
+    else
+        true
+    choose(pl::get_assoc(name,metas,MetaDecl(_,params,fixity,category,body,loc)))
+        true
+    else
+        throw(CompileError('Unknown meta operator: '+name,Loc(0,0)))
+    choose(mode in ['unary','binary','goalUnary','goalBinary'])
+        choose(mode='goalUnary')
+            expectedFixity='unary'
+            expectedCategory='Goal'
+        elseif(mode='goalBinary')
+            expectedFixity='binary'
+            expectedCategory='Goal'
+        else
+            expectedFixity=mode
+            expectedCategory='Expr'
+        choose(expectedFixity=fixity)
+            true
+        else
+            throw(CompileError('Meta operator used with wrong fixity: '+name,loc))
+        choose(expectedCategory=category)
+            true
+        else
+            throw(CompileError('Meta result category does not match use: '+name,loc))
+    else
+        choose((mode='goal' and category='Goal') or (mode='expr' and category='Expr'))
+            true
+        else
+            throw(CompileError('Meta result category does not match use: '+name,loc))
+    pl::new(empty)
+    bind_meta_args(params,args,empty,bindings)
+    substitute(body,bindings,expanded)
+    expand_node(expanded,metas,[name|stack],result)
+
+rel expand_nodes([],metas,stack,[])
+    true
+rel expand_nodes([node|nodes],metas,stack,[result|results])
+    expand_node(node,metas,stack,result)
+    expand_nodes(nodes,metas,stack,results)
+
+rel expand_temporal(kind,args,loc,result)
+    choose(kind in ['init','next'] and args=[body])
+        result=UnaryGoal(kind,body,loc)
+    elseif(kind='until' and args=[condition,body])
+        result=ControlGoal('while',UnaryGoal('not',condition,loc),body,None,loc)
+    else
+        throw(CompileError('Invalid temporal syntax constructor: '+kind,loc))
+
+rel expand_node(node,metas,stack,result)
+    choose(node=MetaApplyGoal(name,[arg],_))
+        expand_meta(name,[arg],'goalUnary',metas,stack,result)
+    elseif(node=MetaApplyGoal(name,[a,b],_))
+        expand_meta(name,[a,b],'goalBinary',metas,stack,result)
+    elseif(node=MetaUnaryExpr(name,arg,_))
+        expand_meta(name,[arg],'unary',metas,stack,result)
+    elseif(node=MetaBinaryExpr(name,a,b,_))
+        expand_meta(name,[a,b],'binary',metas,stack,result)
+    elseif(node=CallGoal(VarExpr(name,_),args,_) and pl::get_assoc(name,metas,_))
+        expand_meta(name,args,'goal',metas,stack,result)
+    elseif(node=CallExpr(VarExpr(name,_),args,_) and pl::get_assoc(name,metas,_))
+        expand_meta(name,args,'expr',metas,stack,result)
+    elseif(node=TemporalGoal(kind,args,loc))
+        expand_nodes(args,metas,stack,values)
+        expand_temporal(kind,values,loc,result)
+    elseif(node=MetaRefGoal(name,loc))
+        throw(CompileError('Meta parameter used outside a template: '+name,loc))
+    elseif(pl::is_list(node))
+        expand_nodes(node,metas,stack,result)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,name,args)
+        expand_nodes(args,metas,stack,values)
+        pl::cc_term(name,values,result)
+    else
+        result=node
+
+rel expand_program(items,result)
+    pl::new(empty)
+    collect_metas(items,empty,metas,program)
+    expand_nodes(program,metas,[],result)
+
+rel fresh(counter,name)
+    pl::cc_cell_get(counter,n)
+    pl::cc_cell_set(counter,n+1)
+    name='$state_'+str(n)
+rel current(name,map,loc,node)
+    choose(pl::get_assoc(name,map,version))
+        node=VarExpr(version,loc)
+    else
+        node=VarExpr(name,loc)
+rel without(name,map,rest)
+    choose(pl::del_assoc(name,map,_,removed))
+        rest=removed
+    else
+        rest=map
+rel parameters([],map,counter,[],map,[])
+    true
+rel parameters([p|ps],before,counter,all,after,outputs)
+    choose(p=StateExpr(VarExpr(name,loc),_))
+        fresh(counter,inputName)
+        fresh(counter,outputName)
+        pl::set_(before,name,inputName,middle)
+        first=[VarExpr(inputName,loc),VarExpr(outputName,loc)]
+        outputs=[Pair(name,outputName)|tail]
+    else
+        choose(p=VarExpr(name,_) or p=TypedParam(_,name,_))
+            without(name,before,middle)
+        else
+            middle=before
+        first=[p]
+        outputs=tail
+    parameters(ps,middle,counter,rest,after,tail)
+    pl::append(first,rest,all)
+rel final_outputs([],map,[])
+    true
+rel final_outputs([Pair(name,output)|pairs],map,[g|gs])
+    current(name,map,Loc(0,0),value)
+    g=UnifyGoal(VarExpr(output,Loc(0,0)),value,Loc(0,0))
+    final_outputs(pairs,map,gs)
+rel callable(params,body,before,counter,newParams,newBody)
+    parameters(params,before,counter,newParams,start,outputs)
+    rewrite(body,start,counter,lowered,finish)
+    final_outputs(outputs,finish,tail)
+    newBody=AndGoal([lowered|tail])
+
+rel arguments([],map,counter,[],map)
+    true
+rel arguments([arg|args],before,counter,all,after)
+    choose(arg=StateExpr(VarExpr(name,loc),_))
+        current(name,before,loc,input)
+        fresh(counter,output)
+        pl::set_(before,name,output,middle)
+        first=[input,VarExpr(output,loc)]
+    else
+        rewrite(arg,before,counter,value,middle)
+        first=[value]
+    arguments(args,middle,counter,rest,after)
+    pl::append(first,rest,all)
+rel sequence([],map,counter,[],map)
+    true
+rel sequence([node|nodes],before,counter,[result|results],after)
+    rewrite(node,before,counter,result,middle)
+    sequence(nodes,middle,counter,results,after)
+
+rel joins([],left,right,before,counter,before,[],[])
+    true
+rel joins([name|names],left,right,before,counter,after,leftGoals,rightGoals)
+    current(name,left,Loc(0,0),a)
+    current(name,right,Loc(0,0),b)
+    choose(a=b)
+        a=VarExpr(version,_)
+        pl::set_(before,name,version,middle)
+        leftGoals=ls
+        rightGoals=rs
+    else
+        fresh(counter,version)
+        pl::set_(before,name,version,middle)
+        leftGoals=[UnifyGoal(VarExpr(version,Loc(0,0)),a,Loc(0,0))|ls]
+        rightGoals=[UnifyGoal(VarExpr(version,Loc(0,0)),b,Loc(0,0))|rs]
+    joins(names,left,right,middle,counter,after,ls,rs)
+rel branches(yes,no,before,counter,newYes,newNo,after)
+    rewrite(yes,before,counter,left,leftMap)
+    rewrite(no,before,counter,right,rightMap)
+    pl::assoc_to_keys(leftMap,leftNames)
+    pl::assoc_to_keys(rightMap,rightNames)
+    pl::append(leftNames,rightNames,all)
+    pl::sort(all,names)
+    joins(names,leftMap,rightMap,before,counter,after,lg,rg)
+    newYes=AndGoal([left|lg])
+    newNo=AndGoal([right|rg])
+
+rel state_names(node,names)
+    choose(node=StateExpr(VarExpr(name,_),_))
+        names=[name]
+    elseif(node=StateExpr(FieldExpr(owner,_,loc),_))
+        state_names(StateExpr(owner,loc),names)
+    elseif(node=ClosureExpr(_,_,_,_) or node=RelationDecl(_,_,_,_,_))
+        names=[]
+    elseif(pl::is_list(node))
+        state_list(node,names)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,args)
+        state_list(args,names)
+    else
+        names=[]
+rel state_list([],[])
+    true
+rel state_list([node|nodes],names)
+    state_names(node,first)
+    state_list(nodes,tail)
+    pl::append(first,tail,names)
+rel loop_states([],temporal,before,counter,loc,[],[],[],before,before)
+    true
+rel loop_states([name|names],temporal,before,counter,loc,[initial|initials],[input|inputs],[output|outputs],inside,after)
+    choose(name in temporal)
+        choose(pl::get_assoc('$init_'+name,before,initialName))
+            initial=VarExpr(initialName,loc)
+            fresh(counter,outputName)
+        else
+            fresh(counter,initialName)
+            initial=VarExpr(initialName,loc)
+            current(name,before,loc,VarExpr(outputName,_))
+    else
+        current(name,before,loc,initial)
+        fresh(counter,outputName)
+    fresh(counter,inputName)
+    input=VarExpr(inputName,loc)
+    output=VarExpr(outputName,loc)
+    without('$init_'+name,before,remaining)
+    loop_states(names,temporal,remaining,counter,loc,initials,inputs,outputs,innerTail,outerTail)
+    pl::set_(innerTail,name,inputName,inside)
+    pl::set_(outerTail,name,outputName,after)
+rel state_values([],map,loc,[])
+    true
+rel state_values([name|names],map,loc,[value|values])
+    current(name,map,loc,value)
+    state_values(names,map,loc,values)
+rel loop(kind,condition,body,before,counter,loc,result,after)
+    state_names(body,all)
+    temporal_names(body,ts)
+    initialized_names(before,initialized)
+    pl::append(ts,initialized,temporalAll)
+    pl::sort(temporalAll,temporal)
+    pl::append(all,temporal,combined)
+    pl::sort(combined,names)
+    loop_states(names,temporal,before,counter,loc,initial,inputs,outputs,inside,after)
+    rewrite(condition,inside,counter,test,testMap)
+    choose(testMap=inside)
+        true
+    else
+        throw(CompileError('State updates in conditions are not supported',loc))
+    temporal_body(body,temporal,inside,counter,prepared,bodyMap,slots,futures)
+    rewrite(prepared,bodyMap,counter,step,finish)
+    loop_values(names,slots,finish,loc,nextValues)
+    future_goals(temporal,slots,futures,finish,loc,futureGoals)
+    fresh(counter,nextName)
+    statePattern=ListExpr(inputs,None,loc)
+    nextVar=VarExpr(nextName,loc)
+    testClosure=ClosureExpr('_',[statePattern],test,loc)
+    pl::append([step,UnifyGoal(nextVar,ListExpr(nextValues,None,loc),loc)],futureGoals,stepGoals)
+    stepClosure=ClosureExpr('_',[statePattern,nextVar],AndGoal(stepGoals),loc)
+    result=CallGoal(VarExpr('pl::cosmos_while',loc),[testClosure,stepClosure,ListExpr(initial,None,loc),ListExpr(outputs,None,loc)],loc)
+rel foreach(key,value,collection,body,before,counter,loc,result,after)
+    rewrite(collection,before,counter,items,middle)
+    state_names(body,all)
+    temporal_names(body,ts)
+    initialized_names(middle,initialized)
+    pl::append(ts,initialized,temporalAll)
+    pl::sort(temporalAll,temporal)
+    pl::append(all,temporal,combined)
+    pl::sort(combined,names)
+    loop_states(names,temporal,middle,counter,loc,initial,inputs,outputs,inside,after)
+    choose(key=None)
+        fresh(counter,keyName)
+        keyParam=VarExpr(keyName,loc)
+    else
+        keyParam=key
+    parameters([keyParam,value],inside,counter,itemParams,bodyMap,_)
+    temporal_body(body,temporal,bodyMap,counter,prepared,preparedMap,slots,futures)
+    rewrite(prepared,preparedMap,counter,step,finish)
+    loop_values(names,slots,finish,loc,nextValues)
+    future_goals(temporal,slots,futures,finish,loc,futureGoals)
+    fresh(counter,nextName)
+    nextVar=VarExpr(nextName,loc)
+    pl::append(itemParams,[ListExpr(inputs,None,loc),nextVar],params)
+    pl::append([step,UnifyGoal(nextVar,ListExpr(nextValues,None,loc),loc)],futureGoals,stepGoals)
+    stepClosure=ClosureExpr('_',params,AndGoal(stepGoals),loc)
+    result=CallGoal(VarExpr('pl::cosmos_for',loc),[items,stepClosure,ListExpr(initial,None,loc),ListExpr(outputs,None,loc)],loc)
+
+// Temporal assignments have separate slots: reads of x keep the current input,
+// reads of next x share the final slot, including reads before its assignment.
+rel initialized_names(map,names)
+    pl::assoc_to_keys(map,keys)
+    initialized_keys(keys,names)
+rel initialized_keys([],[])
+    true
+rel initialized_keys([key|keys],names)
+    choose(#key>=6 and string.slice(key,0,6,'$init_'))
+        string.slice(key,6,#key,name)
+        names=[name|tail]
+    else
+        names=tail
+    initialized_keys(keys,tail)
+rel temporal_boundary(node)
+    node=ClosureExpr(_,_,_,_) or node=RelationDecl(_,_,_,_,_) or node=ControlGoal('while',_,_,_,_) or node=ForGoal(_,_,_,_,_) or (node=ForInGoal(kind,_,_,_,_,_) and kind in ['for','for-in'])
+rel temporal_names(node,names)
+    choose(temporal_boundary(node))
+        names=[]
+    elseif(node=UnaryGoal('next',UnifyGoal(VarExpr(name,_),_,_),_))
+        names=[name]
+    elseif(pl::is_list(node))
+        temporal_name_list(node,names)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,_,args)
+        temporal_name_list(args,names)
+    else
+        names=[]
+rel temporal_name_list([],[])
+    true
+rel temporal_name_list([x|xs],names)
+    temporal_names(x,a)
+    temporal_name_list(xs,b)
+    pl::append(a,b,names)
+rel temporal_slots([],map,counter,map,empty,empty)
+    pl::new(empty)
+rel temporal_slots([name|names],before,counter,after,slots,futures)
+    fresh(counter,slot)
+    fresh(counter,future)
+    current(name,before,Loc(0,0),VarExpr(input,_))
+    pl::set_(before,slot,input,middle)
+    temporal_slots(names,middle,counter,after,ss,fs)
+    pl::set_(ss,name,slot,slots)
+    pl::set_(fs,name,future,futures)
+rel temporal_body(body,names,before,counter,result,after,slots,futures)
+    temporal_slots(names,before,counter,after,slots,futures)
+    choose(names=[])
+        result=body
+    else
+        temporal_rewrite(body,slots,futures,[],result,_)
+rel loop_values([],slots,map,loc,[])
+    true
+rel loop_values([name|names],slots,map,loc,[value|values])
+    choose(pl::get_assoc(name,slots,slot))
+        current(slot,map,loc,value)
+    else
+        current(name,map,loc,value)
+    loop_values(names,slots,map,loc,values)
+rel future_goals([],slots,futures,map,loc,[])
+    true
+rel future_goals([name|names],slots,futures,map,loc,[goal|goals])
+    pl::get_assoc(name,slots,slot)
+    pl::get_assoc(name,futures,future)
+    current(slot,map,loc,value)
+    goal=UnifyGoal(VarExpr(future,loc),value,loc)
+    future_goals(names,slots,futures,map,loc,goals)
+rel temporal_sequence([],slots,futures,assigned,[],assigned)
+    true
+rel temporal_sequence([x|xs],slots,futures,before,[y|ys],after)
+    temporal_rewrite(x,slots,futures,before,y,middle)
+    temporal_sequence(xs,slots,futures,middle,ys,after)
+rel temporal_alternatives([],slots,futures,assigned,[],assigned)
+    true
+rel temporal_alternatives([x|xs],slots,futures,before,[y|ys],after)
+    temporal_rewrite(x,slots,futures,before,y,left)
+    temporal_alternatives(xs,slots,futures,before,ys,right)
+    pl::append(left,right,both)
+    pl::sort(both,after)
+rel same_assignments(left,right)
+    pl::sort(left,names)
+    pl::sort(right,names)
+rel temporal_rewrite(node,slots,futures,before,result,after)
+    choose(temporal_boundary(node))
+        result=node
+        after=before
+    elseif(node=UnaryGoal('next',UnifyGoal(VarExpr(name,_),value,_),loc))
+        choose(name in before)
+            throw(CompileError('Multiple next assignments for '+name+' on one loop path',loc))
+        else
+            true
+        pl::get_assoc(name,slots,slot)
+        pl::get_assoc(name,futures,future)
+        temporal_rewrite(value,slots,futures,before,rhs,_)
+        result=AndGoal([UnifyGoal(StateExpr(VarExpr(slot,loc),loc),rhs,loc),UnifyGoal(VarExpr(future,loc),VarExpr(slot,loc),loc)])
+        after=[name|before]
+    elseif(node=NextExpr(VarExpr(name,_),loc))
+        choose(pl::get_assoc(name,futures,future))
+            result=VarExpr(future,loc)
+            after=before
+        else
+            throw(CompileError('next value requires a next assignment in this loop: '+name,loc))
+    elseif(node=StateExpr(_,loc))
+        throw(CompileError('Use init/next instead of ! in a temporal loop',loc))
+    elseif(node=ControlGoal(kind,condition,yes,no,loc))
+        temporal_rewrite(condition,slots,futures,before,test,testAssigned)
+        choose(same_assignments(testAssigned,before))
+            true
+        else
+            throw(CompileError('next assignments are not allowed in conditions',loc))
+        temporal_alternatives([yes,no],slots,futures,before,[a,b],after)
+        result=ControlGoal(kind,test,a,b,loc)
+    elseif(node=OrGoal(nodes))
+        temporal_alternatives(nodes,slots,futures,before,results,after)
+        result=OrGoal(results)
+    elseif(node=UnaryGoal(op,body,loc) and op in ['not','unsafeNot'])
+        temporal_rewrite(body,slots,futures,before,newBody,finish)
+        choose(same_assignments(finish,before))
+            result=UnaryGoal(op,newBody,loc)
+            after=before
+        else
+            throw(CompileError('next assignments cannot escape negation',loc))
+    elseif(pl::is_list(node))
+        temporal_sequence(node,slots,futures,before,result,after)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,name,args)
+        temporal_sequence(args,slots,futures,before,values,after)
+        pl::cc_term(name,values,result)
+    else
+        result=node
+        after=before
+
+rel rewrite(node,before,counter,result,after)
+    choose(node=VarExpr(name,loc))
+        current(name,before,loc,result)
+        after=before
+    elseif(node=UnaryGoal('init',UnifyGoal(VarExpr(name,_),value,_),loc))
+        rewrite(value,before,counter,rhs,middle)
+        fresh(counter,version)
+        pl::set_(middle,'$init_'+name,version,after)
+        result=UnifyGoal(VarExpr(version,loc),rhs,loc)
+    elseif(node=UnaryGoal(op,_,loc) and op in ['init','next'])
+        throw(CompileError('init requires a variable assignment; next is only valid inside a loop',loc))
+    elseif(node=NextExpr(_,loc))
+        throw(CompileError('next value is only valid in a loop body',loc))
+    elseif(node=UnifyGoal(StateExpr(FieldExpr(owner,key,loc),_),value,_))
+        rewrite(UnifyGoal(StateExpr(owner,loc),SetFieldExpr(FieldExpr(owner,key,loc),value,loc),loc),before,counter,result,after)
+    elseif(node=UnifyGoal(StateExpr(VarExpr(name,loc),_),value,_))
+        rewrite(value,before,counter,rhs,middle)
+        fresh(counter,version)
+        pl::set_(middle,name,version,after)
+        result=UnifyGoal(VarExpr(version,loc),rhs,loc)
+    elseif(node=StateExpr(_,loc))
+        throw(CompileError('! requires a state parameter, call argument or assignment',loc))
+    elseif(node=RelationDecl(kind,name,params,body,loc))
+        callable(params,body,before,counter,newParams,newBody)
+        result=RelationDecl(kind,name,newParams,newBody,loc)
+        after=before
+    elseif(node=ClosureExpr(name,params,body,loc))
+        callable(params,body,before,counter,newParams,newBody)
+        result=ClosureExpr(name,newParams,newBody,loc)
+        after=before
+    elseif(node=CallGoal(fn,args,loc) or node=CallExpr(fn,args,loc))
+        rewrite(fn,before,counter,newFn,middle)
+        arguments(args,middle,counter,newArgs,after)
+        choose(node=CallGoal(_,_,_))
+            result=CallGoal(newFn,newArgs,loc)
+        else
+            result=CallExpr(newFn,newArgs,loc)
+    elseif(node=AndGoal(nodes))
+        sequence(nodes,before,counter,results,after)
+        result=AndGoal(results)
+    elseif(node=OrGoal([left,right|tail]))
+        choose(tail=[])
+            other=right
+        else
+            other=OrGoal([right|tail])
+        branches(left,other,before,counter,a,b,after)
+        result=OrGoal([a,b])
+    elseif(node=ForGoal(initial,condition,advance,body,loc))
+        rewrite(AndGoal([initial,ControlGoal('while',condition,AndGoal([body,advance]),None,loc)]),before,counter,result,after)
+    elseif(node=ControlGoal('while',condition,body,None,loc))
+        loop('while',condition,body,before,counter,loc,result,after)
+    elseif(node=ControlGoal(kind,condition,yes,no,loc))
+        rewrite(condition,before,counter,test,testMap)
+        choose(testMap=before)
+            true
+        else
+            throw(CompileError('State updates in conditions are not supported',loc))
+        choose(no=None)
+            alternative=TrueGoal(loc)
+        else
+            alternative=no
+        branches(yes,alternative,before,counter,a,b,after)
+        result=ControlGoal(kind,test,a,b,loc)
+    elseif(node=ForInGoal(kind,key,value,collection,body,loc) and kind in ['for','for-in'])
+        foreach(key,value,collection,body,before,counter,loc,result,after)
+    elseif(node=ForInGoal(kind,key,value,collection,body,loc))
+        rewrite(collection,before,counter,items,middle)
+        rewrite(body,middle,counter,newBody,finish)
+        choose(finish=middle)
+            result=ForInGoal(kind,key,value,items,newBody,loc)
+            after=middle
+        else
+            throw(CompileError('Use a state-carrying loop instead of updating state in some',loc))
+    elseif(node=UnaryGoal(op,body,loc) and op in ['not','unsafeNot'])
+        rewrite(body,before,counter,newBody,finish)
+        choose(finish=before)
+            result=UnaryGoal(op,newBody,loc)
+            after=before
+        else
+            throw(CompileError('State updates cannot escape negation',loc))
+    elseif(pl::is_list(node))
+        sequence(node,before,counter,result,after)
+    elseif(pl::compound(node))
+        pl::cc_parts(node,name,args)
+        sequence(args,before,counter,values,after)
+        pl::cc_term(name,values,result)
+    else
+        result=node
+        after=before
+
+rel normalize(items,result)
+    pl::new(empty)
+    pl::cc_cell(0,counter)
+    expand_program(items,expanded)
+    declared_modes(expanded,empty,modes)
+    attach_modes(expanded,modes,annotated)
+    sequence(annotated,empty,counter,result,_)
+rel declared_modes([],modes,modes) true
+rel declared_modes([node|nodes],before,after)
+    choose(node=TypedDecl(['Relation'|words],name,None,_))
+        choose(pl::get_assoc(name,before,old))
+            entries=[words|old]
+        else
+            entries=[words]
+        pl::set_(before,name,entries,middle)
+    else
+        middle=before
+    declared_modes(nodes,middle,after)
+rel mode_parameters([],[],loc,[]) true
+rel mode_parameters([word|words],[p|ps],loc,[TypedParam(types,name,loc)|params])
+    choose(p=TypedParam(old,name,_))
+        pl::subtract(old,['In','Out','InOut'],existing)
+    elseif(p=VarExpr(name,_))
+        existing=[]
+    else
+        throw(CompileError('Standalone signatures require named parameters',loc))
+    choose(word in ['In','Out','InOut'])
+        types=[word|existing]
+    else
+        types=[word]
+    mode_parameters(words,ps,loc,params)
+rel mode_contracts([],params,loc,[]) true
+rel mode_contracts([words|rest],params,loc,[contract|contracts])
+    choose(#words=#params)
+        mode_parameters(words,params,loc,contract)
+    else
+        throw(CompileError('Wrong arity in standalone Relation signature',loc))
+    mode_contracts(rest,params,loc,contracts)
+rel attach_modes([],modes,[]) true
+rel attach_modes([node|nodes],modes,[result|rest])
+    choose(node=RelationDecl(annotation,name,params,body,loc) and pl::get_assoc(name,modes,words))
+        mode_contracts(words,params,loc,contracts)
+        choose(pl::is_assoc(annotation))
+            base=annotation
+        else
+            base={category=annotation,determinism='nondet'}
+        pl::set_(base,'contracts',contracts,annotated)
+        result=RelationDecl(annotated,name,params,body,loc)
+    else
+        result=node
+    attach_modes(nodes,modes,rest)
+export({normalize=normalize})
