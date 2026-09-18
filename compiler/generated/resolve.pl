@@ -22,8 +22,9 @@
 'resolve::$impl_category'(A,B):-is_assoc(A)->cosmos_get(A,"category",C),B=C;B=A.
 'resolve::$impl_merge_signatures'([],[]):-true.
 'resolve::$impl_merge_signatures'([A|B],C):-'resolve::merge_signatures'(B,D),'resolve::merge_signature'(A,D,C).
-'resolve::$impl_analyze'(A,B):-'resolve::partition'(A,C,D,E,F),'resolve::scope_variables'(D,G),append(E,F,H),subtract(G,H,I),'resolve::signatures'(C,I,J),'resolve::merge_signatures'(J,K),'resolve::capture_fixpoint'(K,L),append(["Cons","T","Tuple","Pair","Some","None"],F,M),new(N),set_(N,"relations",C,O),set_(O,"top",D,P),set_(P,"globals",I,Q),set_(Q,"signatures",L,R),set_(R,"functors",M,S),B=S.
-resolve(A):-new(B),set_(B,"variables",clos(upvals([]),'resolve::$value_variables'),C),set_(C,"scopeVariables",clos(upvals([]),'resolve::$value_scope_variables'),D),set_(D,"captures",clos(upvals([]),'resolve::$value_inherited'),E),set_(E,"analyze",clos(upvals([]),'resolve::$value_analyze'),A).
+'resolve::$impl_analyze'(A,B):-'resolve::partition'(A,C,D,E,F),'resolve::scope_variables'(D,G),append(E,F,H),subtract(G,H,I),'resolve::signatures'(C,I,J),'resolve::merge_signatures'(J,K),'resolve::capture_fixpoint'(K,L),'resolve::builtin_functors'(M),append(M,F,N),new(O),set_(O,"relations",C,P),set_(P,"top",D,Q),set_(Q,"globals",I,R),set_(R,"signatures",L,S),set_(S,"functors",N,T),B=T.
+'resolve::$impl_builtin_functors'(["Cons","T","Tuple","Pair","Some","None"]):-true.
+resolve(A):-new(B),set_(B,"variables",clos(upvals([]),'resolve::$value_variables'),C),set_(C,"scopeVariables",clos(upvals([]),'resolve::$value_scope_variables'),D),set_(D,"captures",clos(upvals([]),'resolve::$value_inherited'),E),set_(E,"analyze",clos(upvals([]),'resolve::$value_analyze'),F),set_(F,"builtin_functors",clos(upvals([]),'resolve::$value_builtin_functors'),A).
 'resolve::type_references'(A,B):-'resolve::$impl_type_references'(A,B).
 'resolve::$value_type_references'(A,B,upvals([])):-'resolve::type_references'(A,B).
 'resolve::variables'(A,B):-'resolve::$impl_variables'(A,B).
@@ -56,3 +57,5 @@ resolve(A):-new(B),set_(B,"variables",clos(upvals([]),'resolve::$value_variables
 'resolve::$value_merge_signatures'(A,B,upvals([])):-'resolve::merge_signatures'(A,B).
 'resolve::analyze'(A,B):-'resolve::$impl_analyze'(A,B).
 'resolve::$value_analyze'(A,B,upvals([])):-'resolve::analyze'(A,B).
+'resolve::builtin_functors'(A):-'resolve::$impl_builtin_functors'(A).
+'resolve::$value_builtin_functors'(A,upvals([])):-'resolve::builtin_functors'(A).
