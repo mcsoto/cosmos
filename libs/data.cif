@@ -1,0 +1,1 @@
+t("module","data",<,t("fields",t,-,t("exports",t,-,t,t),t("format",1.0,-,t,t)),t("schemas",t("t",t("kind","constructor",-,t("fields",[],-,t,t),t("location",fc_Loc(6.0,1.0),-,t,t)),-,t,t),-,t,t)).

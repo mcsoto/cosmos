@@ -1,0 +1,141 @@
+require('mutable', mutable)
+
+rel insertListener(listener, listeners, result)
+	if(listeners=[])
+		result=[listener]
+	else
+		listeners=[head|tail]
+		if(listener.priority>head.priority)
+			result=[listener|listeners]
+		else
+			result=[head|rest]
+			insertListener(listener, tail, rest)
+
+rel removeListener(id, listeners, result)
+	if(listeners=[])
+		result=[]
+	else
+		listeners=[head|tail]
+		if(head.id=id)
+			result=tail
+		else
+			result=[head|rest]
+			removeListener(id, tail, rest)
+
+rel clearEvent(event, listeners, result, removed)
+	if(listeners=[])
+		result=[]
+		removed=0
+	else
+		listeners=[head|tail]
+		if(head.event=event)
+			mutable.set(head.active, 'value', 0)
+			clearEvent(event, tail, result, tailRemoved)
+			removed=tailRemoved+1
+		else
+			result=[head|rest]
+			clearEvent(event, tail, rest, removed)
+
+rel deactivateAll(listeners, removed)
+	if(listeners=[])
+		removed=0
+	else
+		listeners=[head|tail]
+		mutable.get(head.active, 'value', status)
+		deactivateAll(tail, tailRemoved)
+		if(status=1)
+			mutable.set(head.active, 'value', 0)
+			removed=tailRemoved+1
+		else
+			removed=tailRemoved
+
+rel countEvent(event, listeners, count)
+	if(listeners=[])
+		count=0
+	else
+		listeners=[head|tail]
+		countEvent(event, tail, tailCount)
+		mutable.get(head.active, 'value', status)
+		if(head.event=event and status=1)
+			count=tailCount+1
+		else
+			count=tailCount
+
+rel dispatch(state, listeners, event, payload, count)
+	if(listeners=[])
+		count=0
+	else
+		listeners=[listener|tail]
+		mutable.get(listener.active, 'value', status)
+		if(listener.event=event and status=1)
+			if(listener.once=1)
+				mutable.set(listener.active, 'value', 0)
+				mutable.get(state, 'listeners', current)
+				removeListener(listener.id, current, updated)
+				mutable.set(state, 'listeners', updated)
+			listener.callback(payload)
+			dispatch(state, tail, event, payload, tailCount)
+			count=tailCount+1
+		else
+			dispatch(state, tail, event, payload, count)
+
+rel subscribe(state, event, callback, priority, once, subscription)
+	mutable.get(state, 'nextId', id)
+	mutable.set(state, 'nextId', id+1)
+	active=mutable.new()
+	mutable.set(active, 'value', 1)
+	subscription={id=id,event=event,callback=callback,priority=priority,once=once,active=active}
+	mutable.get(state, 'listeners', listeners)
+	insertListener(subscription, listeners, updated)
+	mutable.set(state, 'listeners', updated)
+
+rel createEmitter(emitter)
+	state=mutable.new()
+	mutable.set(state, 'listeners', [])
+	mutable.set(state, 'nextId', 1)
+
+	emitter={
+		rel on(event, callback, subscription)
+			subscribe(state, event, callback, 0, 0, subscription)
+
+		rel onPriority(event, callback, priority, subscription)
+			subscribe(state, event, callback, priority, 0, subscription)
+
+		rel once(event, callback, subscription)
+			subscribe(state, event, callback, 0, 1, subscription)
+
+		rel oncePriority(event, callback, priority, subscription)
+			subscribe(state, event, callback, priority, 1, subscription)
+
+		rel off(subscription, removed)
+			mutable.get(subscription.active, 'value', status)
+			if(status=1)
+				mutable.set(subscription.active, 'value', 0)
+				mutable.get(state, 'listeners', listeners)
+				removeListener(subscription.id, listeners, updated)
+				mutable.set(state, 'listeners', updated)
+				removed=1
+			else
+				removed=0
+
+		rel emit(event, payload, count)
+			mutable.get(state, 'listeners', snapshot)
+			dispatch(state, snapshot, event, payload, count)
+
+		rel clear(event, removed)
+			mutable.get(state, 'listeners', listeners)
+			clearEvent(event, listeners, updated, removed)
+			mutable.set(state, 'listeners', updated)
+
+		rel clearAll(removed)
+			mutable.get(state, 'listeners', listeners)
+			deactivateAll(listeners, removed)
+			mutable.set(state, 'listeners', [])
+
+		rel listenerCount(event, count)
+			mutable.get(state, 'listeners', listeners)
+			countEvent(event, listeners, count)
+	}
+
+events={'new'=createEmitter}
+export(events)

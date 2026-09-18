@@ -1,0 +1,21 @@
+// Process and host-environment operations.  Keep these separate from logic:
+// programs that only use pure logical relations should not import OS effects.
+
+t={
+	rel halt()
+		c::halt()
+
+	rel exit()
+		c::halt()
+
+	rel exec(String command)
+		c::shell(command)
+
+	rel load(String file)
+		pl::ensure_loaded(file)
+
+	rel searchPath(path)
+		pl::atom_string(name,'cosmos')
+		c::file_search_path(name,path)
+}
+export(t)

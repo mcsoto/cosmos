@@ -4,7 +4,7 @@
 :- initialization(main, main).
 
 version :- 
-	writeln("0.842").
+	writeln("0.845").
 
 main :-
     current_prolog_flag(argv, Arguments),

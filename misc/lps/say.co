@@ -1,0 +1,56 @@
+functor(say)
+functor(said)
+//functor(saying)
+rel saying(T=saying(Agent, sentence, T1, T3)) //event?
+	//...
+--[[
+saying(Agent, sentence, T1, T3) <-
+  saying(Agent, nounphrase, T1, T2),
+  saying(Agent, verbphrase, T2, T3).
+
+saying(Agent, nounphrase, T1, T3) <-
+  saying(Agent, adjective, T1, T2),
+  saying(Agent, noun, T2, T3).
+
+saying(Agent, nounphrase, T1, T3) <-
+  saying(Agent, noun, T1, T3).
+
+saying(Agent, verbphrase, T1, T3) <-
+  saying(Agent, verb, T1, T2),
+  saying(Agent, nounphrase, T2, T3).
+
+saying(Agent, verbphrase, T1, T3) <-
+  saying(Agent, verb, T1, T3).
+
+saying(Agent, adjective, T1, T2) <-
+  say(Agent, my, T1, T2).
+saying(Agent, adjective, T1, T2) <-
+  say(Agent, your, T1, T2).
+
+saying(Agent, noun, T1, T2) <-
+  say(Agent, name, T1, T2).
+saying(Agent, noun, T1, T2) <-
+  say(Agent, what, T1, T2).
+saying(Agent, noun, T1, T2) <-
+  say(Agent, bob, T1, T2).
+
+saying(Agent, verb, T1, T2) <-
+  say(Agent, is, T1, T2).
+]]
+
+fun main()
+	init time=1
+	init turing=[]
+	init robot=[]
+	init facts=[said(turing, []), said(robot, [])]
+	while(time<10)
+		 
+		true
+		if(saying(Agent, nounphrase) and saying(Agent, verbphrase))
+			next saying(Agent, sentence)
+		
+  saying(Agent, verbphrase, T2, T3).
+
+		 
+		true
+		next time=time+1

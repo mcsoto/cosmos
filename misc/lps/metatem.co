@@ -1,0 +1,7 @@
+--[[
+	last r1 then sometime a1
+	last r2 then sometime a2
+	not r1 zince (a1 and not r1) not a1
+	
+	true not a1 and not a2
+--]]

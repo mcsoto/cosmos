@@ -1,0 +1,48 @@
+// Pure logical helpers and term inspection.  Process operations live in os.
+
+require('math', math)
+
+t={
+	rel type(x,y)
+		pl::cosmos_type(x,y)
+
+	rel instantiated(Any x)
+		c::def(x)
+
+	rel size(f,n)
+		c::fcsize(f,n)
+
+	rel get(f,i,value)
+		c::fcget(f,i,value)
+
+	rel apply(Relation predicate, Functor arguments)
+		pl::apply2(predicate,arguments)
+
+	rel applyOnce(Relation predicate, Functor arguments, Relation fallback)
+		pl::apply_catch(predicate,arguments,fallback)
+
+	rel applyCatch(Relation predicate, Functor arguments, Relation fallback)
+		pl::apply_catch(predicate,arguments,fallback)
+
+	rel listOf(x, Relation predicate, args, Functor result)
+		pl::list_of(x,predicate,args,result)
+
+	rel forall(predicate,arguments,thenPredicate,thenArguments)
+		pl::forall_cl(predicate,arguments,thenPredicate,thenArguments)
+
+	rel range(first,last,value)
+		math.range(first,last,value)
+
+	rel toString(x,text)
+		pl::str(x,text)
+
+	rel throw(value)
+		c::throw(value)
+
+	rel functor(x,name,n)
+		pl::functor(x,hostName,hostN)
+		pl::atom_string(hostName,name)
+		pl::cosmos_float(hostN,n)
+
+}
+export(t)

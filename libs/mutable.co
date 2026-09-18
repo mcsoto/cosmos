@@ -1,0 +1,18 @@
+
+rel createCell(t)
+	c::table_new(t)
+
+rel readCell(t,key,value)
+	c::table_get(t,key,value)
+	
+rel writeCell(t,o,o2)
+	c::table_set(t,o,o2,_)
+
+t={
+	'new'=createCell
+	'get'=readCell
+	'set'=writeCell
+}
+//export(t1)
+//exports=t3
+export(t)

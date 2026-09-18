@@ -1,0 +1,21 @@
+
+functor(Info, Functor)
+
+/* misc */
+
+require('string', string)
+
+require('io', io)
+
+rel custom_throw(String msg, Functor info)
+	//info=Info(line, col)
+	//logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+	print(info)
+	c::throw(msg)
+	//c::throw('(line '+line+', col '+col+') '+msg)
+
+t={
+	'custom_throw'=custom_throw
+}
+export(t)
+//print(t)

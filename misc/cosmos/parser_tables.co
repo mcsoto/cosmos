@@ -1,0 +1,186 @@
+// Table-backed AST view of the bootstrapped Cosmos parser.
+//
+// This module intentionally shares parser.co's grammar engine.  It isolates
+// the representation choice: parser.co returns functors, while this module
+// recursively projects the same syntax tree into immutable Cosmos tables.
+
+rel field_names(kind, names)
+    case
+        kind = 'Token'
+        names = ['type','value','line','column']
+    case
+        kind = 'Loc'
+        names = ['line','column']
+    case
+        kind = 'Program'
+        names = ['items']
+    case
+        kind = 'RelationDecl'
+        names = ['declarationKind','name','params','body','loc']
+    case
+        kind = 'FunctorDecl'
+        names = ['name','types','loc']
+    case
+        kind = 'ExportDecl'
+        names = ['value','loc']
+    case
+        kind = 'TypedDecl'
+        names = ['types','name','value','loc']
+    case
+        kind = 'TypedParam'
+        names = ['types','name','loc']
+    case
+        kind = 'AndGoal'
+        names = ['goals']
+    case
+        kind = 'OrGoal'
+        names = ['goals']
+    case
+        kind = 'UnaryGoal'
+        names = ['operator','goal','loc']
+    case
+        kind = 'TrueGoal'
+        names = ['loc']
+    case
+        kind = 'FalseGoal'
+        names = ['loc']
+    case
+        kind = 'CutGoal'
+        names = ['loc']
+    case
+        kind = 'UnifyGoal'
+        names = ['left','right','loc']
+    case
+        kind = 'HasGoal'
+        names = ['item','collection','loc']
+    case
+        kind = 'CompareGoal'
+        names = ['operator','left','right','loc']
+    case
+        kind = 'CallGoal'
+        names = ['callable','args','loc']
+    case
+        kind = 'ControlGoal'
+        names = ['control','condition','then','else','loc']
+    case
+        kind = 'ForGoal'
+        names = ['initial','condition','advance','body','loc']
+    case
+        kind = 'ForInGoal'
+        names = ['control','key','value','collection','body','loc']
+    case
+        kind = 'CaseGoal'
+        names = ['branches','loc']
+    case
+        kind = 'VarExpr'
+        names = ['name','loc']
+    case
+        kind = 'LiteralExpr'
+        names = ['value','loc']
+    case
+        kind = 'CallExpr'
+        names = ['callable','args','loc']
+    case
+        kind = 'BinaryExpr'
+        names = ['operator','left','right','loc']
+    case
+        kind = 'UnaryExpr'
+        names = ['operator','operand','loc']
+    case
+        kind = 'SizeExpr'
+        names = ['operand','loc']
+    case
+        kind = 'NextExpr'
+        names = ['operand','loc']
+    case
+        kind = 'FieldExpr'
+        names = ['object','name','loc']
+    case
+        kind = 'IndexExpr'
+        names = ['object','index','loc']
+    case
+        kind = 'SetFieldExpr'
+        names = ['object','value','loc']
+    case
+        kind = 'ListExpr'
+        names = ['items','tail','loc']
+    case
+        kind = 'DictExpr'
+        names = ['entries','loc']
+    case
+        kind = 'Entry'
+        names = ['key','value']
+    case
+        kind = 'ClosureExpr'
+        names = ['name','params','body','loc']
+    case
+        kind = 'None'
+        names = []
+    case
+        kind = 'ParseError'
+        names = ['message','detail','tokens']
+
+rel functor_kind(value, kind, args)
+    pl::compound_name_arguments(value, atom, args)
+    pl::atom_codes(atom, codes)
+    pl::string_codes(raw, codes)
+    choose(string.slice(raw, 0, 3, 'fc_'))
+        string.slice(raw, 3, #raw, kind)
+    else
+        kind = raw
+
+rel project_list(values, projected)
+    choose(values = [])
+        projected = []
+    else
+        values = [value|tail]
+        projected = [value2|tail2]
+        project(value, value2)
+        project_list(tail, tail2)
+
+rel put_fields(names, args, table0, table)
+    case
+        names = []
+        args = []
+        table = table0
+    case
+        names = [name|name_tail]
+        args = [arg|arg_tail]
+        project(arg, value)
+        pl::set_(table0, name, value, table1)
+        put_fields(name_tail, arg_tail, table1, table)
+    case
+        project_list(args, values)
+        pl::set_(table0, 'args', values, table)
+
+rel project(value, projected)
+    choose(pl::is_list(value))
+        project_list(value, projected)
+    elseif(pl::compound(value))
+        functor_kind(value, kind, args)
+        base = {kind = kind}
+        choose(field_names(kind, names))
+            put_fields(names, args, base, projected)
+        else
+            project_list(args, values)
+            projected = {kind = kind, args = values}
+    else
+        projected = value
+
+rel lex(source, tokens)
+    require('parser', parser)
+    parser.lex(source, functor_tokens)
+    project_list(functor_tokens, tokens)
+
+rel parse(source, ast)
+    require('parser', parser)
+    parser.parse(source, functor_ast)
+    project(functor_ast, ast)
+
+api = {
+    lex = lex,
+    parse = parse,
+    project = project
+}
+
+export(api)

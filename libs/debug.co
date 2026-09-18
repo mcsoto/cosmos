@@ -1,0 +1,184 @@
+
+require('mutable',mutable)
+
+require('io',io)
+
+require('logic',logic)
+
+require('string', string)
+
+functor(F, Functor)
+
+functor(Cons, Functor)
+
+print2=print
+/*
+rel write(s)
+	if(type(s,'string'))
+	else
+	
+rel write(s)
+	if(s!='get')
+		io.write(s)
+	else
+		true
+	*/
+rel write(s)
+	logic.type(s,x)
+	//print('type;'+x)
+	if(x='String')
+		//x='String'
+		string.size(s,n)
+		choose(n>10)
+			io.write('#str')
+		else
+			io.writeFormat(s)
+	else
+		io.write(s)
+		cut
+		
+//write every argument
+//l is a fixed array
+rel str(l,i,n)
+	choose(i=n)
+		io.write('')
+	elseif(i=n-1)
+		pl::int(i,hostI)
+		pl::nth0(hostI,l,e)
+		write(e)
+	else
+		pl::int(i,hostI)
+		pl::nth0(hostI,l,e)
+		write(e)
+		io.write(', ')
+		str(l,i+1,n)
+	
+mutable.new(t)
+set=mutable.set
+get=mutable.get
+
+mutable.set(t,'stack',0)
+
+rel ftrace(l)
+	c::closure(e,name,n,i)
+	//print(['-',l,name,n,i])
+	//print(name)
+	choose(name='get' or name='set')
+		true
+	else
+		io.write('| ')
+		io.write(name)
+		io.write('(')
+		str(l,0,n)
+		io.write(')\n')
+		
+rel onhalt(l)
+	c::closure(e,name,n,i)
+	choose(name='get' or name='set')
+		true
+	else
+		//c::print(['ret',name,mutable.get(t,'stack')])
+		//print(['--',l,name,n,i])
+		mutable.get(t,'stack',i)
+		c::print(['ret',name,l,i])
+		print(t)
+		mutable.set(t,'stack',i-1)
+		
+rel onhalt2(l)
+	c::closure(e,name,n,i)
+	print(['-',l,name,n,i])
+	//c::print(2)//true
+		
+rel sethooks(s,s1,s2)
+	//f=F(s,s1,s2)
+	c::sethook(s1,'r')
+	c::sethook(s,'c')
+
+rel rep(i,stack)
+	choose(i=stack)
+		true
+	else
+		io.write('|')
+		rep(i+1,stack)
+	
+rel trace(l)
+	c::closure(e,name,n,i)
+	//c::sethook(onhalt,'r')
+	//print(['-',l,name,n,i])
+	//print(name)
+	choose(name='get' or name='set')
+		true
+	else
+		c::getstack(stack)
+		rep(0,stack)
+		//io.write(stack)
+		//io.write('| ')
+		io.write(name)
+		io.write('(')
+		str(l,0,n)
+		io.write(')\n')
+
+debug={
+	rel sethook(p,s)
+		c::sethook(p,s)
+		
+	rel trace(l)
+		//sethooks(trace,onhalt,_)
+		c::sethook(trace)
+		
+	sethooks=sethooks
+	
+	rel getlocal(i,x)
+		c::getlocal(i,x)
+		/*todo Cannot derive a negation for this if condition
+	rel print(o)
+		if(mutable.get(t,'on',1))
+			print2(o)
+		else
+			true
+		*/
+	rel switch(i)
+		mutable.set(t,'on',i)
+	rel p(i)
+		true
+}
+
+rel p(x)
+	true
+	
+/*
+rel q(x,y,z)
+	true
+	
+rel callbacks()
+	i=2
+	c::getfname(name)
+	debug.getlocal(2,y)
+	//debug.p()
+	//o=debug.p
+	c::getnargs(c)
+	c::getnlocs(n)
+	print([c,n,x,x1])
+	debug.sethook(p)
+debug.sethook(onhalt,'r')
+debug.sethook(debug.trace)*/
+//print(debug)
+//print(_table)
+//callbacks()
+//debug.sethooks(debug._trace,onhalt,_)
+// Loading the library must not enable tracing or execute demonstration code.
+// Applications opt in by calling debug.trace or another hook explicitly.
+/*
+debug.p(1)
+q(1,x,3)
+
+rel p(x)
+	x=1//+2
+	
+rel callbacks()
+	debug.sethook(1)
+	
+//p(3)
+p(x)
+*/
+export(debug)

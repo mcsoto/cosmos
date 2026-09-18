@@ -1,0 +1,29 @@
+//require('space',sp)
+require('object', Object)
+update=Object.update
+
+base={
+	'x'=10
+}
+Player={
+	//'x'=10
+	rel move(o,x,y,o2)
+		print(x)
+		update(o,{'x'=x},o2)
+}
+
+//world={'entities'=[makeball(0,0)] and 'player'=player and 'dir'='right'}
+//world={'player'=p1}
+x='asd'
+//c::makeobj(Player,player)
+player=Object.create(Player)
+//player=Object.createFrom(Player,base)
+//player=Object.set(player1,'_prototype',base)
+print(player)
+print(player.x)
+player.move(x,y,player2)
+print(player2)
+//print(create(Entity,{x=10 and y=0}))
+print(player2.x)
+//print({}+{'x'=x})
+export(world)

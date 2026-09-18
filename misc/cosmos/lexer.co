@@ -1,0 +1,46 @@
+// Cosmos lexer facade and whitespace/layout remover.
+//
+// parser.co owns the lexical rules used by the bootstrap parser.  This module
+// gives consumers a small lexer-only API without duplicating those rules.
+// `lex/2` preserves NEWLINE, INDENT, and DEDENT because indentation is part of
+// Cosmos syntax.  `remove_whitespace/2` removes those layout tokens when a
+// consumer needs a flat token stream (for example, for inspection or tooling).
+
+functor(Token, Functor)
+
+rel load_parser(parser)
+    require('parser', parser)
+
+rel lex(source, tokens)
+    load_parser(parser)
+    parser.lex(source, tokens)
+
+rel whitespace_token(Token(type,_,_,_))
+    type = 'NEWLINE' or type = 'INDENT' or type = 'DEDENT'
+
+rel remove_whitespace([], result)
+    result = []
+rel remove_whitespace([head|tail], result)
+    choose(whitespace_token(head))
+        remove_whitespace(tail, result)
+    else
+        remove_whitespace(tail, rest)
+        result = [head|rest]
+
+rel remove_layout(tokens, result)
+    remove_whitespace(tokens, result)
+
+rel tokenize(source, tokens)
+    lex(source, tokens)
+
+rel tokenize_without_whitespace(source, tokens)
+    lex(source, all_tokens)
+    remove_whitespace(all_tokens, tokens)
+
+export({
+    lex = lex,
+    tokenize = tokenize,
+    remove_whitespace = remove_whitespace,
+    remove_layout = remove_layout,
+    tokenize_without_whitespace = tokenize_without_whitespace
+})

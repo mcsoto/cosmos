@@ -1,0 +1,22 @@
+
+functor(transfer)
+fun main()
+	init balance={bob=0 and alice=10}
+	init T=transfer(_, _,  _)
+	init time=1
+	//while(true)
+	while(time<10)
+		print(time)
+		 
+		//if alice transfers to bob, bob will transfer to alice
+		if(T=transfer(alice, bob,  X) and balance.bob=A and A>=10)
+			next T=transfer(bob, alice, 10)
+		 
+		//if transfer, next ...
+		if(T=transfer(X,Y,Z) and balance.bob=X1) //rule;trigger on true;event
+			//next balance.bob = X1+1
+			next balance={bob = X1+1 and alice=Y}
+		print(balance)
+		next time=time+1
+	true 
+main()

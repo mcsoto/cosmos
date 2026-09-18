@@ -1,0 +1,78 @@
+
+t={
+	rel sqrt(Real x, Real y)
+		c::sqrt(x, y)
+
+	rel random(i,j,Real x)
+		c::int(i,hostI)
+		c::int(j,hostJ)
+		c::random_between(hostI,hostJ,hostX)
+		c::cosmos_float(hostX,x)
+
+	rel rand(Real x)
+		c::random(x)
+
+	rel abs(Integer x, Integer y)
+		c::abs(x, y)
+		
+	rel floor(Real x, Real y)
+		c::cfloor(x, y)
+		
+	rel ceil(Real x, Real y)
+		c::ceiling(x, hostY)
+		c::cosmos_float(hostY,y)
+		
+	rel min(Real x, Integer y)
+		c::inf(x, y)
+	rel max(Real x, Integer y)
+		c::sup(x, y)
+
+	rel range(x,y,z)
+		z=Pair(T(x,y),it)
+		it={
+		rel next(l,l2,k,v,i)
+			l=T(v,b,k)
+			if(v>b)
+				i=0
+			else
+				l2=T(v+1,b,k+1)
+				i=1
+		rel iter(pair,l)
+			pair=Pair(T(a,b),_)
+			l=T(a,b,0)
+		}
+
+	/* ... */
+		
+	rel add(x,y,z)
+		z=x+y
+	rel sub(x,y,z)
+		z=x-y
+	rel mul(x,y,z)
+		z=x*y
+	rel div(x,y,z)
+		z=x/y
+		
+	rel inc(x,y)
+		y=x+1//c::inc(x,y)
+	rel dec(x,y)
+		y=x-1//c::dec(x,y)
+
+	/* ... */
+
+	rel stringToNumber(s,n)
+		c::number_string(n,s)
+		
+	rel integerToString(Integer n, String s)
+		c::number_string(n,s)
+
+	rel realToString(Real n, String s)
+		c::number_string(n,s)
+/* missing
+	rel integerToReal(Integer n, Real x)
+		c::integer_float(n,x)
+		
+	rel realToInteger(Real n, Real x)
+		c::integer_float(n,x)*/
+}
+export(t)

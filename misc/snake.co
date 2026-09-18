@@ -1,0 +1,86 @@
+require('math', math)
+functor(True, Functor)
+functor(False, Functor)
+
+grid=20
+cell=24
+board=480
+step_ms=140
+
+initial={
+    head_x=10 and head_y=10
+    body1_x=9 and body1_y=10
+    body2_x=8 and body2_y=10
+    food_x=14 and food_y=10
+    dir_x=1 and dir_y=0
+    next_x=1 and next_y=0
+    score=0 and game_over=False and win=False
+}
+
+rel reset(s)
+    s=initial
+
+rel same(x1,y1,x2,y2)
+    x1=x2 and y1=y2
+
+rel occupied(s,x,y)
+    same(x,s.head_x,y,s.head_y) or
+    same(x,s.body1_x,y,s.body1_y) or
+    same(x,s.body2_x,y,s.body2_y)
+
+rel place_food(s,x,y)
+    math.random(1,18,x)
+    math.random(1,18,y)
+    when(occupied(s,x,y))
+        place_food(s,x,y)
+
+rel apply_key(key,s,s2)
+    if(key='up' and s.dir_y!=1)//(key!=up or s.dir_y=1)
+        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=0 and dir_y=-1 and next_x=0 and next_y=-1 and score=s.score and game_over=s.game_over and win=s.win}
+    elseif(key='down' and s.dir_y!=-1)
+        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=0 and dir_y=1 and next_x=0 and next_y=1 and score=s.score and game_over=s.game_over and win=s.win}
+    elseif(key='left' and s.dir_x!=1)
+        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=-1 and dir_y=0 and next_x=-1 and next_y=0 and score=s.score and game_over=s.game_over and win=s.win}
+    elseif(key='right' and s.dir_x!=-1)
+        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=1 and dir_y=0 and next_x=1 and next_y=0 and score=s.score and game_over=s.game_over and win=s.win}
+    elseif(key='r' and s.game_over=True)
+        s2=initial
+    else
+        s2=s
+
+rel tick(s,s2)
+    if(s.game_over=True)
+        s2=s
+    else
+        nx=s.head_x+s.next_x
+        ny=s.head_y+s.next_y
+        if(nx<0 or nx>=grid or ny<0 or ny>=grid)
+            s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score and game_over=True and win=False}
+        elseif(same(nx,ny,s.body1_x,s.body1_y) or same(nx,ny,s.body2_x,s.body2_y))
+            s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score and game_over=True and win=False}
+        elseif(same(nx,ny,s.food_x,s.food_y))
+            place_food(s,food_x,food_y)
+            s2={head_x=nx and head_y=ny and body1_x=s.head_x and body1_y=s.head_y and body2_x=s.body1_x and body2_y=s.body1_y and food_x=food_x and food_y=food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score+1 and game_over=False and win=False}
+        else
+            s2={head_x=nx and head_y=ny and body1_x=s.head_x and body1_y=s.head_y and body2_x=s.body1_x and body2_y=s.body1_y and food_x=s.food_x and food_y=s.food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score and game_over=False and win=False}
+
+rel draw_cell(x,y,color)
+    canvas.rect(x*cell+1,y*cell+1,cell-2,cell-2,color)
+
+rel render(s)
+    canvas.rect(0,0,board,board,'#0b1220')
+    draw_cell(s.food_x,s.food_y,'#ff6b6b')
+    draw_cell(s.body2_x,s.body2_y,'#2fbf87')
+    draw_cell(s.body1_x,s.body1_y,'#42d99a')
+    draw_cell(s.head_x,s.head_y,'#b4ffe2')
+    if(s.game_over=True)
+        canvas.rect(120,216,240,48,'#182235')
+
+sp.start(step_ms,{
+    rel keypressed(key,s,s2)
+        apply_key(key,s,s2)
+    rel update(s,s2)
+        tick(s,s2)
+    rel draw(s)
+        render(s)
+},initial)

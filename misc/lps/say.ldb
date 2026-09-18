@@ -1,0 +1,32 @@
+saying(Agent, sentence, T1, T3) <-
+  saying(Agent, nounphrase, T1, T2)
+  saying(Agent, verbphrase, T2, T3)
+
+saying(Agent, nounphrase, T1, T3) <-
+  saying(Agent, adjective, T1, T2)
+  saying(Agent, noun, T2, T3)
+
+saying(Agent, nounphrase, T1, T3) <-
+  saying(Agent, noun, T1, T3)
+
+saying(Agent, verbphrase, T1, T3) <-
+  saying(Agent, verb, T1, T2)
+  saying(Agent, nounphrase, T2, T3)
+
+saying(Agent, verbphrase, T1, T3) <-
+  saying(Agent, verb, T1, T3)
+
+saying(Agent, adjective, T1, T2) <-
+  say(Agent, my, T1, T2)
+saying(Agent, adjective, T1, T2) <-
+  say(Agent, your, T1, T2)
+
+saying(Agent, noun, T1, T2) <-
+  say(Agent, name, T1, T2)
+saying(Agent, noun, T1, T2) <-
+  say(Agent, what, T1, T2)
+saying(Agent, noun, T1, T2) <-
+  say(Agent, bob, T1, T2)
+
+saying(Agent, verb, T1, T2) <-
+  say(Agent, is, T1, T2)

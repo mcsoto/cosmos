@@ -1,0 +1,248 @@
+
+rel debug(x) true;
+//rel debug(x) print(x);
+
+functor(Cons, Functor)
+
+require('io',io)
+require('string', string)
+require('list', list)
+
+//lib
+functor(Token, Functor)
+functor(Info, Functor) //Info(line,column)
+functor(Cons, Functor)
+
+rel iterate(p, n, x, y)
+	//print(['it',p, n, x, y])
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+		
+//list lib
+
+rel rest(Functor l, Any b)
+	l=Cons(_,b)
+
+//ws
+
+rel find_last_char2(s,c,i,pos)
+	i!=-1
+	when(string.at(s, i, c))
+		pos=i
+	else
+		find_last_char2(s,c,i-1,pos)
+
+rel find_last_char(s,c,pos)
+	s!=''
+	string.size(s,n)
+	find_last_char2(s, c, n-1, pos)
+
+rel remove_from_start(s1,s2,s3)
+	//remove s2 from s1, e.g. remove_from_start('zxc',z') = 'xc'
+	string.find(s1,s2,pos) //might fail if s2 is not found
+	c::cut()
+	string.size(s2,n)
+	string.size(s1,n2)
+	k=n+pos
+	string.slice(s1, k, n2, s3) //s3 = s2[#s2+s.find(s2) : #s] //
+	
+rel remove_prev_inds(s1,ind,s2)
+	list.fold(ind, remove_from_start, s1, s2)
+
+rel remove_cur_inds(ind, sgoal, n)
+	case
+		list.fold(ind, string.concat, '', s)
+		c::str(s,s1)//todo
+		s1=sgoal
+		n=0
+	case
+		ind=Cons(h,tail)
+		remove_cur_inds(tail, sgoal, i)
+		n=i+1
+
+rel after_nl(a, a2)
+	string.size(a, i)
+	find_last_char(a,'\n',i2)
+	string.slice(a, i2+1, i, a2)
+
+rel push_semicolon(l,l2)
+	l2=Cons(Token(';', ';',_), l)
+
+rel pr(l)
+	case
+		l=[Token(a,_,_)|l2]
+		io.write(a)
+		io.write(' ')
+		pr(l2)
+	case
+		l=[]
+	
+	 
+
+
+
+
+
+
+
+
+
+Relation ws
+
+rel ws2(l, ind, tk_prev, l2)
+	//one whitespace
+	//check if a token needs to be added
+	//update indent
+	l=[h1|t1]
+	h1=Token(a, tk_type,_)
+	after_nl(a, a2)
+	//l=Cons(_, Cons(Token(_, type_next,_), _)) //l1 <- token(y2), l <- [l1]
+	t1=Cons(Token(_, type_next,_), _)
+	//l2=t1
+	debug([a2,ind,snew])
+	//c::break()
+	if(type_next='EOF') //end of file, do not add 'and's, add ';'s for the remaining indents
+		list.size(ind,n)
+		iterate(push_semicolon, n, t1, l2)
+		//do_semicolons(0,n,t2,l2)
+	else
+		rel neq(x)
+			type_next!=x
+		when(remove_prev_inds(a2,ind,snew))
+			//snew is the string of the new indent (if old indent is '\t' and indent is '\t  ', snew is '  ')
+			//if the indent is the same, snew is ''
+			//if it's an unindent, e.g. ('',' ')
+			//it fails
+			debug(['indent', snew])
+			//c::break()
+			when(snew='')
+				//same indent level, ''
+				ind2=ind
+				tk_prev=Token(_, type_prev,_)
+				rel neq2(x)
+					type_prev!=x
+				debug(['same',type_next,type_prev])
+				list.forall([';', 'connective', 'else', 'elseif', 'case','cond'],neq)
+				list.forall([';', '{', 'connective', 'else', 'elseif', 'case','cond'],neq2) //debug(type_prev)
+				ws(t1, ind2, h1, t2)
+				l2=Cons(Token('and','connective',info), t2)
+			else
+				//more indent
+				snew!=''
+				ind2=Cons(snew, ind)
+				ws(t1, ind2, h1, t2)
+				l2=t2
+		else
+			//unindent
+			debug('unindent')
+			debug(['unindent',ind,a2,n])
+			remove_cur_inds(ind,a2,n)
+			debug(['rem',rest,n,ind])
+			iterate(rest, n, ind, ind2)
+			tk_prev=Token(_, type_prev,_)
+			debug(['prev',tk_prev,n])
+			type_next!=';'
+			type_next!='connective'
+			//type_next!='}'
+			rel neqprev(x)
+				type_prev!=x
+			list.forall(['connective', 'else', 'elseif', 'case','cond'],neqprev)//for x in ..: x!=type_prev
+			list.forall([';', 'connective'],neq)//for x in ..: x!=type_next //type_next not in l?
+			when(type_prev!=';') //add semicolons, 'and'
+				//type_prev!='}'
+				list.forall(['}','else','elseif','case','cond'],neq)
+				debug(1)
+				iterate(push_semicolon, n, Cons(Token('and','connective',info), t2), l2)
+				ws(t1, ind2, h1, t2)
+			elseif(type_prev='}') //also counts as terminator
+				debug(2)
+				l2=Cons(Token('and','connective',info), t2)
+				//l2=t2
+				ws(t1, ind2, h1, t2)
+			elseif(type_prev=';') //already terminated
+				debug(2)
+				l2=Cons(Token('and','connective',info), t2)
+				ws(t1, ind2, h1, t2)
+			else
+				n2=n-1 //math.sub
+				debug('skip3')
+				debug([3,n2])
+				iterate(push_semicolon, n2, t2, l2)
+				ws(t1, ind2, h1, t2)
+			
+rel ws(l, ind, tk_prev, l2)
+	l=[h1|t1]
+	h1=Token(a, type,_)
+	choose(l=[Token(_,'EOF',_)])
+		if(ind=Cons)
+			l2=l
+		else
+			l2=Cons(Token(';',';',_),l)
+	
+	elseif(type!='whitespace')
+		//not a whitespace
+		l2=Cons(h1,t2)
+		ws(t1, ind, h1, t2)
+		
+	else
+		h1=Token(a, type,_)
+		debug('ws')
+		if(t1=[Token(_, 'whitespace',_)| t2])
+			//two whitespace tokens found, ignore the first
+			ws(t1, ind, tk_prev, l2)
+		else
+			when(ws2(l, ind, tk_prev, l2))
+				true
+			else
+				//skip whitespace
+				debug('skip2')
+				ws(t1, ind, h1, l2)
+	
+fun run_ws(l1,l2)
+	if(l1=[Token(_,'whitespace',_)| tks_tail]) //remove whitespace at the beginning
+		run_ws(tks_tail, l2)
+	else
+		ws(l1, [], Token('','SOF',_), l2) //SOF=start of file token
+ 
+
+
+require('lexer', lexer)
+
+rel run_all(s,l3)
+	debug("lexer...")
+	lexer.run(s, l2)
+	debug(l2)
+	//halt()
+	cut
+	debug("whitespace...")
+	run_ws(l2,l3)
+	
+t={
+	'run'=run_ws
+	'run2'=run_all
+}
+export(t) 
+
+//run_all('a=2',l)
+//io.readFile('gen9.co',s)
+//s='rel p;'
+//s='rel p.p() true;'
+//s='x2\nonce x=cond1 and cond <='
+//s='x2\nonce x=cond1'
+//s='x2\nonce x=cond1 and cond <='
+//s="c::require('table9.bc', _table)"
+//s='a=2'
+s='x2\nonce x=cond1'
+run_all(s,l)
+//s='true'
+//s='rel p(x) x=2; and p(x)\n'
+//run_all(s,l)
+//s='x=((1)+2)//a'
+//s='t={\n\tx=\trel()\n\t\tx=1\n}'
+debug(l)
+debug('--')
+//iterate(rest, 0+1, ['\t'], ind2)
+debug(2)

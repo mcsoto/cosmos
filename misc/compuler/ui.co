@@ -1,0 +1,14 @@
+ui={
+	true
+}
+rel makemenu(list,b)
+	true
+item1={
+	title='open'
+	action='open'
+}
+menu={
+	img='panel.png'
+	panels=[menu1]
+}
+export(makemenu)

@@ -1,0 +1,68 @@
+require('table',table)
+require('list',list)
+require('logic',os)
+require('math',math)
+functor(fact, Functor)
+functor(then, Functor)
+functor(implies, Functor)
+
+db={
+	rel assert(s)
+		pl::assert_(s)
+	rel ask(s)
+		pl::assert_get(s)
+}
+
+
+bool p(x)
+	x!=2
+ 
+rel q(x)
+	x!=2
+//not q(x)
+not p(x)
+//p(x)
+ 
+
+
+
+
+
+
+
+
+
+
+initial={
+	rel location(x,pos)
+		x=somewhere
+		pos=1,2 or
+		x=other
+		pos=2,2
+	at(somewhere,1,2)
+	at(other,1,2)
+}
+
+human1={
+	mind={
+		fact(2)
+		at(1,0)
+		found(food) then get(food)
+		
+	}+initial
+	rel move(x,y)
+		update(other,2,2)
+}
+	mind={
+		fact=2
+		at=pos(1,0)
+		//found(food) and at(pos(1,0)) then get(food)
+		found(chest,x,y)) then get(chest)
+		found(chest,x,y)<-at(chest,x,y)
+		get(chest)<-at(chest,x,y),move(x,y):
+	}+initial
+
+l=[fact(2),fact(1),then(2,1)]//,implies(2,1)
+l2=[then(1,2)]
+print(l)
+//decision-db:..

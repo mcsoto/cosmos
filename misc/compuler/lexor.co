@@ -1,0 +1,375 @@
+
+fun debug(s)
+	true
+	//print(s)
+
+require('string', string)
+require('list', list)
+require('io',io)
+require('ui',ui)
+
+//lexer
+functor(Cons, Functor)
+functor(Token, Functor)
+functor(Info, Functor) //Info(line,column)
+functor(Pair, Functor)
+functor(T, Functor)
+
+//lexer
+rel digit(c)
+	string.lessOrEqual(c,'9')
+	string.lessOrEqual('0',c)
+
+rel letter(c)
+	string.lessOrEqual(c,'z') and string.lessOrEqual('a',c) or
+	string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+
+rel letter2(c)
+	case
+		string.lessOrEqual(c,'z') and string.lessOrEqual('a',c)
+	case
+		string.lessOrEqual(c,'Z') and string.lessOrEqual('A',c)
+	case
+		c='_'
+
+rel single_quote(c) 
+	//string2.code(c,x)
+	string.code(c, 39)
+	string.code(c, 39)
+rel double_quote(c) 
+	c='\"'
+rel quote(c) 
+	single_quote(c) or double_quote(c)
+rel endline(c)
+	c='\n'
+rel slash(c) 
+	string.code(c, 92)
+rel newline(c)
+	string.code(c, 10)
+rel newline2(c)
+	string.code(c, 13)
+rel tab(c) 
+	string.code(c, 9)
+
+rel whitespace(c) 
+	c=' ' or c='\t' or c='\n' or c='\r'
+
+//matching utilities
+	
+rel match_rel2(s,i,i2,f)
+	when(true)
+		string.at(s,i,c)
+		f(c)
+		match_rel2(s,i+1,i2,f)
+	else
+		i=i2
+
+rel match_some(s,i,i2,f)
+	string.at(s,i,c)
+	f(c)
+	match_rel2(s,i+1,i2,f)
+
+rel match_one(s,i,i2,f)
+	i2=i+1
+	string.at(s,i,c)
+	f(c)
+
+rel match_any(s,i,i2,f)
+	case
+		string.at(s,i,c)
+		f(c)
+		match_any(s,i+1,i2,f)
+	case
+		i=i2
+
+rel match_until(s,i,i2,f)
+	case
+		string.at(s,i,c)
+		f(c)
+		i=i2
+	case
+		match_until(s,i+1,i2,f)
+
+rel match_string(s,i,i2,str)
+	string.size(str,size1)
+	c::def(i)
+	i2=i+size1
+	string.slice(s,i,i2,str2)
+	c::def(i2)
+	str2=str //todo unnecessary var
+
+//tries to find if word s is in list, if so set s=z
+rel match_list(l,s,z)
+	l=Cons(head, tail)
+	if(head=s) //choose
+		z=s
+	else
+		match_list(tail, s, z)
+		
+//parsing
+	
+rel match_whitespace(s,i,i2)
+	match_some(s,i,i2,whitespace)
+
+rel parse_double_string(s,i,i2)
+	string.at(s,i,c)
+	when(double_quote(c))
+		i=i2
+	elseif(slash(c))
+		parse_double_string(s,i+2,i2)
+	else
+		parse_double_string(s,i+1,i2)
+		
+rel parse_string(s,i,i2)
+	j=i+1
+	string.at(s,i,c)
+	debug(c)
+	when(double_quote(c))
+		parse_double_string(s,j,j2)
+		i2=j2+1
+	else
+		debug('-')
+		single_quote(c)
+		match_until(s,j,j2,single_quote)
+		i2=j2+1
+		
+//parses whitespace and updates line/column information
+rel navigate_ws2(String s, i, i2,line,col,info2)
+	when(string.at(s,i,c))
+		if(c='\n')
+			navigate_ws2(s,i+1,i2,line+1,1,info2)
+		elseif(c='\t')
+			navigate_ws2(s,i+1,i2,line,col+4,info2)
+		elseif(c='\r')
+			navigate_ws2(s,i+1,i2,line,col,info2)
+		else
+			whitespace(c)
+			navigate_ws2(s,i+1,i2,line,col+1,info2)
+	else
+		i2=i
+		info2=Info(line,col)
+
+rel navigate_whitespace(s,i,i2,info,info2)
+	string.at(s,i,c)
+	//debug(c)
+	whitespace(c)
+	info=Info(line,col)
+	if(c='\n')
+		navigate_ws2(s,i+1,i2,line+1,0,info2)
+	else
+		navigate_ws2(s,i+1,i2,line,col,info2)
+
+rel navigate_until_asterisk(s,i,i2,info,info2)
+	info=Info(line,col)
+	string.at(s,i,c)
+	if(c='*')
+		i=i2 and info2=info
+	else
+		if(c='\n')
+			info1=Info(line+1, 1)
+		elseif(c='\t')
+			info1=Info(line, col+4)
+		else
+			info1=Info(line, col+1)
+		navigate_until_asterisk(s,i+1,i2,info1,info2)
+	 
+
+
+
+
+
+
+
+
+
+//parses comment and updates line/column information
+rel navigate_comment(s,i,i2,info,info2)
+	when(match_string(s,i,x,'//'))
+		info2=info
+		when(string.findIndex(s,'\n',x,z)) //todo add to trace //fails on eof
+			i2=z
+		else
+			string.size(s,i2)
+	elseif(string.at(s,i,'%'))
+		info2=info
+		when(string.findIndex(s,'\n',i,z)) //todo add to trace //fails on eof
+			i2=z
+		else
+			string.size(s,i2)
+	else
+		match_string(s,i,x,' 
+
+
+') //todo fails
+		
+rel parse_number(s,i,i2)
+	debug('num')
+	//pl::writeln(digit)
+	when(match_some(s,i,x1,digit))
+		match_string(s,x1,x2,'.')
+		match_some(s,x2,i2,digit)
+	else
+		match_some(s,i,i2,digit)
+	
+rel parse_id(s,i,i2)
+	//some[a-z]any[0-9]
+	match_some(s,i,x,letter2)
+	match_any(s,x,i2,digit)
+//
+
+	
+rel run_tk(tk, type, l0, l)
+	case
+		type!='comment'
+		l=Cons(tk,l0)
+	case
+		l=l0
+
+rel keywords(s, z)
+	list.has(['?-', 'choose'],z)
+	
+rel step5(s, i, j, z, c, info)
+	case
+		l=['<=','>=','=<','=>','!=','::','?-',':-']
+		match_list(l, string.slice(s,i,i+2), z) and j=i+2
+	case
+		l=['+','-','<','>','[',']','=','/','*','#','!',':']
+		match_list(l, c, z) and	j=i+1
+	case
+		match_one(s,i,j,single_quote)
+		z='single_quote'
+
+rel step4(s, i, j, z, c,info, info2)
+	case
+		parse_string(s,i,j)
+		z='string'
+	case
+		parse_number(s,i,j)
+		z='number'
+	case
+		step5(s, i, j, z, c, info)
+		//lexer slow when case is after code
+
+fun step1(s, i, j, z, info, info2)
+	debug([i])//todo print([int(j),n])
+	c::def(i)
+	//print(string.size(s))
+	if(navigate_whitespace(s,i,j,info,info2))
+		z='whitespace'
+	elseif(navigate_comment(s,i,j,info,info2))
+		z='comment'
+	else
+		string.at(s,i,c)
+		k=i+1
+		debug(['at',c,k])
+		l=[';','(',')','{','}','.',';',',','|','#']
+		when(match_list(l, c, z))
+			j=i+1
+		elseif(letter2(c))//letter or _
+			if(parse_id(s,i,j))
+				print([i,j])
+				string.slice(s,i,j,s2)
+				z='id'
+				debug(['id/',s,s2])
+			//c::halt()
+		elseif(step4(s, i, j, z,c, info, info2))
+			true
+		else
+			throw(1)
+		info=Info(line, col)
+		info2=Info(int(line), int(col+j-i))
+	debug(['type',z,i,j])
+
+rel run2(s,start,l,info,info2)
+	case
+		debug(['run',s,start])
+		step1(s,int(start),x,type,info,info1)
+		string.at(s,start,c)
+		//print(1)
+		//print([s,x,l0,info1,info2])
+		//io.writeln(c)//todo aswell
+		run2(s,x,l0,info1,info2)
+		string.slice(s,int(start),x,lexeme)
+		//print(2) and print(lexeme)
+		run_tk(Token(lexeme, type, info), type, l0, l)
+	case
+		debug(['--',start])
+		//debug(l)
+		l=Cons(Token('EOF','EOF',_), Cons)
+		string.size(s,z)
+		debug(['end',z,start])
+		z=int(start)
+		info2=info
+	case
+		throw('error')
+	
+rel run_lx(s,l)
+	//run2(s,start,l,Info(1, 0),info2)
+	run2(s,0,l,Info(1, 1),info2)
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+t={
+	'run_lexer'=run_lx
+	//'run'=run_all
+	'run'=run_lx
+}
+export(t)
+
+f=Info(0, 0)
+i=0
+//run2('032', 0, z, f, f2)
+//run2('a32', 0, z, f, f2)
+//run2('rel=a', 0, z, f, f2)
+//run2('x=1', 0, z, f, f2)
+//run2('rel', 0, z, f, f2)
+//run('rel = true', 0, z)
+//run('p(a,1)+ = true', 0, z)
+//run('a+1', 0, z)
+//s='a;'
+//s='p(x) and %asd'
+s='p(x,y) <- X=1.'
+//s='x2\nonce x=cond1 and cond <='
+//s='t[1]'
+//io.readFile('test3.co',s)
+//s='p(a,1)+ = true'
+//run_lx(s,z) and print(z)
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//run_lx(s,z) and print(z)
+ 

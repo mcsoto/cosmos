@@ -1,0 +1,72 @@
+require('table', table)
+
+nil={}
+
+list=table.toList
+update_=table.update
+set_=table.set
+
+rel new(o,prop,_o)
+	table.update(o,prop,o2)
+	
+rel get(t,o,o2)
+	choose(pl::get_(t,o,o2))
+		true
+	else
+		//not o in t
+		choose(get(t._prototype,o,o2))
+			true
+		else
+			throw('cannot access field '+o+' of object')
+	
+rel set(t,o,o2,t2)
+	pl::obj_set(t,o,o2,t2)
+	
+t={
+	'new'=new
+	'get'=get
+	'set'=set
+	
+	rel create(t,obj)
+		set_(t,'_prototype',nil,t2)
+		c::makeobj(t2,obj)
+		
+	rel createFrom(t,_o,o2)
+		set_(t,'_prototype',_o,t2)
+		c::makeobj(t2,o2)
+		
+	rel update(o1,t2,o3)
+		c::makeobj(t1,o1)
+		//update_(t1,t2,t3)
+		update_(t1,t2,t3)
+		c::makeobj(t3,o3)
+		
+	rel toString(o,s)
+		table.remove(o,'_prototype',o2)
+		table.toString(o, o2)
+	
+	rel _write(o,s)
+		true
+	
+	rel getTable(o,t)
+		c::makeobj(o,t)
+	
+	rel map(t,l,t2)
+		table.map(t,l,t2)
+		
+	rel imap(t,l,t2)
+		table.imap(t,l,t2)
+}
+
+//set(t3,'set2',set2,t)
+//export(t1)
+//exports=t3
+export(t)
+/*
+insert(E, f, 2)
+insert(f, f2, 1)
+insert(f2, f3, 3)
+insert(f3, f4, 4)
+print(f4)
+member(f4,1)
+*/

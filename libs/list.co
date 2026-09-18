@@ -1,0 +1,316 @@
+/*
+*/
+rel get(L, N, Any Element)
+	pl::int(N, HostN)
+	pl::nth0(HostN,L,Element)
+
+functor(Cons, Functor)
+functor(T, Functor)
+//FunctorObject Cons
+require('string', string)
+/*todo warn
+rel size(l, n)
+	size(tail,j)
+
+rel size(l, n)
+	if(l=[])
+		n=0
+	else
+		l=Cons(_,tail)
+		size(tail,j)
+		n=j+1
+*/
+
+rel size(l, n)
+	if(l=[])
+		n=0
+	else
+		l=[_|tail]
+		Number j
+		n=j+1
+		size(tail,j)
+
+//list lib
+rel filter(l, Relation Any p, l2)
+	when(l=[])
+		l2=[]
+	else
+		l=Cons(head, tail)
+		when(p(head))
+			l2=Cons(head, tail2)
+			filter(tail, p, tail2)
+		else
+			filter(tail, p, l2)
+
+rel removeAll(l, Relation Any p, l2)
+	if(l=[])
+		l2=[]
+	else
+		l=[head|tail]
+		when(p(head))
+			removeAll(tail, p, l2)
+		else
+			l2=Cons(head, tail2)
+			removeAll(tail, p, tail2)
+
+rel remove2(l, i, n, l2)
+	case
+		l=[]
+		l2=l
+	case
+		l=[e1|tail]
+		if(i=n)
+			l2=tail
+		else
+			i2=i+1
+			l2=[e1|l3]
+			remove2(tail, i2, n, l3)
+		
+rel removeIndex(l, i, l2)
+	c::type(i,'int')
+	remove2(l, 0, i, l2)
+	
+rel remove(l, n, l2)
+	case
+		l=[]
+		l2=l
+	case
+		l=[e|tail]
+		if(e=n)
+			l2=tail
+		else
+			l2=[e|l3]
+			remove(tail, n, l3)
+		
+rel has2(l, Any e)
+	if(l=Cons(e, _))
+		//print(['e',e])
+		true
+	else
+		//print(l)
+		l=Cons(_, tail)
+		has2(tail,e)
+		
+rel has(l, Any e)
+	pl::memberd_t(e,l,_)
+
+rel concat(l, l2, l3)
+	pl::append(l,l2,l3)
+
+rel push(l, x, l2)
+	l2=[x|l]
+	
+rel pop(l, l2)
+	l=Cons(x, l2)
+	l2=tail
+	
+rel set(t,o,o2,t2)
+	case
+		t=T(e,v,tail)
+		if(e=o)
+			t2=T(o,o2,tail)
+		else
+			set(tail,o,o2,t3)
+			t2=T(e,v,t3)
+	case
+		t2=T(o,o2,t)
+/*
+rel has(l, Any x)
+	find(l, x, _)
+*/
+rel last(l,a)
+	get(l, size(l)-1, a)
+
+rel reverse(l, l2)
+	if(l=Cons(a,tail))
+		reverse(tail, ltemp)
+		concat(ltemp, Cons(a,Cons), l2)//todo tc
+	else
+		l=Cons
+		l2=Cons
+
+// ... 
+		
+
+//like map but relation has an argument for the index
+//each([1,2,3], rel(i, x, y) y=x*i;, x) //x = [0, 2, 6]
+rel eachIndex(l,p,i,l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		l2=Cons(head2, tail2)
+		p(i, head, head2)
+		eachIndex(tail, p, i+1, tail2)
+		
+rel each(l, Relation Any Any p, l2)
+	eachIndex(l, p, 0, l2)
+
+rel join(l, String sep, String s)
+	if(l=Cons(a,Cons))
+		s=a
+	elseif(l=Cons(s1,tail))
+		s=s1+sep+s2
+		join(tail,sep,s2)
+		//print(s1)
+		//print(sep)
+	else
+		l=Cons
+		s=''
+		
+rel join5(l, String sep, String s)
+	if(l=Cons(a,Cons))
+		s=a
+	elseif(l=Cons(s1,tail))
+		s=s1+sep+s2
+		join(tail,sep,s2)
+		//print(s1)
+		//print(sep)
+	else
+		l=Cons
+		s=''
+		
+rel fold(l, pred, Any s, Any result)
+	if(l=Cons(b,tail))
+		pred(s,b,c)
+		fold(tail, pred, c, result)
+	else
+		l=Cons
+		result=s
+
+//concat=string.concat
+rel join2(l, String sep, s,String s2)
+	if(l=Cons(b,tail))
+		s1=s+sep+b
+		//string.concat(s,sep,sa)//s1=s+sep+b//((s+b)+c)
+		//string.concat(sa,b,s1)
+		join2(tail, sep, s1,s2)
+	else
+		l=Cons
+		s=s2
+	//todo check the type of join better
+rel join_string(l, String sep, s,String s2)
+	if(l=[b|tail])
+		string.concat(s,sep,sa)//s1=s+sep+b//((s+b)+c)
+		string.concat(sa,b,s1)
+		join_string(tail, sep, s1,s2)
+	else
+		l=[]
+		s=s2
+rel join3(l, String sep, String s2)
+	if(l=[sa|tail])
+		join_string(tail, sep, sa, s2)
+	else
+		s2=''
+		l=[]
+	
+rel unique_(l,l2,dup)
+	case
+		l=[]
+		l2=l
+	case
+		l=[e|tail]
+		when(list.has(dup,e))
+			//print('dup')
+			l2=tail2
+			unique_(tail,tail2,dup) //skip
+		else
+			dup1=[e|dup]
+			//print(dup1)
+			l2=[e|tail2]
+			unique_(tail,tail2,dup1)
+
+rel unique(l,l2,dup)
+	unique_(l2,l,[])
+
+rel first(l, Any a)
+	l=[a|_]
+
+//mapping
+
+fun findOnce(l, Any e, i)
+	l=Cons(x,tail)
+	if(e=x)
+		i=0
+	else
+		i=j+1
+		findOnce(tail,e,j)
+		
+rel every(l, Relation Any p)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		p(head)
+		every(tail, p)
+
+rel map(l, Relation Any Any p, l2)
+	if(l=Cons)
+		l2=Cons
+	else
+		l=Cons(head, tail)
+		l2=Cons(head2, tail2)
+		p(head, head2)
+		map(tail, p, tail2)
+
+//do p(x) n times, using result as next iteration argument
+rel iterate(p, Number n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		iterate(p, n-1, x2, y)
+
+rel find(l, Any e, i)
+	l=[e1|tail]
+	if(e=e1)
+		i=0
+	else
+		find(tail,e,j)
+		i=j+1
+
+/*
+*/
+t={
+	rel new(x)
+		x=[]
+	rel next(l,l2,k,v,i)
+		if(l=[])
+			i=0
+		else
+			l=[v|l2]
+			i=1
+	rel iter(l,l)
+		true
+
+	'size'=size
+	length=size
+	'filter'=filter
+	'removeIndex'=removeIndex
+	'remove'=remove
+	'push'=push
+	pop=pop
+	'has'=has2
+	'has2'=has2
+	at=get
+	'concat'=concat
+	'removeAll'=removeAll
+	join=join3
+	joinString=join_string
+	fold=fold
+	each=each
+	eachIndex=eachIndex
+	iterate=iterate
+	reverse=reverse
+	first=first
+	last=last
+	rel slice(l, i, j, l2)
+		//once pl::slice(l, i, j, l2)
+		pl::slice(l, i, j, l2)
+
+}
+export(t)
+//remove([1,2,3,4,5],1,l)
+//removeElement([1,2,3,4,5],2,l)
+
+c::setmeta('list', t)

@@ -1,0 +1,1 @@
+cosmos.exe -l test

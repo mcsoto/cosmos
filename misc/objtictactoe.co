@@ -1,0 +1,145 @@
+require('io',io)
+require('table',table)
+require('list',list)
+require('math',math)
+require('object', object)
+range=math.range
+set_=table.set
+
+rel pause()
+	print('> ')
+	c::ioread(x)
+
+debug=rel(x) true;
+
+_board={' ',' ',' ',' ',' ',' ',' ',' ',' '}
+
+Board={
+	_initialBoard=_board
+	curBoard=_board
+	//initialBoard={' ',' ',' ',' ',' ',' ',' ',' ',' '}todo
+	
+	rel set(o,o2,x,y,e)
+		i=x+(y*3)
+		//o2=o.curBoard:e
+		table.set(o.curBoard,i,e,newBoard)
+		object.update(o,{'curBoard'=newBoard},o2)
+	
+	rel get(o,x,y,e)
+		i=x+(y*3)//todo
+		table.get(o.curBoard,i,e)
+	
+	rel empty(board,x,y)
+		board.get(x,y,' ')
+	
+	rel move(board, p, board2)
+		p.ai(board, x, y)//todo get(p,'ai') not checked
+		debug([x,y,p.piece])
+		board.set(board2,x,y,p.piece)
+			
+	rel win(board,piece)
+		case
+			some(col in range(0,2))
+				debug('col'+col)
+				board.get(0,col,piece)
+				board.get(1,col,piece)
+				board.get(2,col,piece)
+				debug('piece'+piece)
+		case
+			some(line in range(0,2))
+				debug('line'+line)
+				board.get(line,0,piece)
+				board.get(line,1,piece)
+				board.get(line,2,piece)
+				debug(piece)
+		case
+			for(pos in range(0,2))
+				debug('line'+line)
+				board.get(pos,pos,piece)
+				debug(piece)
+		case
+			board.get(2,0,piece)
+			board.get(1,1,piece)
+			board.get(0,2,piece)
+		piece!=' '
+		
+	rel full(board)
+		for(x in board)
+			x!=' '
+		
+}
+
+write=io.write
+rel draw(board)
+	init i=0
+	while(i<3)
+		init j=0
+		write('|')
+		while(j<3)
+			tile=board.get(j,i)
+			write(tile)
+			write('|')
+			next j=j+1
+		write('\n')
+		next i=i+1
+
+function wait()
+	print('> ') and io.read(x)
+	if(x='halt')
+		c::halt()
+	
+//ai
+rel leftmost(x)
+	x=0 or x=1 or x=2
+	
+function _player(board,x,y)
+	print('> input line:')
+	y=math.stringToNumber(io.read())-1
+	print('> input column:')
+	x=math.stringToNumber(io.read())-1
+	if(not empty(board,x,y))//print([x,y])
+		throw('invalid move')
+	
+rel _default(board,x,y)
+	leftmost(x) and leftmost(y)
+	board.empty(x,y)
+	
+rel _random(board,x,y)
+	math.random(0,2,x)
+	math.random(0,2,y)
+	empty(board,x,y)
+	
+function game(board,p1,p2,turn)
+	//if(win(board,x))
+	if(board.win('X'))
+		io.writeln('X won!')
+	elseif(board.win('O'))
+		io.writeln('O won!')
+	elseif(board.full())
+		io.writeln('Draw!')
+	else
+		io.writeln('')
+		io.writeln(str('turn '+turn))
+		once board.move(p1,board2)
+		//wait()
+		draw(board2)
+		game(board2,p2,p1,turn+1)
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export(Board)

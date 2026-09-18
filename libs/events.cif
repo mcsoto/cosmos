@@ -1,0 +1,1 @@
+t("module","events",<,t("format",1.0,<,t("exports",t,-,t,t),t),t("schemas",t("events",t("kind","constructor",-,t("fields",[fc_Entry(fc_LiteralExpr("new",fc_Loc(140.0,9.0)),fc_VarExpr("createEmitter",fc_Loc(140.0,15.0)))],-,t,t),t("location",fc_Loc(140.0,1.0),-,t,t)),-,t,t),-,t,t)).

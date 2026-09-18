@@ -1,0 +1,251 @@
+
+//game=[[0,0,0],[0,0,0],[0,0,0]]
+//map={0={},1={},2={}}
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+require('io',io)
+require('table',table)
+require('list',list)
+require('math',math)
+
+rel pause()
+	print('> ')
+	c::ioread(x)
+
+debug=rel(x) true;
+
+functor(Pair,Functor)
+functor(T,Functor)
+
+range=math.range
+
+_board={' ',' ',' ',' ',' ',' ',' ',' ',' '}
+set_=table.set
+//_board=[' ',' ',' ',' ',' ',' ',' ',' ',' '] and set_=list.set
+ 
+rel set(o,o2,x,y,e)
+	i=x+(y*3)
+	set_(o,i,e,o2)
+	
+rel get(o,x,y,e)
+	i=x+(y*3)//todo
+	e=o[i]
+	
+rel empty(board,x,y)
+	get(board,x,y,' ')
+
+rel win_col(board,piece)
+	some(col in range(0,2))
+		get(board,0,col,piece)//board[0][col]=piece ;det;true
+		
+write=io.write
+rel draw(board)
+	init i=0
+	while(i<3)
+		init j=0
+		write('|')
+		while(j<3)
+			tile=get(board,j,i)
+			write(tile)
+			write('|')
+			next j=j+1
+		write('\n')
+		next i=i+1
+
+rel win(board,piece)
+	case
+		some(col in range(0,2))
+			debug('col'+col)
+			get(board,0,col,piece)
+			get(board,1,col,piece)
+			get(board,2,col,piece)
+			debug('piece'+piece)
+	case
+		some(line in range(0,2))
+			debug('line'+line)
+			get(board,line,0,piece)
+			get(board,line,1,piece)
+			get(board,line,2,piece)
+			debug(piece)
+	case
+		for(pos in range(0,2))
+			debug('line'+line)
+			get(board,pos,pos,piece)
+			debug(piece)
+	case
+		get(board,2,0,piece)
+		get(board,1,1,piece)
+		get(board,0,2,piece)
+	piece!=' '
+	
+rel full(board)
+	for(x in board)
+		x!=' '
+	
+rel move(board, p, board2)
+	p.ai(board, x, y)//todo get(p,'ai') not checked
+	set(board,board2,x,y,p.piece)
+	
+function wait()
+	print('> ') and io.read(x)
+	if(x='halt')
+		c::halt()
+	
+function game(board,p1,p2,turn)
+	//if(win(board,x))
+	if(win(board,'X'))
+		io.writeln('X won!')
+	elseif(win(board,'O'))
+		io.writeln('O won!')
+	elseif(full(board))
+		io.writeln('Draw!')
+	else
+		io.writeln('')
+		io.writeln(str('turn '+turn))
+		once move(board,p1,board2)
+		//wait()
+		draw(board2)
+		game(board2,p2,p1,turn+1)
+//ai
+rel leftmost(x)
+	x=0 or x=1 or x=2
+	
+function _player(board,x,y)
+	print('> input line:')
+	y=math.stringToNumber(io.read())-1
+	print('> input column:')
+	x=math.stringToNumber(io.read())-1
+	if(not empty(board,x,y))//print([x,y])
+		throw('invalid move')
+	
+rel _default(board,x,y)
+	leftmost(x) and leftmost(y)
+	//x>=0 and y>=0
+	//x<=2 and y<=2
+	empty(board,x,y)
+	
+rel _random(board,x,y)
+	math.random(0,2,x)
+	math.random(0,2,y)
+	empty(board,x,y)
+	
+function main()
+	true
+	
+p1={
+	piece='X'
+	ai=_default
+}
+p2={
+	piece='O'
+	ai=_default//_player//_default
+}
+
+board=_board
+debug(board)
+debug('-draw')
+game(board,p1,p2,1)
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//print(board[0][0])
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+

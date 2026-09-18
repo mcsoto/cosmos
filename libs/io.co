@@ -1,0 +1,105 @@
+
+/* files */
+	/*
+	
+rel openWrite(String name, File f)
+	pl::fopen(name,'write',f)
+
+	*/
+	/*
+rel readFile(String name, String s)
+	pl::fread_all(f,s)//c::readFile(name, s)
+	
+	*/
+	
+/* file utilities */
+
+t={
+	//
+
+	rel write(Any x)
+		c::write(x)
+		
+	rel writeln(Any x)
+		write(x)
+		write('\n')
+
+	rel read(String x)
+		c::ioread(x)
+		
+	rel open(String name, String mode, f)
+		c::fopen(name,mode,f)
+
+	rel close(File f)
+		c::close(f)
+		
+
+	rel pause()
+		c::ioread(x)
+		
+	rel opened(String name, String mode, f)
+		c::fopen_(name,mode,f)
+
+	//files
+	
+	rel fwrite(File f, x)
+		c::write(f,x)
+		
+	rel fread(File f, String s)
+		c::read(f,s)
+			
+	rel fileReadLine(File f, String s)
+		pl::fread(f,s)
+		
+	rel fileReadChar(File f, String s)
+		pl::read_string(f,int(1),s)
+		
+	//binary
+	
+	rel exists(String name)
+		c::fopen_binary(name,mode,_)
+		
+	rel openBinary(String name, String mode, f)
+		c::fopen_binary(name,mode,f)
+		
+	rel write8(f, x)
+		//pl::put_byte(f, x)
+		c::int(x, byte)
+		c::write8(f, byte)
+
+	rel write16(f, n)
+		c::int(n, word)
+		c::write16(f, word)
+		
+	rel write32(f, n)
+		//pl::writeInt32(f, n)
+		c::int(n, word)
+		c::write32(f, word)
+	
+	//
+	rel appendToFile(String name, String s)
+		open(name,'append',f)
+		c::write(f,s)
+		close(f)
+	/*todo error
+	rel opened(String name, String mode, f)
+		c::fopen_(name,mode,f)
+	*/	
+	rel writeToFile(String name, String s)
+		open(name,'write',f)
+		c::write(f,s)
+		c::close(f)
+
+	rel writeFormat(Any x)
+		c::write_format(x)
+				
+	rel readFile(String name, String s)
+		open(name,'read',f)
+		pl::fread_all(f,s)
+		close(f)
+		
+}
+//c::table_set(t5,'code',code,t)
+export(t)
+//t.readFile('test0.co',s)
+//print(s)

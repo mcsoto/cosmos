@@ -1,0 +1,13 @@
+functor(factoid)
+
+fun main()
+	init time=1
+	init term=[]
+	init fact=factoid(term)
+	while(time<10)
+		 
+		true
+		 
+		true
+		next time=time+1
+		

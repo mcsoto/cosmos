@@ -1,0 +1,162 @@
+//rel debug_write(x) true; and rel debug(x) true;
+rel debug_write(x) io.write(x); and rel debug(x) print(x);
+
+//lexer
+functor(Cons, Functor)
+functor(Token, Functor)
+functor(Info, Functor) //Info(line,column)
+functor(Pair, Functor)
+functor(T, Functor)
+	
+//parser
+
+functor(Eq, Functor)
+functor(Neq, Functor)
+functor(Stm, Functor)
+functor(Stm2, Functor)
+functor(Inequality, Functor)
+functor(True, Functor)
+functor(False, Functor)
+functor(Pred, Functor)
+functor(And, Functor)
+functor(Or, Functor)
+functor(Bracket, Functor)
+functor(ObjPred, Functor)
+functor(If, Functor)
+functor(Cond, Functor)
+functor(SoftCut, Functor)
+functor(Op, Functor)
+functor(Host, Functor)
+functor(Once, Functor)
+functor(Declaration, Functor)
+functor(Mutable, Functor)
+functor(Size, Functor)
+
+//'world'
+functor(Rel, Functor)
+functor(Fact, Functor)
+
+//'expression'
+functor(Num, Functor)
+functor(Str, Functor)
+functor(Id, Functor)
+functor(ObjGet, Functor)
+functor(ObjGet2, Functor)
+functor(Func, Functor)
+functor(TList, Functor Functor)
+//functor(TArray, Functor List)
+//functor(TTable, Functor Functor)
+functor(Op, Functor)
+
+require('logic', logic)
+require('table', table)
+require('list', list)
+require('string', string)
+	
+require('env4', Env)
+
+require('types2', types)
+
+//require('list5.bc', list)
+require('mutable',mutable)
+
+fun custom_throw(msg, Functor info)
+	if(pl::ground(info))
+		info=Info(line, col)
+		//logic.throw('(line '+math.integerToString(line)+', col '+math.integerToString(col)+') '+msg)
+		//io.writeln(info)
+		//c::throw(msg)
+		throw(str('(line '+line+', col '+col+') '+msg))
+	else
+		throw(msg)
+	
+//essentials
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+print(logic.path())

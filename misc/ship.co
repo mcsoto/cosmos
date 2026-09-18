@@ -1,0 +1,25 @@
+require('object', object)
+update=object.update
+
+Ship={
+	x=1
+	y=1
+
+	rel move(this,x,y,this2)
+		//this2=this:{'x'=x and 'y'=y}
+		once update(this,{'x'=x and 'y'=y},this2)
+		//!this.x = x//this2 = this.x : x//this2 = this.x : 2
+}
+
+//1.
+init ship=object.create(Ship)
+for(i in math.range(1,4))
+	print(ship.x)
+	next ship=ship.move(ship.x+1,1)
+	//(next ship).x += 1 -- (next ship).x = ship.x + 1
+	print(ship)
+
+ship=object.create(Ship)
+print(ship.y) //1
+print(ship)
+

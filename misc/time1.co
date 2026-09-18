@@ -1,0 +1,13 @@
+
+rel fact(z,x)
+	init x=z
+	while(false)
+		if(x=0)
+			next x=1
+		else
+			next x=x*fact(x-1)
+	//print(x)
+	true
+
+fact(2,y)
+print(y)

@@ -1,0 +1,1505 @@
+# Cosmos EBNF Specification
+
+## Draft 0.1
+
+This document defines the concrete syntax of Cosmos using Extended Backus–Naur Form.
+
+The grammar describes source code after lexical tokenization and layout analysis. The layout analyzer validates indentation and produces the virtual tokens:
+
+```text
+NEWLINE
+INDENT
+DEDENT
+EOF
+```
+
+These tokens are not written explicitly by the programmer.
+
+Cosmos also permits an explicit semicolon in places where indentation would otherwise delimit a body. Properly indented code normally requires no semicolons.
+
+---
+
+# 1. EBNF Conventions
+
+The following notation is used:
+
+```ebnf
+"word"          (* literal token *)
+rule            (* reference to another production *)
+[ rule ]        (* optional *)
+{ rule }        (* zero or more repetitions *)
+rule | rule     (* alternative *)
+( rule )        (* grouping *)
+```
+
+Virtual layout tokens are written in uppercase:
+
+```ebnf
+NEWLINE
+INDENT
+DEDENT
+EOF
+```
+
+---
+
+# 2. Program Structure
+
+```ebnf
+program
+    = separators ,
+      { program-item , separators } ,
+      EOF
+    ;
+
+program-item
+    = declaration
+    | goal
+    ;
+```
+
+Top-level goals are permitted.
+
+```ebnf
+separators
+    = { NEWLINE }
+    ;
+```
+
+---
+
+# 3. Declarations
+
+```ebnf
+declaration
+    = relation-declaration
+    | functor-declaration
+    | export-declaration
+    ;
+```
+
+`require(...)` is not a declaration. It is an ordinary callable expression or goal.
+
+---
+
+# 4. Relation Declarations
+
+A named relation declaration begins with `rel`, `fun`, or `bool`.
+
+```ebnf
+relation-declaration
+    = relation-keyword ,
+      identifier ,
+      "(" ,
+      [ parameter-list ] ,
+      ")" ,
+      callable-body
+    ;
+
+relation-keyword
+    = "rel"
+    | "fun"
+    | "bool"
+    ;
+```
+
+Examples:
+
+```cosmos
+rel append(l, a, b)
+    ...
+
+fun calculate(x)
+    ...
+
+bool member(x, xs)
+    ...
+```
+
+The precise semantic differences among `rel`, `fun`, and `bool` may be expanded in later versions.
+
+A relation has one declaration and one body. Repeated Prolog-style clauses are not used.
+
+---
+
+# 5. Relation Parameters
+
+Relation parameters are general terms.
+
+```ebnf
+parameter-list
+    = parameter ,
+      { "," , parameter }
+    ;
+
+parameter
+    = [ type-expression ] , term
+    ;
+```
+
+Examples:
+
+```cosmos
+rel identity(x)
+
+rel sample([_|x], [], x)
+
+rel typed(Integer x, List Any xs)
+```
+
+Header terms participate in ordinary unification when the relation is called. There is no separate pattern-matching operation.
+
+---
+
+# 6. Callable Bodies
+
+A relation or anonymous relation may use either an indented body or an inline body terminated by a semicolon.
+
+```ebnf
+callable-body
+    = layout-body
+    | inline-body
+    ;
+```
+
+Indented form:
+
+```ebnf
+layout-body
+    = NEWLINE ,
+      INDENT ,
+      goal-block ,
+      DEDENT
+    ;
+```
+
+Inline form:
+
+```ebnf
+inline-body
+    = goal , ";"
+    ;
+```
+
+These forms are equivalent:
+
+```cosmos
+rel p(x)
+    true and false
+```
+
+```cosmos
+rel p(x) true and false;
+```
+
+A simple goal such as:
+
+```cosmos
+x = 1
+```
+
+does not require a semicolon. The semicolon is used to terminate an explicitly inline body.
+
+---
+
+# 7. Functor Declarations
+
+`functor(...)` is a built-in declaration form, not an ordinary runtime call.
+
+```ebnf
+functor-declaration
+    = "functor" ,
+      "(" ,
+      functor-name ,
+      "," ,
+      type-expression ,
+      ")"
+    ;
+
+functor-name
+    = identifier
+    ;
+```
+
+Examples:
+
+```cosmos
+functor(Tuple, Functor)
+
+functor(TupleInt, Functor Integer)
+
+functor(Node, Tree Any Any Any)
+```
+
+Conceptually:
+
+```cosmos
+functor(Node, Tree Any Any Any)
+```
+
+declares `Node` as a functor associated with the type `Tree` and three values of type `Any`.
+
+---
+
+# 8. Export Declarations
+
+`export(...)` is a built-in declaration form.
+
+```ebnf
+export-declaration
+    = "export" ,
+      "(" ,
+      export-value ,
+      ")"
+    ;
+
+export-value
+    = expression
+    ;
+```
+
+Example:
+
+```cosmos
+export(tree)
+```
+
+Although its syntax resembles a call, `export(...)` is recognized as a declaration by the parser.
+
+---
+
+# 9. Goal Blocks
+
+A block contains one logical goal.
+
+Consecutive goals on separate lines form an implicit conjunction.
+
+```ebnf
+goal-block
+    = goal-line ,
+      { NEWLINE , goal-line } ,
+      [ NEWLINE ]
+    ;
+
+goal-line
+    = goal
+    ;
+```
+
+Thus:
+
+```cosmos
+a
+b
+c
+```
+
+is equivalent to:
+
+```cosmos
+a and b and c
+```
+
+The parser normalizes both forms into a conjunction.
+
+---
+
+# 10. Goals
+
+```ebnf
+goal
+    = disjunction-goal
+    ;
+```
+
+Goal precedence, from tightest to loosest, is:
+
+```text
+prefix goal operators
+atomic goals
+and
+or
+```
+
+---
+
+# 11. Disjunction
+
+```ebnf
+disjunction-goal
+    = conjunction-goal ,
+      { "or" , conjunction-goal }
+    ;
+```
+
+Example:
+
+```cosmos
+a or b or c
+```
+
+Nested disjunctions may be flattened in the AST.
+
+---
+
+# 12. Conjunction
+
+```ebnf
+conjunction-goal
+    = prefix-goal ,
+      { "and" , prefix-goal }
+    ;
+```
+
+Example:
+
+```cosmos
+a and b and c
+```
+
+`and` binds more tightly than `or`.
+
+Therefore:
+
+```cosmos
+a and b or c
+```
+
+means:
+
+```cosmos
+(a and b) or c
+```
+
+---
+
+# 13. Prefix Goals
+
+```ebnf
+prefix-goal
+    = "not" , prefix-goal
+    | "once" , prefix-goal
+    | atomic-goal
+    ;
+```
+
+Examples:
+
+```cosmos
+not member(x, xs)
+
+once member(x, xs)
+```
+
+---
+
+# 14. Atomic Goals
+
+```ebnf
+atomic-goal
+    = unification-goal
+    | typed-unification-goal
+    | comparison-goal
+    | call-goal
+    | if-goal
+    | when-goal
+    | choose-goal
+    | case-goal
+    | parenthesized-goal
+    | true-goal
+    | fail-goal
+    ;
+```
+
+---
+
+# 15. Parenthesized Goals
+
+```ebnf
+parenthesized-goal
+    = "(" , goal , ")"
+    ;
+```
+
+Example:
+
+```cosmos
+(a or b) and c
+```
+
+---
+
+# 16. Truth and Failure
+
+```ebnf
+true-goal
+    = "true"
+    ;
+
+fail-goal
+    = "false"
+    | "fail"
+    ;
+```
+
+Whether both `false` and `fail` remain accepted aliases may be finalized later.
+
+---
+
+# 17. Unification
+
+Unification treats its left and right operands symmetrically.
+
+```ebnf
+unification-goal
+    = expression ,
+      "=" ,
+      expression
+    ;
+```
+
+Examples:
+
+```cosmos
+x = 1
+
+x = []
+
+[x|xs] = list
+
+Node(value, left, right) = tree
+```
+
+Either side may contain:
+
+* variables,
+* literals,
+* lists,
+* dictionaries,
+* functor terms,
+* calls,
+* compound expressions.
+
+Structural pattern matching is a consequence of unification. It is not represented by a separate grammar or AST category.
+
+---
+
+# 18. Typed Unification
+
+A type may be written to the left of a variable.
+
+```ebnf
+typed-unification-goal
+    = type-expression ,
+      identifier ,
+      "=" ,
+      expression
+    ;
+```
+
+Examples:
+
+```cosmos
+Any x = 2
+
+Integer count = 3
+
+Relation Any p = rel(x)
+    x = 1
+```
+
+A type annotation does not change the runtime meaning of a correctly typed program.
+
+Because type annotations are optional, this remains valid:
+
+```cosmos
+x = 2
+```
+
+---
+
+# 19. Comparisons
+
+```ebnf
+comparison-goal
+    = expression ,
+      comparison-operator ,
+      expression
+    ;
+
+comparison-operator
+    = "!="
+    | "<"
+    | "<="
+    | ">"
+    | ">="
+    ;
+```
+
+Equality uses unification:
+
+```cosmos
+x = y
+```
+
+It is therefore not included among the ordinary comparison operators.
+
+---
+
+# 20. Call Goals
+
+```ebnf
+call-goal
+    = callable-expression ,
+      "(" ,
+      [ argument-list ] ,
+      ")"
+    ;
+```
+
+Examples:
+
+```cosmos
+p(x)
+
+append(a, b, c)
+
+object.p(x)
+
+callback(x)
+```
+
+The callable may be:
+
+* a named relation,
+* a relation-valued variable,
+* an anonymous relation,
+* a field,
+* a built-in callable,
+* a future foreign callable.
+
+---
+
+# 21. If Goals
+
+`if` supports zero or more `elseif` branches and an optional `else`.
+
+```ebnf
+if-goal
+    = "if" ,
+      condition-header ,
+      control-body ,
+      { elseif-branch } ,
+      [ else-branch ]
+    ;
+
+elseif-branch
+    = "elseif" ,
+      condition-header ,
+      control-body
+    ;
+
+else-branch
+    = "else" ,
+      unconditional-body
+    ;
+```
+
+```ebnf
+condition-header
+    = "(" , goal , ")"
+    ;
+```
+
+Example:
+
+```cosmos
+if(x = 1)
+    y = 2
+elseif(x = 2)
+    y = 3
+else
+    true
+```
+
+The condition and every branch body are goals.
+
+---
+
+# 22. When Goals
+
+```ebnf
+when-goal
+    = "when" ,
+      condition-header ,
+      control-body ,
+      [ else-branch ]
+    ;
+```
+
+Example:
+
+```cosmos
+when(x = 1)
+    y = 2
+else
+    y = 3
+```
+
+`when` uses the same block structure as `if` but retains distinct semantics.
+
+---
+
+# 23. Choose Goals
+
+```ebnf
+choose-goal
+    = "choose" ,
+      condition-header ,
+      control-body ,
+      [ else-branch ]
+    ;
+```
+
+Example:
+
+```cosmos
+choose(x = 1)
+    y = 2
+else
+    y = 3
+```
+
+`choose` represents committed if-then-else and lowers to Prolog `->`.
+It is distinct from the `soft_if`/`*->` soft-cut form.
+
+---
+
+# 24. Control Bodies
+
+Control structures may use an indented body or an explicitly terminated inline body.
+
+```ebnf
+control-body
+    = layout-body
+    | inline-body
+    ;
+
+unconditional-body
+    = layout-body
+    | inline-body
+    ;
+```
+
+Examples:
+
+```cosmos
+when(x = 1)
+    y = 2
+```
+
+```cosmos
+when(x = 1) y = 2;
+```
+
+---
+
+# 25. Case Goals
+
+A `case` contains two or more logical alternatives.
+
+```ebnf
+case-goal
+    = "case" ,
+      NEWLINE ,
+      INDENT ,
+      case-alternative ,
+      { case-separator , case-alternative } ,
+      DEDENT
+    ;
+```
+
+A case alternative consists of a guard followed by a more deeply indented body.
+
+```ebnf
+case-alternative
+    = goal ,
+      NEWLINE ,
+      INDENT ,
+      goal-block ,
+      DEDENT
+    ;
+```
+
+```ebnf
+case-separator
+    = { NEWLINE }
+    ;
+```
+
+Example:
+
+```cosmos
+rel append(l, a, b)
+    case
+        l = []
+            b = a
+	case
+        l = [x|xs]
+            append(xs, a, ys)
+            b = [x|ys]
+```
+
+Semantically, `case` expands to disjunction.
+
+The preceding example is equivalent to:
+
+```cosmos
+(l = [] and b = a)
+or
+(l = [x|xs] and append(xs, a, ys) and b = [x|ys])
+```
+
+The parser may preserve a `CaseGoal` node. A later lowering phase converts it into conjunctions and disjunctions.
+
+---
+
+# 26. Expressions
+
+```ebnf
+expression
+    = additive-expression
+    ;
+```
+
+Expressions produce values. They do not independently succeed or fail.
+
+---
+
+# 27. Arithmetic Precedence
+
+```ebnf
+additive-expression
+    = multiplicative-expression ,
+      { additive-operator , multiplicative-expression }
+    ;
+
+additive-operator
+    = "+"
+    | "-"
+    ;
+```
+
+```ebnf
+multiplicative-expression
+    = unary-expression ,
+      { multiplicative-operator , unary-expression }
+    ;
+
+multiplicative-operator
+    = "*"
+    | "/"
+    | "%"
+    ;
+```
+
+```ebnf
+unary-expression
+    = unary-operator , unary-expression
+    | postfix-expression
+    ;
+
+unary-operator
+    = "+"
+    | "-"
+    ;
+```
+
+Arithmetic precedence is:
+
+```text
+postfix operations
+unary + and -
+* / %
++ -
+```
+
+---
+
+# 28. Postfix Expressions
+
+```ebnf
+postfix-expression
+    = primary-expression ,
+      { postfix-operation }
+    ;
+```
+
+```ebnf
+postfix-operation
+    = call-suffix
+    | field-suffix
+    | index-suffix
+    ;
+```
+
+---
+
+# 29. Calls
+
+```ebnf
+call-suffix
+    = "(" ,
+      [ argument-list ] ,
+      ")"
+    ;
+
+argument-list
+    = expression ,
+      { "," , expression }
+    ;
+```
+
+Examples:
+
+```cosmos
+f()
+
+plus(x, 2)
+
+object.p(x)
+```
+
+---
+
+# 30. Field Access
+
+```ebnf
+field-suffix
+    = "." , identifier
+    ;
+```
+
+Examples:
+
+```cosmos
+object.name
+
+object.p
+```
+
+---
+
+# 31. Indexing
+
+```ebnf
+index-suffix
+    = "[" , expression , "]"
+    ;
+```
+
+Example:
+
+```cosmos
+list[i]
+```
+
+The exact runtime semantics of indexing remain to be specified.
+
+---
+
+# 32. Primary Expressions
+
+```ebnf
+primary-expression
+    = literal
+    | identifier
+    | list-expression
+    | dictionary-expression
+    | functor-expression
+    | anonymous-relation-expression
+    | parenthesized-expression
+    ;
+```
+
+---
+
+# 33. Parenthesized Expressions
+
+```ebnf
+parenthesized-expression
+    = "(" , expression , ")"
+    ;
+```
+
+---
+
+# 34. Literals
+
+```ebnf
+literal
+    = integer-literal
+    | float-literal
+    | string-literal
+    | boolean-literal
+    | atom-literal
+    ;
+```
+
+```ebnf
+boolean-literal
+    = "true"
+    | "false"
+    ;
+```
+
+Whether `true` and `false` are accepted as expression values as well as goals is a semantic decision. The lexer recognizes them as reserved tokens.
+
+---
+
+# 35. Lists
+
+```ebnf
+list-expression
+    = "[" , "]"
+    | "[" , list-items , "]"
+    ;
+```
+
+```ebnf
+list-items
+    = expression ,
+      { "," , expression } ,
+      [ "|" , expression ]
+    ;
+```
+
+Examples:
+
+```cosmos
+[]
+
+[1, 2, 3]
+
+[x|xs]
+
+[a, b|tail]
+```
+
+Lists participate in general unification.
+
+---
+
+# 36. Dictionaries
+
+```ebnf
+dictionary-expression
+    = "{" ,
+      [ dictionary-entries ] ,
+      "}"
+    ;
+```
+
+```ebnf
+dictionary-entries
+    = dictionary-entry ,
+      { dictionary-entry-separator , dictionary-entry }
+    ;
+```
+
+```ebnf
+dictionary-entry
+    = dictionary-key ,
+      "=" ,
+      expression
+    ;
+```
+
+```ebnf
+dictionary-entry-separator
+    = ","
+    | NEWLINE
+    ;
+```
+
+```ebnf
+dictionary-key
+    = identifier
+    | string-literal
+    | atom-literal
+    ;
+```
+
+Example:
+
+```cosmos
+person = {
+    name = "Alice"
+    age = 20
+}
+```
+
+Dictionary values may include relation values.
+
+---
+
+# 37. Functor Terms
+
+A functor application uses ordinary callable syntax.
+
+```ebnf
+functor-expression
+    = constructor-identifier ,
+      "(" ,
+      [ argument-list ] ,
+      ")"
+    ;
+```
+
+Examples:
+
+```cosmos
+Node(value, left, right)
+
+TupleInt(2)
+```
+
+A zero-argument functor may also be represented as a bare constructor identifier:
+
+```cosmos
+Red
+Black
+Empty
+```
+
+The distinction between a bare variable, atom, and zero-argument constructor is resolved by name resolution and functor declarations.
+
+---
+
+# 38. Anonymous Relations
+
+An anonymous relation is an expression.
+
+```ebnf
+anonymous-relation-expression
+    = "rel" ,
+      "(" ,
+      [ parameter-list ] ,
+      ")" ,
+      callable-body
+    ;
+```
+
+Example:
+
+```cosmos
+Relation Any p = rel(x)
+    x = 1
+```
+
+Anonymous relations capture visible lexical variables.
+
+Capture analysis is performed after parsing.
+
+Future versions may permit anonymous `fun` and `bool` forms.
+
+---
+
+# 39. Relational Call Sugar
+
+Expression-style relation calls are preserved by the parser.
+
+For example:
+
+```cosmos
+x = f()
+```
+
+initially parses as unification between `x` and a call expression.
+
+A later lowering phase transforms it into:
+
+```cosmos
+f(x)
+```
+
+Likewise:
+
+```cosmos
+y = plus(x, 2)
+```
+
+lowers to:
+
+```cosmos
+plus(x, 2, y)
+```
+
+This transformation is semantic and is not part of the concrete grammar.
+
+---
+
+# 40. Type Expressions
+
+```ebnf
+type-expression
+    = relation-type
+    | applied-type
+    ;
+```
+
+---
+
+# 41. Named and Applied Types
+
+Type application uses whitespace.
+
+```ebnf
+applied-type
+    = type-name ,
+      { type-argument }
+    ;
+```
+
+```ebnf
+type-argument
+    = type-name
+    | "(" , type-expression , ")"
+    ;
+```
+
+```ebnf
+type-name
+    = identifier
+    ;
+```
+
+Examples:
+
+```cosmos
+Any
+
+Integer
+
+Functor Integer
+
+Tree Any Any Any
+
+List Integer
+```
+
+Conceptually:
+
+```cosmos
+Tree Any Any Any
+```
+
+means:
+
+```text
+Tree(Any, Any, Any)
+```
+
+---
+
+# 42. Relation Types
+
+```ebnf
+relation-type
+    = "Relation" ,
+      type-expression
+    ;
+```
+
+Example:
+
+```cosmos
+Relation Any
+```
+
+A future revision may extend relation types with explicit parameter types.
+
+The AST should permit such an extension even if Draft 0.1 accepts only the result-type form.
+
+---
+
+# 43. Lexical Grammar
+
+## 43.1 Identifiers
+
+```ebnf
+identifier
+    = identifier-start ,
+      { identifier-continue }
+    ;
+```
+
+```ebnf
+identifier-start
+    = unicode-letter
+    | "_"
+    ;
+```
+
+```ebnf
+identifier-continue
+    = unicode-letter
+    | unicode-digit
+    | "_"
+    ;
+```
+
+The final specification may reserve naming conventions for types, constructors, and variables, but Draft 0.1 does not require Prolog capitalization rules.
+
+---
+
+## 43.2 Integers
+
+```ebnf
+integer-literal
+    = decimal-digit ,
+      { decimal-digit }
+    ;
+```
+
+---
+
+## 43.3 Floating-Point Numbers
+
+```ebnf
+float-literal
+    = decimal-digit ,
+      { decimal-digit } ,
+      "." ,
+      decimal-digit ,
+      { decimal-digit }
+    ;
+```
+
+Additional numeric forms may be added later.
+
+---
+
+## 43.4 Strings
+
+```ebnf
+string-literal
+    = '"' ,
+      { string-character | escape-sequence } ,
+      '"'
+    ;
+```
+
+```ebnf
+string-character
+    = ? any Unicode character except
+        unescaped quotation mark,
+        backslash,
+        or line terminator ?
+    ;
+```
+
+```ebnf
+escape-sequence
+    = "\\"
+      (
+          "\\"
+        | '"'
+        | "'"
+        | "n"
+        | "r"
+        | "t"
+        | "0"
+      )
+    ;
+```
+
+Examples:
+
+```cosmos
+"hello"
+
+"quotation: \""
+
+"apostrophe: \'"
+
+"backslash: \\"
+```
+
+The escaped apostrophe `\'` is valid even though strings are delimited by double quotation marks.
+
+---
+
+## 43.5 Atoms
+
+A provisional quoted-atom syntax is:
+
+```ebnf
+atom-literal
+    = "'" ,
+      { atom-character | escape-sequence } ,
+      "'"
+    ;
+```
+
+The exact role of atoms relative to zero-argument functors remains to be finalized.
+
+---
+
+## 43.6 Comments
+
+```ebnf
+line-comment
+    = "//" ,
+      { ? any character except a line terminator ? }
+    ;
+```
+
+```ebnf
+block-comment
+    = "/*" ,
+      { block-comment-character } ,
+      "*/"
+    ;
+```
+
+Nested block comments are not required by Draft 0.1.
+
+Comments are discarded before parsing but may be retained separately for documentation tooling.
+
+---
+
+# 44. Reserved Words
+
+The following words are reserved by Draft 0.1:
+
+```text
+rel
+fun
+bool
+if
+elseif
+else
+when
+choose
+case
+and
+or
+not
+once
+true
+false
+fail
+functor
+export
+Relation
+```
+
+`require` is normally resolved as a built-in callable rather than treated as declaration syntax.
+
+Whether it is lexically reserved may be decided by the implementation.
+
+---
+
+# 45. Layout Rules
+
+The layout analyzer operates after tokenization and before syntactic parsing.
+
+It must:
+
+* measure indentation at the start of logical lines;
+* ignore indentation on blank lines;
+* ignore indentation inside parentheses, brackets, and braces where appropriate;
+* reject inconsistent indentation;
+* emit `INDENT` when indentation increases;
+* emit one or more `DEDENT` tokens when indentation decreases;
+* emit `NEWLINE` between logical lines;
+* reject a block-opening header without an indented body;
+* reject unexpected indentation after a non-block-opening goal.
+
+The parser determines which constructs are permitted to open blocks.
+
+These include:
+
+```text
+rel
+fun
+bool
+anonymous rel
+if
+elseif
+else
+when
+choose
+case
+case alternatives
+```
+
+A simple goal does not itself open a nested block:
+
+```cosmos
+x = 1
+```
+
+---
+
+# 46. Explicit and Implicit Body Termination
+
+A body may be terminated in one of two ways.
+
+Indented form:
+
+```cosmos
+rel p(x)
+    true
+```
+
+Inline form:
+
+```cosmos
+rel p(x) true;
+```
+
+The semicolon terminates the inline body.
+
+It is not required after ordinary goals:
+
+```cosmos
+x = 1
+y = 2
+```
+
+The end of an indented body is represented by `DEDENT`, not by a synthesized semicolon.
+
+---
+
+# 47. Syntactic Normalization
+
+The parser or an immediate syntax-normalization pass may perform transformations that require no semantic name information:
+
+```text
+consecutive goals  → conjunction
+nested conjunction → flattened conjunction
+nested disjunction → flattened disjunction
+elseif chain       → one IfGoal with several branches
+```
+
+The following transformations belong to a later semantic-lowering phase:
+
+```text
+case                         → disjunction
+x = f(a)                     → f(a, x)
+lexical variable references → resolved bindings
+anonymous relation          → closure with captures
+type annotations            → type constraints
+```
+
+---
+
+# 48. Remaining Open Grammar Questions
+
+The following details remain intentionally open:
+
+1. The exact semantic distinction among `rel`, `fun`, and `bool`.
+...
+These questions do not prevent implementation of the initial lexer, layout analyzer, or parser.

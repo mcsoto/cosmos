@@ -1,0 +1,14 @@
+
+rel gen4(Functor f, String code, env, env2, info)
+	if(f=Declaration(name, type))
+		debug('declaration')
+		if(type=['Relation'|t])
+			t0=['void'|t]
+			print(t0)
+		else
+			t0=type
+		t0=type
+		Env.push(env, Var(name,'local',t0), env2)//env2=env
+		code=''
+		debug(Env.vars(env2))
+		

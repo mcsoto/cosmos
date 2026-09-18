@@ -1,0 +1,7 @@
+// Standard data functors are language built-ins.  This module exists so a
+// program may consistently `require('data', data)` without a missing module.
+//
+// T and Tuple accept any arity.  Pair/2, Some/1, and None/0 are also built in.
+
+t={}
+export(t)

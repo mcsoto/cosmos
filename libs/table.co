@@ -1,0 +1,180 @@
+functor(T, Functor)
+functor(Pair, Functor)
+
+debug=rel(x)true;
+
+rel new(t)
+	pl::new(t)
+
+rel get(t,o,o2)
+	pl::get_(t,o,o2)
+	
+rel set(t,o,o2,t2)
+	pl::set_(t,o,o2,t2)
+	
+rel remove(t,k,v,t2)
+	pl::del_(t,k,v,t2)//removes a pair-value k,v
+	
+rel next_(t,t2,k,v)
+	pl::next_pair(t,t2,k,v)
+	//get(t,k,v)
+	true
+	//remove(t,k,v,t2)
+	
+rel concat2(t,t2,t3)//forall x in List t2: add to t
+	when(next_(t2,t1,k,v))
+		true
+		set(t,k,v,t_)
+		concat2(t_,t1,t3)
+	else
+		t3=t
+	
+rel concat_(t,t2,t3)//forall x in List t: add to t2
+	when(next_(t,t1,k,v))
+		true
+		set(t2,k,v,t_)
+		concat_(t1,t_,t3)
+	else
+		t3=t2
+	
+rel next(l,l2,k,v,i)
+	if(l=[])
+		i=0
+	else
+		l=[a|l2]
+		a=Pair(k,v)
+		i=1
+		
+rel toList(t,l)
+	pl::assoc_to_list2(t,l)
+
+rel iter(t,l)
+	toList(t,l)
+	
+//table lib
+rel join(l, String sep, String s2)
+	next(l,l1,k,s,i)
+	if(i=1)
+		debug(s)
+		s2=s+sep+s1
+		debug(s2)
+		join(l1, sep, s1)
+	else
+		s2=''
+
+rel sub(t, l, t2)
+	next(l,l1,k,s,i)
+	if(i=1)
+		remove(t,k,_,t1)
+		sub(t1, l1, t2)
+	else
+		t2=t
+	
+rel map(t,p,l)
+	next(t,t1,k,v,i)
+	if(i=1)
+		debug([k,v])
+		p(k,v,x)
+		l=[x|l2]
+		map(t1,p,l2)
+	else
+		debug(['end',i,k,v])
+		l=[]
+	
+rel fold(l, p, Any a, Any result)
+	next(l,l1,k,b,i)
+	if(i=1)
+		p(a,k,b,c)
+		fold(l1, p, c, result)
+	else
+		a=result
+		
+rel concat(t,t2,t3)
+	pl::assoc_to_list(t,l)
+	concat_(l,t2,t3)
+	
+rel update(t,t2,t3)
+	pl::assoc_to_list(t2,l)
+	concat2(t,l,t3)
+	
+rel nothas(t,o)
+	for(x in t)
+		x!=o
+	
+rel notget(t,o,o2)
+	//pl::get_(t,o,o2)//in,in,any;det
+	false
+		
+rel _get(t,o,o2)
+	//pl::get_(t,o,o2)//in,in,any;det
+	false
+	
+t={
+	'new'=new
+	'get'=get
+	'set'=set
+	iter=iter
+	next=next_
+	
+	rel has(t,o)
+		get(t,o,_)
+		
+	rel toList(t,l)
+		pl::assoc_to_list(t,l)
+			
+	rel toKeys(t,l)
+		pl::assoc_to_keys(t,l)
+	
+	rel toValues(t,l)
+		pl::assoc_to_values(t,l)
+		
+	rel map(t,l,t2)
+		map(iter(t),l,t2)
+
+	rel join(t,l,t2)
+		join(iter(t),l,t2)
+
+	rel fold(t,l,c,t2)
+		fold(iter(t),l,c,t2)
+
+	rel sub(t,l,t2)
+		sub(t,iter(l),t2)
+
+	rel imap(t,l,t2)
+		true
+	
+	rel empty(t)
+		pl::empty_assoc(t)
+	
+	rel mixin(t,Properties,t2)
+		concat(Properties,t,t2)
+		
+	update=update
+	remove=remove
+	concat=concat
+}
+
+rel map_(t,l,t2)
+	true
+
+rel imap_(t,l,t2)
+	true
+
+pl::setmeta('table',t)
+
+/*
+	
+require('list', list)
+c::setmeta('list', list)*/
+//set(t3,'set2',set2,t)
+//export(t1)
+//exports=t3
+export(t)
+/*
+insert(E, f, 2)
+insert(f, f2, 1)
+insert(f2, f3, 3)
+insert(f3, f4, 4)
+debug(f4)
+member(f4,1)
+*/

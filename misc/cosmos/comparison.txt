@@ -1,0 +1,73 @@
+Functor parser vs table AST view
+================================
+
+Both implementations use the lexer and grammar in parser.co.  This is
+intentional: parser_tables.co changes the representation without introducing a
+second grammar whose bugs would make the comparison misleading.
+
+Functor representation (parser.co)
+-----------------------------------
+
+Example:
+
+    Program([
+        UnifyGoal(VarExpr("x", Loc(1,1)),
+                  LiteralExpr(1, Loc(1,5)),
+                  Loc(1,1))
+    ])
+
+Strengths:
+
+* Compact SWI-Prolog terms.
+* Natural Cosmos/Prolog structural pattern matching.
+* Node arity documents and validates the physical shape.
+* No lookup tree is needed for a field.
+
+Costs:
+
+* Consumers must know each node's argument order and arity.
+* Adding a field changes the functor shape and every matching pattern.
+* Generic tooling needs reflection or a node schema.
+
+Table representation (parser_tables.co)
+----------------------------------------
+
+Example:
+
+    {kind="Program", items=[
+        {kind="UnifyGoal",
+         left={kind="VarExpr", name="x", loc={...}},
+         right={kind="LiteralExpr", value=1, loc={...}},
+         loc={line=1,column=1}}
+    ]}
+
+Strengths:
+
+* Named fields are self-describing and order-independent.
+* Generic visitors can dispatch on `kind` and inspect fields dynamically.
+* Optional/new fields are easier to introduce without changing arity.
+* The shape is friendlier to editor tooling and serialization.
+
+Costs:
+
+* Every AST node becomes an immutable association tree with several entries.
+* Field access and construction require table operations.
+* Structural matching is less concise than matching a functor directly.
+* The comparison frontend adds one recursive projection traversal.
+
+Measured comparison
+-------------------
+
+On this workspace's SWI-Prolog 9.0.4, parsing parser.co and then projecting the
+result produced the following one-run figures:
+
+    grammar parse:       3.937500 CPU seconds
+    table projection:    0.656250 CPU seconds
+    functor AST:        76,646 term cells
+    table AST:         378,488 term cells
+
+The timing is illustrative rather than a benchmark suite, but term_size/2
+shows the central tradeoff clearly: the table representation used about 4.9x
+as many Prolog term cells for this source.  The functor AST is the better
+compiler-internal representation today; the table view is attractive at API,
+tooling, and serialization boundaries.

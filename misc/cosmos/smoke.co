@@ -1,0 +1,29 @@
+functor(Node, Tree Any Any Any)
+
+rel classify(Number x, out)
+    if(x < 0)
+        out = 'negative'
+    elseif(x = 0)
+        out = 'zero'
+    else
+        out = 'positive'
+
+rel member(item, values)
+    case
+        values = [item|_]
+    case
+        values = [_|tail]
+        member(item, tail)
+
+rel controls(values)
+    for(init i = 0; i < 2; next i = i + 1)
+        true
+    for(index, value in values)
+        value != 'missing'
+    some(value in values)
+        value = 1
+
+callback = rel(x) x >= 0;
+tree = Node(1, [], [])
+record = {name = 'cosmos', tree = tree, callback = callback}
+export(record)

@@ -1,0 +1,71 @@
+
+require('io',io)
+require('table',table)
+require('list', list)
+require('math',math)
+
+pause=io.pause
+range=math.range
+
+debug=rel(x) true;
+
+rel size(l, n)
+	if(l=[])
+		n=0
+	else
+		l=[_|tail]
+		Number j
+		n=j+1
+		size(tail,j)
+		
+functor(T,Functor)
+functor(Pair,Functor)
+
+rel array(t,z)
+	z=Pair(t,it)
+	it={
+		rel next(l,l2,k,v,i)
+			l=T(t,k,n)
+			//n=#l-1
+			if(n=k)
+				i=0
+			else
+				table.get(t,k,v)
+				l2=T(t,k+1,n)
+				i=1
+		rel iter(fc,fc2)
+			fc=Pair(t,_)
+			pl::assoc_to_list(t,l)
+			list.size(l,n)
+			fc2=T(t,0,n)
+	}
+	
+//
+
+p1={
+	piece='X'
+	ai=_default
+}
+p2={
+	piece='O'
+	ai=_default//_player//_default
+}
+
+function main()
+	true
+	
+t={_,_,_}
+for(i,x in array(t))
+	t[i]=1
+print(t)
+
+
+ 
+
+
+
+
+
+
+
+//print(board[0][0])

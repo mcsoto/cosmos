@@ -53,6 +53,7 @@ Cosmos is relational. `=` is unification: it constrains two values to be the
 same, and may bind an unbound variable.
 
 ```cosmos
+// file: hello.co
 rel add(x,y,result)
     result=x+y
 
@@ -114,7 +115,7 @@ Parameters may declare a mode and type:
 rel increment(In Number input,Out Number result)
     result=input+1
 
-increment(4,next)
+increment(4,nextValue)
 ```
 
 - `In` expects a ground value on entry.
@@ -175,7 +176,7 @@ They work as declarations and anonymous callable values:
 positive=bool(x)
     x>0
 
-choose=function(x,result)
+classify=function(x,result)
     if(positive(x))
         result='positive'
     else
@@ -267,6 +268,7 @@ Declare a class with a table of relations. A class constructor is named `new`
 and receives `this`, then `result`, then the user arguments:
 
 ```cosmos
+// file: class-point.co
 class(Point,{
     rel new(this,result,x,y)
         result=object.create(this,{x=x,y=y})
@@ -318,7 +320,11 @@ state updates:
 count=0
 !count+=1
 !count=count+1
+export(count)
 ```
+
+This complete program exports `2.0`. An update reads the current logical
+version and creates the next one; it does not overwrite a Prolog variable.
 
 The compiler implements `!` by threading fresh logical versions. A declaration
 such as `rel advance(!x)` expands to before/after positions; call it as
@@ -335,7 +341,10 @@ Field updates are also supported:
 ```cosmos
 point={x=1,y=2}
 !point.x+=3
+export(point)
 ```
+
+This exports `{x=4,y=2}` (shown in the runtime's table representation).
 
 Current iterative loops use `!` updates:
 
@@ -347,7 +356,11 @@ for(item in [2,3,4])
 i=0
 while(i<3)
     !i+=1
+
+export([total,i])
 ```
+
+The exported result is `[9.0,3.0]`.
 
 The temporal spelling uses `init` and `next`. Updates in one iteration are
 simultaneous, and `next value` reads the pending next value:
@@ -360,7 +373,12 @@ while(i<1)
     next x=y
     next y=x
     next i+=1
+
+export([x,y,i])
 ```
+
+The result is `[2.0,1.0,1.0]`: both assignments read the same current
+iteration, so this is a swap rather than two sequential assignments.
 
 `for(init i=0; i<3; next i+=1)` and `for(item in list)` are supported. Every
 next assignment on a possible path must be unambiguous. A branch that omits an
@@ -406,7 +424,7 @@ may be used to group alternatives.
 Compile dependencies before consumers, into the same directory:
 
 ```cosmos
-// arithmetic.co
+// file: arithmetic.co
 rel add(In Number x,In Number y,Out Number result)
     result=x+y
 export({add=add,pi=3.14159})
@@ -419,6 +437,7 @@ cosmos.bat -c arithmetic.co
 Then import its exported table:
 
 ```cosmos
+// file: consumer.co
 require('arithmetic',math)
 math.add(2,3,total)
 export(total)
@@ -523,14 +542,20 @@ host boundaries.
 ```powershell
 node compiler/build.mjs
 node --test tests/compiler/compiler.test.mjs
+node --test tests/compiler/guide.test.mjs
 ```
 
 The build compiles all six Cosmos compiler modules through successive Prolog
 stages and verifies that the final two generations are byte-identical.
 
-At the time of this update, the compiler suite passes 23 tests, the self-build
-stabilizes, and all 10 broader events/Canvas/runtime checks pass, including the
-complete shipped Space pipeline.
+The guide test extracts every fenced `cosmos` example in this document and
+compiles it with `compiler/platform/cli.pl`. Keep examples executable rather
+than adding pseudocode to a `cosmos` fence; use an unlabelled text fence for
+non-compiling sketches.
+
+At the time of this update, the compiler suite and executable-guide check pass,
+the self-build stabilizes, and the broader events/Canvas/runtime checks pass,
+including the complete shipped Space pipeline.
 
 ## Relationship to Cosmos 0.824
 

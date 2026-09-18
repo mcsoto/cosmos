@@ -1,0 +1,108 @@
+require('space',sp)
+require('table',table)
+require('list',list)
+require('logic',os)
+require('math',math)
+require('board',Board)
+require('object', object)
+
+range=math.range
+set=table.set
+
+//ai
+rel leftmost(x)
+	x=0 or x=1 or x=2
+	
+rel _default(board,x,y)
+	leftmost(x) and leftmost(y)
+	board.empty(x,y)
+	
+//data
+
+t_w=50 and t_h=50
+
+cpu={
+	piece='x'
+	ai=_default
+}
+player={
+	piece='o'
+	ai=_player
+}
+
+_board=object.create(Board)
+
+rel floor(x,y)
+	y=int(x)
+
+function radius_of(self, x,y, n)
+	self.x>=x-n and self.x<=x+n
+	self.y>=y-n and self.y<=y+n
+
+function find_tile(mx,x)
+	x = floor(mx/t_h)
+
+//graphical data
+
+sp.init(600,450)
+
+img_x=sp.loadImage('x.png')
+img_o=sp.loadImage('o.png')
+
+rel clear()
+	sp.setRGBA(255,255,255,255) and sp.clear()
+
+function draw(board)
+	sp.setRGB(0,0,100)
+	for(init x=0;x<3;next x=x+1;)
+		for(init y=0;y<3;next y=y+1;)
+			sp.rectBorder(x*t_w,y*t_h,t_w,t_h)
+			board.get(x,y,tile)
+			//print(['-',x,y,tile])
+			if(tile='x')
+				sp.drawImage(img_x,(x*t_w)+5,(y*t_h)+5)
+			elseif(tile='o')
+				sp.drawImage(img_o,(x*t_w)+5,(y*t_h)+5)
+			else
+				true
+
+rel checkwin(board)
+	board.win('x') or board.win('O') or board.full()//draw
+	
+function move(x,y,board,board2)
+	if(checkwin(board))
+		print('game ended')
+		board=board2
+	elseif(board.empty(x,y))
+		board.set(x,y,'o',board1)
+		if(checkwin(board1))//board1=checkwin(board1) ? board2 : board1.move(cpu) //?
+			print('game ended')
+			board1=board2
+		else
+			board1.move(cpu,board2)
+	else
+		board=board2
+
+sp.start(500,{
+	rel mouseup(mx,my,board,board2)
+		find_tile(mx,x)
+		find_tile(my,y)
+		print([x,y])
+		move(x,y,board,board2)
+	rel keypressed(key,s,s2)
+		if(key='escape')
+			pl::halt()
+		else
+			s2=s
+	rel update(s,s)
+		//clear
+		clear()
+		//draw
+		board=s
+		sp.setRGB(0,0,0)
+		draw(board)
+		//update
+		//end loop
+		sp.refresh()
+		//pl::halt()
+},_board)

@@ -1,0 +1,161 @@
+//currently keeps lp/fp 'map' as well as some os 'exec' data
+
+/*	
+todo Integer->Number
+*/
+
+require('list', list)
+require('string', string)
+/*
+rel toString(Any x, String s)
+	once if(pl::is_list(x))
+		list.map(x, toString, l2)
+		list.join(l2, ', ', s0)
+		s = '['+s0+']'
+	elseif(pl::compound(x) and pl::atom_string(atom,'closure') and pl::functor(x, atom, _))
+		s='#relation'
+	elseif(pl::var(x))
+		s = '#var'
+	elseif(pl::is_assoc(x)) //table
+		rel bindingToString(b, s)
+			pl::get_binding(b, key, value)
+			s = toString(key) + ' = ' + toString(value)
+		pl::assoc_to_list(x,l)
+		list.join(list.map(l, bindingToString), ' and ', s0)
+		s = '{'+s0+'}'
+	elseif(pl::atom(x)) 
+		pl::atom_string(x, s0)
+		if(string.slice(s0, 0, 2, 'fc')) //atomic functor
+			string.slice(s0, 2, string.size(s0), s)
+		else //relation
+			s='#relation'
+	elseif(pl::compound(x)) //functor
+		pl::functor_info(x, s0, args)
+		s = string.slice(s0, 2, string.size(s0)) + '(' + list.join(list.map(args, toString), ', ') + ')'
+	elseif(pl::number(x))
+		pl::number_string(x, s)
+	else
+		s=x
+	
+rel type(x,y)
+	pl::nonvar(x)
+	if(pl::number(x))
+		y='Number'
+	elseif(pl::string(x))
+		y='String'
+	elseif(pl::is_list(x))
+		y='List'
+	elseif(pl::is_assoc(x))
+		y='Record'
+	elseif(pl::compound(x) or pl::atom(x) or x=[])
+		y='Functor'
+	elseif(y='Relation')
+		s='rel'
+	elseif(y='File')
+		s='file'
+	elseif(y='ref')
+		s='ref'
+	else
+		s='null'
+	else
+		y='Any'*/
+	
+rel instantiated(Any x)
+	c::def(x)
+
+rel size(f,n)
+	c::fcsize(f,n)
+
+rel get(f,i,o2)
+	c::fcget(f,i,o2)
+
+rel logic_iterate(Relation Any Any p, n, x, y)
+	if(n=0)
+		y=x
+	else
+		p(x,x2)
+		logic_iterate(p,n-1,x2,y)
+		
+rel apply(Relation p, Functor l)
+	pl::apply2(p,l)
+	
+rel applyOnce(Relation p, Functor l)
+	pl::apply_once(p,l)
+	
+rel eval(fname)
+	//module=fname
+	//code='pl'+' -f '+fname+'.pl'+' -g '+'\"'+module+'(X),writeln(--),writeln_(-),halt\"'
+	//pl::shell(str(code))
+	pl::ensure_loaded(fname)
+	pl::atom_string(X,fname)
+	pl::call(X,_)
+
+t={
+	type=type
+	instantiated=instantiated
+	apply=apply
+	evalFile=eval
+		/*
+	rel foreach(i,j,p2)
+		when(i<=j)
+			x=i
+			p2(x)
+			foreach(num(i+1),j,p2)
+		else
+			true
+*/
+	rel applyOnce(Relation p, Functor l, Relation q)
+		pl::apply_catch(p,l,q)
+		
+	rel applyCatch(Relation p, Functor l, Relation q)
+		pl::apply_catch(p,l,q)
+		
+	rel listOf(x, Relation p, args, Functor l)
+		pl::list_of(x, p, args, l)
+/**/	
+	rel forall(p,l,p2,l2)
+		pl::forall_cl(p,l,p2,l2)
+		
+	rel range(i, j, x)
+		math.range(i, j, x)
+		
+	rel all(x,p,l)
+		pl::forall_cl(p,l,p2,l2)
+		
+	rel exit()
+		c::halt()
+	rel halt()
+		c::halt()
+	rel toString(x,s)
+		pl::str(x,s)
+
+	rel pause()
+		c::read(x)
+		
+	rel exec(s)
+		c::shell(s)
+		
+	rel throw(x)
+		c::throw(x)
+		/*
+	rel functor(x,name,n)
+		pl::functor(x,name2,n)
+		pl::atom_string(name2,name)
+		pl::cosmos_float(n,floatN)
+		n=floatN
+		*/
+	rel iterate(Relation p, n, x, y)
+		if(n=0)
+			y=x
+		else
+			logic_iterate(p, n, x, y)
+	rel path(x)
+		pl::atom_string(name,'cosmos')
+		c::file_search_path(name,x)
+	
+	'get'=get
+	'size'=size
+}
+export(t)
+
+

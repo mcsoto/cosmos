@@ -1,0 +1,409 @@
+SPACE PROGRAM PIPELINE: AUDIT AND IMPLEMENTATION PLAN
+Date: 2026-09-12
+
+IMPLEMENTATION UPDATE: STARTUP AND PILOT INPUT FIXED
+=================================================
+The startup blockers R1/R2 and tic-tac-toe failures R3/R4 below are now fixed
+in the implementation and shipped runtime bundle. The ABI uses a reserved
+printable @cosmos-host:<id> token and accepts SWI-WASM atom results as well
+as strings. Ordinary application strings must not use that reserved format.
+
+Numeric event arguments now use Cosmos-compatible float literals, including
+mouse button values. Tic-tac-toe accepts the button argument, ignores occupied
+cells and non-primary buttons, and has an unambiguous reset branch (the mixed
+tab indentation previously compiled without assigning its output state).
+Initialization failure is reported separately from a missing start call.
+
+Verification: node --test tests/space-canvas-host.test.mjs
+  tests/space-pipeline.test.mjs
+Result: 7 tests passed. The new integration test uses the actual shipped
+compiler/assets/session/SWI-WASM without diagnostic substitutions. It checks
+both pilots, occupied/repeated clicks, reset, Minesweeper's 70-cell win, nested
+graphics, returned native context handles, and setters.
+The recording Canvas does not verify visual fidelity. A hidden Electron smoke
+command returned exit code 0 but supplied no diagnostic payload, so this is
+not recorded as a verified visual/input acceptance gate.
+Historical findings below remain for context; broader lifecycle/package work
+is still pending.
+
+FOLLOW-UP REVIEW AFTER HANDLE/FACADE FIXES
+========================================
+This section supersedes the current-status claims in the original audit below.
+The original findings and plan are retained as historical context.
+
+Status: neither unmodified pilot reaches a running callback loop in the
+current shipped SWI-WASM pipeline. The remaining immediate work is narrower
+than the full API plan: repair the handle transport, then fix two tic-tac-toe
+input failures. Minesweeper's tested game transitions work past the transport.
+
+Confirmed improvements
+  - The malformed /libs/space.pl clause and duplicate asserted fallback are
+    gone. No facade syntax error appeared in this review.
+  - All 13 embedded compiler/runtime files match their checkout counterparts.
+  - Nested portable drawing works when the two transport issues below are
+    bypassed together in memory. The earlier root-only limitation has been
+    addressed in the runtime's conversion design.
+
+Remaining blockers, in repair order
+
+R1 [BLOCKER] Handle tokens arrive as atoms, not strings.
+  compiler/platform/runtime.pl:8 accepts the token only when string(Wire).
+  Actual cosmos_host_op(root,...) returns a Prolog atom from JavaScript.
+  The decoder falls through and leaves the token unwrapped; subsequent host
+  method dispatch fails. Both original apps compile but session.run() returns
+  tag=failure, with no registered tick.
+  Fix: normalize the actual wire types before decoding. Test with the real
+  SWI-WASM engine; JavaScript-only handle tests cannot detect this mismatch.
+
+R2 [BLOCKER] Embedded NUL prevents the reverse host call.
+  The new token begins with U+0000 (canvas/space-canvas-host.js: hostToken;
+  compiler/platform/runtime.pl: cosmos_host_encode).
+  An in-memory diagnostic change accepting atom tokens exposed a second
+  failure: calls back to JavaScript fail with "Could not evaluate ...dispatch"
+  and a diagnostic truncated at the embedded NUL. sp.init fails at startup;
+  portable graphics fails on its property lookup.
+  An in-memory test using a printable marker on BOTH sides, together with
+  atom-aware decoding, allowed startup and nested portable drawing to pass.
+  Fix: choose a transport representation safe in both directions. A printable
+  marker is a diagnostic proof, not a complete collision-safe codec design.
+
+R3 [HIGH] Tic-tac-toe release callback still omits button.
+  canvas/space_tictactoe.co:73 declares four public arguments; the runner
+  supplies five. After bypassing R1/R2, the first click raises an unknown
+  callback predicate error (/6 supplied versus /5 including environment).
+  Fix: add button to the callback and decide which buttons count as a move.
+  Validate the signature during registration, before accepting input.
+
+R4 [HIGH] Clicking an occupied tic-tac-toe cell stops the app.
+  After ALSO correcting R3 in the source string in memory, the first click
+  succeeds and a second click on the same cell raises:
+    Space callback failed: mousereleased
+  canvas/space_tictactoe.co:61 requires the cell to contain a space without
+  an unchanged-state alternative. The runner treats this ordinary invalid
+  move as fatal and disposes the session, so R cannot reset it afterward.
+  Fix: return state2=state for occupied cells; reserve callback errors for
+  actual application faults. Check the same behavior after the board is full.
+
+Additional release-readiness issues
+  - tests/space-canvas-host.test.mjs:74 still expects {host:id}; the host now
+    returns a string token. Result: 5 passing tests, 1 failing test. Update the
+    assertion to the agreed ABI and add real-WASM round-trip regression tests.
+  - canvas/main.js's --smoke-test logs renderer errors but calls app.quit()
+    without converting a failed graphical check into a nonzero exit status.
+    It must assert startup, input state changes, and reset independently.
+  - The available launcher remains canvas/space.bat; no space.cmd was found.
+    Use the actual filename in instructions or ship the intended alias.
+  - Fixed-step catch-up, compiled sp.stop(), package-relative resources, and
+    input completion from the original audit remain follow-up work. They are
+    not prerequisites for testing these two self-contained board-game pilots.
+  - The tic-tac-toe sample contains no winner/draw detection or terminal-game
+    lockout. Treat it as a board-placement demo until those rules are added;
+    distinguish that feature gap from the launch/input crashes above.
+
+Minesweeper verification AFTER in-memory transport bypasses
+  - Startup and drawing passed.
+  - Header click at (20,20) left moves=0 and revealed=[] unchanged.
+  - Mine click at (72,112) produced moves=1 and game_over=1.
+  - R reset restored moves=0, game_over=0, and no revealed cells.
+  - Clicking all 70 safe cells produced 70 revealed cells, moves=70,
+    game_over=0, and the Won state; drawing still succeeded.
+  These results validate the existing simplified game's tested transitions,
+  not a complete Minesweeper feature set or real-window interaction.
+
+Minimum acceptance gate for "space [app] runs reliably"
+  1. Run the unmodified packaged pipeline, with no diagnostic substitutions.
+  2. Both pilots register their tick and draw at their declared logical size.
+  3. Tic-tac-toe: first move, occupied-cell no-op, second valid move, outside
+     board no-op, and R reset all succeed without disposing the application.
+  4. Minesweeper: safe reveal, repeated reveal, header/outside no-op, mine,
+     post-loss input, R reset, all-safe win, and post-win reset pass.
+  5. Exercise those transitions through runner events, then actual Electron
+     pointer/keyboard input at a resized window, not only session.event().
+  6. Closing/relaunching works, and smoke-test failures return nonzero status.
+
+Scope of this follow-up
+  Actual bundled compiler, session adapter, SWI-WASM, and Space backend were
+  exercised with a recording Canvas substitute. Diagnostic codec/signature
+  changes existed only in memory and are NOT implementation fixes. No Electron
+  window was launched. Only this audit document was edited.
+
+ORIGINAL AUDIT AND BROADER PLAN
+==============================
+
+Purpose
+-------
+Make a Cosmos .co program launch as a graphical Space application through
+"space program.co", with application logic and state owned by Cosmos and
+graphics, input, and platform services supplied by the Space host API.
+
+This document records the audit of the current checkout and proposes next
+steps. It does not claim that the proposed fixes have been implemented.
+Paths below are relative to the repository root.
+
+1. CURRENT EXECUTION LAYOUT
+
+  space.bat program.co
+    -> canvas/space.mjs
+       Resolves the entry path against the caller's working directory.
+       Checks that it is a .co file and starts Electron.
+    -> canvas/main.js
+       Opens space-app.html and exposes the entry source through preload IPC.
+    -> canvas/preload.js / canvas/space-app.js
+       Retrieves {name, source}, creates a runner, and focuses its canvas.
+    -> canvas/cosmos-space-runner.js
+       Owns animation scheduling and canvas-local event forwarding.
+    -> canvas/cosmos-swipl-session.js
+       Loads bundled compiler/runtime assets into the SWI-WASM filesystem.
+       Compiles a revision, consults its Prolog, and invokes its entry.
+       Retains Cosmos callback closures and application state in Prolog.
+    -> compiler/platform/runtime.pl: cosmos_host_op/3
+       Implements the root/get/set/method boundary used by generated code.
+    -> canvas/space-canvas-host.js
+       Resolves host handles and performs Canvas2D/input operations.
+    -> Canvas2D presentation
+
+The compiler implementation is under compiler/src/. Standalone execution uses
+the generated compiler embedded in canvas/cosmos-swipl-assets.js, rather than
+rebuilding compiler/ for each launch. This is a real compiled Cosmos path;
+the active standalone path does not depend on Lua or game-name recognition.
+
+The checkout has canvas/space.bat, not space.cmd. The README's space.cmd
+examples therefore do not match the shipped launcher. No space.cmd was found
+in the checkout or by command lookup during this audit.
+
+2. VERIFICATION AND LIMITS
+
+Executed:
+  - node --test tests/space-canvas-host.test.mjs: 6 tests passed.
+  - Actual shipped SWI-WASM engine, compiler assets, and session adapter,
+    attached to the real Space backend with a recording Canvas substitute.
+  - Space Welcome: compilation, startup, drawing, and release event passed.
+  - Minesweeper: compilation, startup, drawing, and release event passed.
+  - Space tic-tac-toe: compilation and drawing passed; release event failed.
+  - Focused probes for nested handles, direct roots, stop, and dt.
+  - Controlled runner scheduling probe with simulated animation timestamps.
+  - Comparison of embedded compiler/runtime assets against local files:
+    12 matched; embedded src/swi.pl differed.
+
+Not verified:
+  - An actual Electron window, native user input, or visual rendering quality.
+  - A complete application package with sibling imports and image assets.
+  - Broad gameplay parity, browser portability, or long-running performance.
+
+The unit tests exercise the JavaScript host but do not establish that Cosmos
+values survive the complete Prolog/WASM/JavaScript boundary.
+
+3. FINDINGS
+
+F1 [HIGH] Returned host handles do not round-trip through the ABI.
+Evidence:
+  sp.graphics.rectangle(...) and sp.graphics.setColor(...) failed in actual
+  compiled execution. Calling fillRect on the result of getContext('2d') also
+  failed. Direct roots js::graphics and js::context successfully drew.
+Cause:
+  cosmos_host_root wraps the bridge result in host(...), while cosmos_get and
+  cosmos_method_value return bridge results without equivalent conversion.
+  Host setters receive serialized Prolog host terms that the JavaScript
+  resolver does not unwrap; this also affects assignment to space.canvas.
+Impact:
+  The primary portable API fails even when its JavaScript method exists.
+References:
+  compiler/platform/runtime.pl:4-26
+  canvas/space-canvas-host.js:150-165
+Action:
+  Define and implement one bidirectional value codec for every ABI operation.
+
+F2 [HIGH] A shipped Space program has an incompatible mouse callback.
+Evidence:
+  canvas/space_tictactoe.co draws, then fails on the first release event with
+  an unknown callback predicate at the supplied arity.
+Cause:
+  The runner supplies x,y,button,state,next; the example declares
+  mousereleased(mx,my,state,state2), omitting button.
+References:
+  canvas/space_tictactoe.co:73
+  canvas/cosmos-space-runner.js:49
+  canvas/cosmos-swipl-session.js:151-166
+Action:
+  Fix the example and validate callback signatures before scheduling input.
+  Preserve explicitly documented mouseup/mousedown compatibility adapters.
+
+F3 [HIGH] Launching a file loses its application package context.
+Evidence from source inspection:
+  Startup transfers only name and source. Session compilation writes source
+  into a synthetic WASM folder, and loads bundled libraries only. It does not
+  transfer sibling modules or interface files from the program's directory.
+  loadImage assigns the supplied string directly to Image.src, so relative
+  paths use the host page's base URL rather than the original .co directory.
+  HTML export embeds the entry source and runtimes without collecting assets
+  or application modules.
+References:
+  canvas/main.js:63-68
+  canvas/space.mjs:34-73
+  canvas/cosmos-swipl-session.js:53-77,183-203
+  canvas/space-canvas-host.js:146
+Action:
+  Carry entry identity, package root, module mapping, and asset resolution
+  through launch, compilation, and export. Test from a different working
+  directory, including paths containing spaces.
+
+F4 [MEDIUM] Fixed-step simulation is capped by rendering frequency.
+Evidence:
+  A 10 ms requested interval with 60 animation callbacks over approximately
+  one second produced only 60 updates, advancing 600 ms of simulation.
+Cause:
+  The accumulator processes at most one update per animation callback.
+Reference:
+  canvas/cosmos-space-runner.js:61-76
+Action:
+  Execute bounded catch-up updates, then draw once. Define how excess lag is
+  handled. Do not simply invoke the current combined update/draw operation
+  repeatedly and call that independent rendering.
+Contract decision:
+  Current callbacks receive milliseconds. Earlier porting plans specify
+  seconds. Resolve and document this difference explicitly; preserve v1
+  start(interval) milliseconds and avoid silent application behavior changes.
+
+F5 [MEDIUM] Stop and disposal do not share the compiled scheduler's ownership.
+Evidence:
+  A compiled update calling sp.stop() still permitted subsequent frames.
+Cause:
+  start/startCanvas are intercepted in Prolog, but stop reaches the separate
+  JavaScript animation loop. Session disposal retracts runtime state without
+  invoking an application disposal callback.
+References:
+  canvas/cosmos-swipl-session.js:89-101,134,278-285
+  canvas/space-canvas-host.js:114-142
+Action:
+  Make start, stop, restart, and disposal operate on one application instance.
+  Define cleanup order, callback failure behavior, and cancellation semantics.
+
+F6 [MEDIUM] Startup writes a syntactically invalid Space facade.
+Evidence:
+  Actual execution reports /libs/space.pl:2:117, Illegal start of term.
+Cause:
+  The hard-coded generated clause contains an extra closing parenthesis.
+  A separately asserted space/1 definition masks the broken library load.
+Reference:
+  canvas/cosmos-swipl-session.js:75-79
+Action:
+  Compile and bundle one authoritative facade from its Cosmos source; remove
+  the duplicate runtime patch once the generated facade is verified.
+
+F7 [MEDIUM] Input and async services have incomplete application contracts.
+Source findings:
+  - Documented focus/blur application callbacks are not forwarded.
+  - textinput relies on beforeinput on a non-editable canvas, without a text
+    entry mechanism for normal typing or composed input.
+  - Wheel deltas are forwarded without deltaMode normalization.
+  - Image loading returns a Promise but the synchronous Cosmos bridge has no
+    application completion/preload scheduling contract.
+References:
+  canvas/cosmos-space-runner.js:47-60
+  canvas/space-canvas-host.js:146
+Action:
+  Complete focused input routing and define queued asynchronous completions.
+  Keep unsupported APIs explicit instead of treating a Promise handle as a
+  loaded resource.
+
+F8 [LOW] Documentation and build provenance have drifted.
+Evidence:
+  canvas/README.md still describes game-specific fallback execution and a
+  space.cmd launcher. The current code uses shared compiled callbacks.
+  Embedded src/swi.pl differs from the local source; this is a freshness
+  finding, not proof that the difference itself causes a runtime defect.
+Action:
+  Regenerate browser assets as part of a reproducible build and check hashes.
+  Document the actual command and supported contract. Include required SWI
+  session/assets files in installation verification; remove obsolete Lua
+  prerequisites from the standalone Space setup path where unnecessary.
+
+4. PROPOSED TARGET LAYOUT
+
+  Launcher
+    -> Application descriptor
+       Entry path, package root, API version, logical size, title, resources.
+    -> Module/asset resolver
+       Same package identities for desktop execution and HTML export.
+    -> Compiler service
+       Versioned compiler/runtime bundle; compiled artifact and diagnostics.
+    -> Application instance
+       Cosmos state, callbacks, event queue, clock, resource ownership.
+    -> Typed host bridge
+       Shared conversion rules for root/get/set/method and async completion.
+    -> Space backend
+       Graphics, focused input, resource loading, and platform adapters.
+
+Keep game rules and state transitions in Cosmos. JavaScript supplies host
+primitives and instance scheduling. Separate legacy API adapters from the
+portable contract so compatibility does not depend on guessing source text.
+
+5. IMPLEMENTATION ORDER AND ACCEPTANCE GATES
+
+Step 1: Repair the value boundary and facade boot.
+  - Specify primitives, false, null, lists, records, opaque handles, and void
+    effects; preserve method receivers and nested host arguments.
+  - Fix root/get/set/method conversion consistently.
+  - Generate one valid Space facade and fail startup on invalid assets.
+  Gate: a compiled program draws using sp.graphics, obtains a native context,
+  uses a returned font handle, and passes a host handle into a setter/method.
+  No startup syntax errors; no fallback definition required.
+
+Step 2: Establish a complete runnable pilot.
+  - Correct tic-tac-toe callback signatures.
+  - Validate required and optional callbacks at registration.
+  - Test valid clicks, occupied cells, out-of-board clicks, and restart.
+  - Decide whether an event relation failing means rejection or a fatal app
+    error; encode that policy deliberately and report useful diagnostics.
+  Gate: Welcome, Minesweeper, and tic-tac-toe run and respond through the same
+  pipeline using real compiled code, without application-specific host logic.
+
+Step 3: Unify lifecycle and timing.
+  - Give the application instance ownership of start/stop/dispose.
+  - Separate update from draw and implement bounded catch-up.
+  - Settle dt units, API version selection, and lag policy.
+  - Release session files, host handles, listeners, and pending work.
+  Gate: identical state traces across different rendering schedules; no more
+  updates or input transitions after stop; restart creates a clean instance.
+
+Step 4: Support application packages.
+  - Preserve the source directory and resolve local imports/interfaces.
+  - Resolve asset URLs against the package, with explicit preload completion.
+  - Package the same dependencies for single-file export or reject export
+    with a clear list of unresolved resources.
+  Gate: an external folder containing main.co, a helper module, and an image
+  works from another working directory and in its exported form.
+
+Step 5: Finish input and graphics behavior needed by the next ports.
+  - Focus/blur, text composition, normalized wheel, pointer cancellation.
+  - Graphics state push/pop and frame boundaries.
+  - Font measurement and wrapping where required by an actual pilot.
+  Gate: focused input reaches one instance, lost focus releases held input,
+  and text/graphics behavior is checked in a real browser or Electron window.
+
+Step 6: Make delivery reproducible.
+  - Choose and ship the canonical command spelling; align README examples.
+  - Automate compiler/facade/runtime bundle generation and freshness checks.
+  - Turn graphical smoke failures into a failing process exit status.
+  - Distinguish HTML packaging from ahead-of-time compilation: current -c
+    embeds source and compiler, with Cosmos compilation occurring at startup.
+  Gate: a clean install can launch the pilot using the documented command.
+
+6. NEXT CONCRETE TASK
+
+Start with F1 and F6, backed by tests that load the actual shipped session
+adapter and SWI-WASM engine. Do not substitute a duplicate bridge implementation
+inside the test. Use a recording Canvas for ABI assertions, then a real window
+for the graphical acceptance gate.
+
+Minimal regression sequence:
+  1. Import space with no boot diagnostics.
+  2. Set logical dimensions through the facade.
+  3. Draw through sp.graphics and a returned native context.
+  4. Read a host property/result and pass a handle back to the host.
+  5. Run one update and draw with an observable state change.
+  6. Deliver mouse and keyboard events with the documented signatures.
+  7. Stop and verify that no further callbacks run.
+
+After that gate passes, tackle package resolution and scheduler correctness
+before adding more API surface or porting larger games.
