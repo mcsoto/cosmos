@@ -217,6 +217,19 @@ types. If a checked constructor receives an unbound field, the compiler installs
 a delayed runtime guard; binding that field later to the wrong type raises a
 contract error.
 
+Use a leading colon when the constructor is intentionally undeclared and should
+be emitted as an arbitrary Prolog functor:
+
+```cosmos
+value=:F(1,2)
+empty=:Empty
+```
+
+The result has the general static type `Functor`. Arguments are checked and
+evaluated normally, but there is deliberately no declared parent, field-type, or
+arity validation. Without the colon, `F(1,2)` remains an ordinary declared
+constructor or callable expression.
+
 ## Protocols
 
 Protocols describe structural fields and methods:
@@ -361,36 +374,14 @@ iteration, plain `x` is the current value and `next x` is the shared pending
 value, even when read before its assignment. Temporal assignments currently use
 `=` and `+=`; do not mix `!` state transitions into the same temporal loop body.
 
-## Meta templates
+## Meta declarations
 
-The active compiler adds source-defined meta templates; this facility was not
-present in the 0.824 self-hosted compiler. Parameters are declared as `Goal` or
-`Expr`, and the template may be call-style, unary, or binary:
-
-```cosmos
-meta twice(Expr value):unary
-    value+value
-
-meta unless(Goal condition,Goal fallback):binary
-    if not condition
-        fallback
-
-rel unavailable()
-    false
-rel available()
-    true
-
-eight=twice 4
-unavailable() unless available()
-```
-
-Call-style use such as `twice(4)` is also accepted. `temporal(init, goal)`,
-`temporal(next, goal)`, and `temporal(until, condition, body)` let templates
-construct temporal syntax before normal lowering.
-
-Meta operator recognition is currently too broad: an ordinary identifier can
-occasionally be parsed as an undeclared word operator. The verified Space
-fixture presently fails with `Unknown meta operator: state`; see Current limits.
+The active compiler deliberately does not support source-defined `meta`
+declarations. They were present in the archived `compiler-0.8.43` experiment,
+but its broad word-operator recognition increased compiler load and could
+misparse ordinary program identifiers. A `meta ...` declaration is therefore a
+parse error in the current compiler. This removal does not affect ordinary
+relations, callable values, or explicit and temporal state syntax.
 
 ## Conditionals, iteration, assertions, and errors
 
@@ -523,13 +514,6 @@ The current compiler is usable, but these areas remain incomplete:
   loops;
 - asynchronous host calls and a universal live-host value codec.
 
-There is also one confirmed regression in the current tree: both native and
-SWI-WASM compilation of `canvas/space_tictactoe.co` fail with
-`Unknown meta operator: state`. The generic Canvas bridge and host-dispatch
-tests pass; the failure occurs earlier in parsing/meta expansion. Until the meta
-grammar is narrowed, the complete shipped Space application pipeline should not
-be considered passing.
-
 Use annotations at module boundaries, compile imported modules first, and keep
 runtime contract checks enabled while developing code that crosses dynamic or
 host boundaries.
@@ -544,9 +528,9 @@ node --test tests/compiler/compiler.test.mjs
 The build compiles all six Cosmos compiler modules through successive Prolog
 stages and verifies that the final two generations are byte-identical.
 
-At the time of this update, the compiler suite passes 22 tests and the
-self-build stabilizes. The broader events/Canvas/runtime checks pass except for
-the Space pipeline regression described above.
+At the time of this update, the compiler suite passes 23 tests, the self-build
+stabilizes, and all 10 broader events/Canvas/runtime checks pass, including the
+complete shipped Space pipeline.
 
 ## Relationship to Cosmos 0.824
 
@@ -555,11 +539,16 @@ callable categories, typed modes, explicit and temporal state, protocols,
 classes, constructors, nominal functors, query compilation, and SWI execution.
 The active tree additionally has:
 
-- source-defined meta templates;
+- arbitrary undeclared functors through `:Name(...)` and `:Name`;
 - `.cif` interfaces with exported and nested table-member checking;
 - one-shot queries in a file's lexical scope;
 - generic `--main` and `--exe` application entry points;
 - generated SWI-WASM compiler assets and synchronous Canvas host dispatch.
+
+Compared with the archived `compiler-0.8.43`, the active compiler source is
+about 8.5 percent smaller and its generated Prolog is about 8.3 percent smaller
+because MetaDecl parsing and expansion are absent. The independent checker,
+interface, CLI, REPL, host, and arbitrary-functor improvements are retained.
 
 Do not use the old `cosmos-0.824` compiler, runtime, or generated artifacts as
 dependencies of new programs. Use it only as a historical behavior reference;

@@ -11,13 +11,6 @@ functor(OrGoal,Functor)
 functor(ControlGoal,Functor)
 functor(TrueGoal,Functor)
 functor(RelationDecl,Functor)
-functor(MetaDecl,Functor)
-functor(MetaParam,Functor)
-functor(MetaApplyGoal,Functor)
-functor(MetaRefGoal,Functor)
-functor(TemporalGoal,Functor)
-functor(MetaUnaryExpr,Functor)
-functor(MetaBinaryExpr,Functor)
 functor(ClosureExpr,Functor)
 functor(CallGoal,Functor)
 functor(CallExpr,Functor)
@@ -30,156 +23,6 @@ functor(ForGoal,Functor)
 functor(ListExpr,Functor)
 functor(NextExpr,Functor)
 functor(TypedDecl,Functor)
-
-rel collect_metas([],metas,metas,[])
-    true
-rel collect_metas([node|nodes],before,after,items)
-    choose(node=MetaDecl(name,params,fixity,category,body,loc))
-        choose(pl::get_assoc(name,before,_))
-            throw(CompileError('Duplicate meta declaration: '+name,loc))
-        else
-            true
-        choose((fixity='unary' and #params=1) or (fixity='binary' and #params=2) or fixity='call')
-            true
-        else
-            throw(CompileError('Meta fixity does not match parameter count: '+name,loc))
-        pl::set_(before,name,node,middle)
-        items=rest
-    else
-        middle=before
-        items=[node|rest]
-    collect_metas(nodes,middle,after,rest)
-
-rel goal_from_expression(CallExpr(fn,args,loc),CallGoal(fn,args,loc)) true
-rel goal_from_expression(VarExpr(name,loc),MetaRefGoal(name,loc)) true
-rel goal_from_expression(MetaUnaryExpr(name,value,loc),MetaApplyGoal(name,[goal],loc))
-    goal_from_expression(value,goal)
-rel goal_from_expression(MetaBinaryExpr(name,a,b,loc),MetaApplyGoal(name,[left,right],loc))
-    goal_from_expression(a,left)
-    goal_from_expression(b,right)
-rel goal_from_expression(value,goal)
-    throw(CompileError('Expected goal syntax in meta argument',Loc(0,0)))
-
-rel bind_meta_args([],[],bindings,bindings)
-    true
-rel bind_meta_args([MetaParam(kind,name,loc)|params],[arg|args],before,after)
-    choose(kind='Goal')
-        choose(arg=CallExpr(_,_,_) or arg=VarExpr(_,_) or arg=MetaUnaryExpr(_,_,_) or arg=MetaBinaryExpr(_,_,_,_))
-            goal_from_expression(arg,value)
-        else
-            value=arg
-    else
-        value=arg
-    pl::set_(before,name,value,middle)
-    bind_meta_args(params,args,middle,after)
-rel bind_meta_args(params,args,before,after)
-    throw(CompileError('Wrong meta arity',Loc(0,0)))
-
-rel substitute_list([],bindings,[])
-    true
-rel substitute_list([node|nodes],bindings,[result|results])
-    substitute(node,bindings,result)
-    substitute_list(nodes,bindings,results)
-
-rel substitute(node,bindings,result)
-    choose(node=VarExpr(name,_) and pl::get_assoc(name,bindings,value))
-        result=value
-    elseif(node=MetaRefGoal(name,loc))
-        choose(pl::get_assoc(name,bindings,value))
-            result=value
-        else
-            throw(CompileError('Unknown meta template parameter: '+name,loc))
-    elseif(pl::is_list(node))
-        substitute_list(node,bindings,result)
-    elseif(pl::compound(node))
-        pl::cc_parts(node,name,args)
-        substitute_list(args,bindings,values)
-        pl::cc_term(name,values,result)
-    else
-        result=node
-
-rel expand_meta(name,args,mode,metas,stack,result)
-    choose(name in stack)
-        throw(CompileError('Recursive meta expansion: '+name,Loc(0,0)))
-    else
-        true
-    choose(pl::get_assoc(name,metas,MetaDecl(_,params,fixity,category,body,loc)))
-        true
-    else
-        throw(CompileError('Unknown meta operator: '+name,Loc(0,0)))
-    choose(mode in ['unary','binary','goalUnary','goalBinary'])
-        choose(mode='goalUnary')
-            expectedFixity='unary'
-            expectedCategory='Goal'
-        elseif(mode='goalBinary')
-            expectedFixity='binary'
-            expectedCategory='Goal'
-        else
-            expectedFixity=mode
-            expectedCategory='Expr'
-        choose(expectedFixity=fixity)
-            true
-        else
-            throw(CompileError('Meta operator used with wrong fixity: '+name,loc))
-        choose(expectedCategory=category)
-            true
-        else
-            throw(CompileError('Meta result category does not match use: '+name,loc))
-    else
-        choose((mode='goal' and category='Goal') or (mode='expr' and category='Expr'))
-            true
-        else
-            throw(CompileError('Meta result category does not match use: '+name,loc))
-    pl::new(empty)
-    bind_meta_args(params,args,empty,bindings)
-    substitute(body,bindings,expanded)
-    expand_node(expanded,metas,[name|stack],result)
-
-rel expand_nodes([],metas,stack,[])
-    true
-rel expand_nodes([node|nodes],metas,stack,[result|results])
-    expand_node(node,metas,stack,result)
-    expand_nodes(nodes,metas,stack,results)
-
-rel expand_temporal(kind,args,loc,result)
-    choose(kind in ['init','next'] and args=[body])
-        result=UnaryGoal(kind,body,loc)
-    elseif(kind='until' and args=[condition,body])
-        result=ControlGoal('while',UnaryGoal('not',condition,loc),body,None,loc)
-    else
-        throw(CompileError('Invalid temporal syntax constructor: '+kind,loc))
-
-rel expand_node(node,metas,stack,result)
-    choose(node=MetaApplyGoal(name,[arg],_))
-        expand_meta(name,[arg],'goalUnary',metas,stack,result)
-    elseif(node=MetaApplyGoal(name,[a,b],_))
-        expand_meta(name,[a,b],'goalBinary',metas,stack,result)
-    elseif(node=MetaUnaryExpr(name,arg,_))
-        expand_meta(name,[arg],'unary',metas,stack,result)
-    elseif(node=MetaBinaryExpr(name,a,b,_))
-        expand_meta(name,[a,b],'binary',metas,stack,result)
-    elseif(node=CallGoal(VarExpr(name,_),args,_) and pl::get_assoc(name,metas,_))
-        expand_meta(name,args,'goal',metas,stack,result)
-    elseif(node=CallExpr(VarExpr(name,_),args,_) and pl::get_assoc(name,metas,_))
-        expand_meta(name,args,'expr',metas,stack,result)
-    elseif(node=TemporalGoal(kind,args,loc))
-        expand_nodes(args,metas,stack,values)
-        expand_temporal(kind,values,loc,result)
-    elseif(node=MetaRefGoal(name,loc))
-        throw(CompileError('Meta parameter used outside a template: '+name,loc))
-    elseif(pl::is_list(node))
-        expand_nodes(node,metas,stack,result)
-    elseif(pl::compound(node))
-        pl::cc_parts(node,name,args)
-        expand_nodes(args,metas,stack,values)
-        pl::cc_term(name,values,result)
-    else
-        result=node
-
-rel expand_program(items,result)
-    pl::new(empty)
-    collect_metas(items,empty,metas,program)
-    expand_nodes(program,metas,[],result)
 
 rel fresh(counter,name)
     pl::cc_cell_get(counter,n)
@@ -593,9 +436,8 @@ rel rewrite(node,before,counter,result,after)
 rel normalize(items,result)
     pl::new(empty)
     pl::cc_cell(0,counter)
-    expand_program(items,expanded)
-    declared_modes(expanded,empty,modes)
-    attach_modes(expanded,modes,annotated)
+    declared_modes(items,empty,modes)
+    attach_modes(items,modes,annotated)
     sequence(annotated,empty,counter,result,_)
 rel declared_modes([],modes,modes) true
 rel declared_modes([node|nodes],before,after)
