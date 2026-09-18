@@ -23,18 +23,3 @@ the answer without relying on a separately reconstructed convention.
 `variables` must be a list of identifier strings; its order is the answer
 order. For example, selecting `["y", "x"]` makes the generated entry return
 `[y, x]`.
-
-## Command-line applications
-
-Pass `--main` when compiling an application to add a generic command-line
-entry point for `rel main(args)`. `args` is the conventional argv list: its
-zero element is the executable and `args[1]` is the first user argument.
-
-```
-cosmos.bat -c app --main
-cosmos.bat -c app --exe
-```
-
-`--exe` implies `--main`, writes `app.pl`, and uses SWI-Prolog's saved-state
-utility to create `app.exe`. The executable invokes the generated `main/1`
-relation; no source filename or program-specific behavior is involved.

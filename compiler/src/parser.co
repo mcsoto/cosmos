@@ -8,8 +8,6 @@ functor(Token, Functor)
 functor(Loc, Functor)
 functor(Program, Functor)
 functor(RelationDecl, Functor)
-functor(MetaDecl, Functor)
-functor(MetaParam, Functor)
 functor(FunctorDecl, Functor)
 functor(ExportDecl, Functor)
 functor(TypedDecl, Functor)
@@ -30,9 +28,6 @@ functor(UnifyGoal, Functor)
 functor(HasGoal, Functor)
 functor(CompareGoal, Functor)
 functor(CallGoal, Functor)
-functor(MetaApplyGoal, Functor)
-functor(MetaRefGoal, Functor)
-functor(TemporalGoal, Functor)
 functor(ControlGoal, Functor)
 functor(ForGoal, Functor)
 functor(ForInGoal, Functor)
@@ -42,8 +37,6 @@ functor(LiteralExpr, Functor)
 functor(CallExpr, Functor)
 functor(BinaryExpr, Functor)
 functor(UnaryExpr, Functor)
-functor(MetaUnaryExpr, Functor)
-functor(MetaBinaryExpr, Functor)
 functor(SizeExpr, Functor)
 functor(NextExpr, Functor)
 functor(FieldExpr, Functor)
@@ -410,9 +403,7 @@ rel parse_program_items(tokens, items, rest)
         items = [item|tail]
 
 rel parse_program_item(tokens, item, rest)
-    choose(is_token(tokens,'meta'))
-        parse_meta_declaration(tokens,item,rest)
-    elseif(starts_relation(tokens))
+    choose(starts_relation(tokens))
         parse_relation_declaration(tokens, item, rest)
     elseif(is_token(tokens, 'functor'))
         parse_functor_declaration(tokens, item, rest)
@@ -433,87 +424,6 @@ rel parse_program_item(tokens, item, rest)
         parse_typed_declaration(tokens, item, rest)
     else
         parse_goal(tokens, item, rest)
-
-rel parse_meta_parameters(tokens,params,rest)
-    choose(is_token(tokens,')'))
-        params=[]
-        rest=tokens
-    else
-        token_loc(tokens,loc)
-        eat(tokens,'ID',t1,Token(_,category,_,_))
-        choose(category in ['Goal','Expr'])
-            true
-        else
-            throw(ParseError('Meta parameters must be Goal or Expr',tokens))
-        eat(t1,'ID',t2,Token(_,name,_,_))
-        choose(is_token(t2,','))
-            eat(t2,',',t3,_)
-            parse_meta_parameters(t3,tail,rest)
-            params=[MetaParam(category,name,loc)|tail]
-        else
-            params=[MetaParam(category,name,loc)]
-            rest=t2
-
-rel meta_goal_parameter([MetaParam(category,name,_)|params],name)
-    category='Goal'
-rel meta_goal_parameter([_|params],name)
-    meta_goal_parameter(params,name)
-
-rel meta_goal_start(tokens,params)
-    token_value(tokens,word)
-    word in ['assert','init','next','not','unsafeNot','once','if','when','choose','soft_if','while','for','for-in','some','case','true','false','fail','cut','temporal']
-rel meta_goal_start(tokens,params)
-    token_type(tokens,'ID')
-    token_value(tokens,name)
-    meta_goal_parameter(params,name)
-
-rel parse_meta_block(tokens,params,category,body,rest)
-    skip_newlines(tokens,t1)
-    eat(t1,'INDENT',t2,_)
-    skip_newlines(t2,start)
-    choose(meta_goal_start(start,params))
-        parse_body_items(start,goals,t3)
-        make_and(goals,body)
-        category='Goal'
-    else
-        parse_term(start,body,t3)
-        category='Expr'
-    skip_newlines(t3,t4)
-    eat(t4,'DEDENT',rest,_)
-
-rel parse_meta_template(tokens,params,category,body,rest)
-    choose(is_token(tokens,'NEWLINE'))
-        parse_meta_block(tokens,params,category,body,rest)
-    elseif(meta_goal_start(tokens,params))
-        parse_goal(tokens,body,t1)
-        optional_token(t1,';',t2)
-        skip_newlines(t2,rest)
-        category='Goal'
-    else
-        parse_term(tokens,body,t1)
-        optional_token(t1,';',t2)
-        skip_newlines(t2,rest)
-        category='Expr'
-
-rel parse_meta_declaration(tokens,declaration,rest)
-    token_loc(tokens,loc)
-    eat(tokens,'meta',t1,_)
-    eat(t1,'ID',t2,Token(_,name,_,_))
-    eat(t2,'(',t3,_)
-    parse_meta_parameters(t3,params,t4)
-    eat(t4,')',t5,_)
-    choose(is_token(t5,':'))
-        eat(t5,':',t6,_)
-        eat(t6,'ID',t7,Token(_,fixity,_,_))
-        choose(fixity in ['unary','binary'])
-            true
-        else
-            throw(ParseError('Meta fixity must be unary or binary',t6))
-    else
-        fixity='call'
-        t7=t5
-    parse_meta_template(t7,params,category,body,rest)
-    declaration=MetaDecl(name,params,fixity,category,body,loc)
 
 rel parse_id_words_until_paren(tokens, words, rest)
     choose(is_token(tokens, ')'))
@@ -637,13 +547,11 @@ rel parse_parameters(tokens, params, rest)
             rest = t1
 
 rel parse_parameter(tokens, param, rest)
-    choose(token_type(tokens,'ID') and tokens=[Token(_,first_name,line,column),Token('ID',_,_,_)|_])
-        eat(tokens,'ID',typed,_)
-        loc=Loc(line,column)
-        parse_parameter_type_tail(typed,[first_name],words,name,rest)
-        param=TypedParam(words,name,loc)
+    parse_term(tokens, first, t1)
+    choose(first = VarExpr(first_name, loc) and is_token(t1, 'ID'))
+        parse_parameter_type_tail(t1, [first_name], words, name, rest)
+        param = TypedParam(words, name, loc)
     else
-        parse_term(tokens, first, t1)
         param = first
         rest = t1
 
@@ -747,23 +655,7 @@ rel control_keyword(word)
     word in ['if','when','choose','soft_if','while','for','for-in','some']
 
 rel parse_unary_goal(tokens, goal, rest)
-    choose(is_token(tokens,'temporal'))
-        token_loc(tokens,loc)
-        eat(tokens,'temporal',t1,_)
-        eat(t1,'(',t2,_)
-        eat(t2,'ID',t3,Token(_,kind,_,_))
-        eat(t3,',',t4,_)
-        parse_goal(t4,first,t5)
-        choose(is_token(t5,','))
-            eat(t5,',',t6,_)
-            parse_goal(t6,second,t7)
-            args=[first,second]
-        else
-            args=[first]
-            t7=t5
-        eat(t7,')',rest,_)
-        goal=TemporalGoal(kind,args,loc)
-    elseif(is_token(tokens,'assert'))
+    choose(is_token(tokens,'assert'))
         token_loc(tokens,loc)
         eat(tokens,'assert',t1,_)
         choose(is_token(t1,'('))
@@ -803,11 +695,6 @@ rel parse_unary_goal(tokens, goal, rest)
         goal = UnaryGoal(word, child, loc)
     elseif(token_type(tokens, 'ID') and token_value(tokens, word) and control_keyword(word))
         parse_control(tokens, goal, rest)
-    elseif(token_type(tokens,'ID') and unsafeNot next_is_token(tokens,'(') and tokens=[_|tail] and token_type(tail,'ID') and token_value(tail,operandWord) and meta_binary_word(operandWord))
-        token_loc(tokens,loc)
-        eat(tokens,'ID',t1,Token(_,name,_,_))
-        parse_unary_goal(t1,child,rest)
-        goal=MetaApplyGoal(name,[child],loc)
     elseif(is_token(tokens, 'case'))
         parse_case_group(tokens, goal, rest)
     elseif(is_token(tokens, 'true'))
@@ -863,30 +750,8 @@ rel parse_atomic_goal(tokens, goal, rest)
     elseif(left = CallExpr(fn, args, loc))
         goal = CallGoal(fn, args, loc)
         rest = t1
-    elseif(left=MetaUnaryExpr(name,operand,loc))
-        syntax_goal(operand,child)
-        goal=MetaApplyGoal(name,[child],loc)
-        rest=t1
-    elseif(left=MetaBinaryExpr(name,a,b,loc))
-        syntax_goal(a,leftGoal)
-        syntax_goal(b,rightGoal)
-        goal=MetaApplyGoal(name,[leftGoal,rightGoal],loc)
-        rest=t1
-    elseif(left=VarExpr(name,loc))
-        goal=MetaRefGoal(name,loc)
-        rest=t1
     else
         throw(ParseError('Expected goal operator', t1))
-
-rel syntax_goal(CallExpr(fn,args,loc),CallGoal(fn,args,loc)) true
-rel syntax_goal(MetaUnaryExpr(name,operand,loc),MetaApplyGoal(name,[goal],loc))
-    syntax_goal(operand,goal)
-rel syntax_goal(MetaBinaryExpr(name,a,b,loc),MetaApplyGoal(name,[left,right],loc))
-    syntax_goal(a,left)
-    syntax_goal(b,right)
-rel syntax_goal(VarExpr(name,loc),MetaRefGoal(name,loc)) true
-rel syntax_goal(expression,goal)
-    throw(ParseError('Meta goal operand must be goal syntax',expression))
 
 rel is_comparison(tokens, op)
     op in ['!=','<','<=','>','>=']
@@ -946,12 +811,9 @@ rel parse_control(tokens, goal, rest)
     elseif(kind in ['for','for-in','some'])
         parse_for_in_control(kind, t1, loc, goal, rest)
     else
-        choose(is_token(t1,'('))
-            eat(t1, '(', t2, _)
-            parse_goal(t2, condition, t3)
-            eat(t3, ')', t4, _)
-        else
-            parse_unary_goal(t1,condition,t4)
+        eat(t1, '(', t2, _)
+        parse_goal(t2, condition, t3)
+        eat(t3, ')', t4, _)
         parse_body(t4, yes, t5)
         parse_control_tail(kind, t5, no, rest)
         goal = ControlGoal(kind, condition, yes, no, loc)
@@ -1038,21 +900,7 @@ rel expression_loc(ClosureExpr(_,_,_,loc), loc)
     true
 
 rel parse_term(tokens, expression, rest)
-    parse_additive(tokens, first, t1)
-    parse_meta_binary_tail(t1,first,expression,rest)
-
-rel meta_binary_word(word)
-    unsafeNot word in ['and','or','in','is','else','elseif','det','semidet','multi','nondet']
-
-rel parse_meta_binary_tail(tokens,left,expression,rest)
-    choose(token_type(tokens,'ID') and token_value(tokens,name) and meta_binary_word(name) and expression_loc(left,Loc(line,_)) and token_loc(tokens,Loc(line,_)))
-        token_loc(tokens,loc)
-        eat(tokens,'ID',t1,_)
-        parse_additive(t1,right,t2)
-        parse_meta_binary_tail(t2,MetaBinaryExpr(name,left,right,loc),expression,rest)
-    else
-        expression=left
-        rest=tokens
+    parse_additive(tokens, expression, rest)
 
 rel parse_additive(tokens, expression, rest)
     parse_multiplicative(tokens, first, t1)
@@ -1118,21 +966,8 @@ rel parse_prefix_expression(tokens, expression, rest)
         eat(tokens, 'next', t1, _)
         parse_primary(t1, child, t2)
         parse_postfix_tail(t2, NextExpr(child, loc), expression, rest)
-    elseif(token_type(tokens,'ID') and tokens=[_|tail] and prefix_meta_operand(tail) and unsafeNot next_is_token(tokens,'('))
-        token_loc(tokens,loc)
-        eat(tokens,'ID',t1,Token(_,name,_,_))
-        parse_prefix_expression(t1,operand,rest)
-        expression=MetaUnaryExpr(name,operand,loc)
     else
         parse_postfix(tokens, expression, rest)
-
-rel prefix_meta_operand(tokens)
-    token_type(tokens,type)
-    choose(type='ID')
-        token_value(tokens,word)
-        meta_binary_word(word)
-    else
-        type in ['NUMBER','STRING','{']
 
 rel parse_postfix(tokens, expression, rest)
     parse_primary(tokens, first, t1)

@@ -185,9 +185,7 @@ rel analyze(items,program)
     signatures(relations,globals,initial)
     merge_signatures(initial,merged)
     capture_fixpoint(merged,resolved)
-    builtin_functors(builtins)
-    pl::append(builtins,declared,functors)
+    pl::append(['Cons','T','Tuple','Pair','Some','None'],declared,functors)
     program={relations=relations,top=top,globals=globals,signatures=resolved,functors=functors}
 
-rel builtin_functors(['Cons','T','Tuple','Pair','Some','None']) true
-export({variables=variables,scopeVariables=scope_variables,captures=inherited,analyze=analyze,builtin_functors=builtin_functors})
+export({variables=variables,scopeVariables=scope_variables,captures=inherited,analyze=analyze})

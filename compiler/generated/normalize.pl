@@ -1,23 +1,4 @@
 :- style_check(-singleton).
-'normalize::$impl_collect_metas'([],A,A,[]):-true.
-'normalize::$impl_collect_metas'([A|B],C,D,E):-(A=fc_MetaDecl(F,G,H,I,J,K)->(get_assoc(F,C,L)->add_("Duplicate meta declaration: ",F,M),throw(fc_CompileError(M,K));true),((H="unary",size_(G,N),N=1.0;H="binary",size_(G,O),O=2.0;H="call")->true;add_("Meta fixity does not match parameter count: ",F,P),throw(fc_CompileError(P,K))),set_(C,F,A,Q),E=R;Q=C,E=[A|R]),'normalize::collect_metas'(B,Q,D,R).
-'normalize::$impl_goal_from_expression'(fc_CallExpr(A,B,C),fc_CallGoal(A,B,C)):-true.
-'normalize::$impl_goal_from_expression'(fc_VarExpr(A,B),fc_MetaRefGoal(A,B)):-true.
-'normalize::$impl_goal_from_expression'(fc_MetaUnaryExpr(A,B,C),fc_MetaApplyGoal(A,[D],C)):-'normalize::goal_from_expression'(B,D).
-'normalize::$impl_goal_from_expression'(fc_MetaBinaryExpr(A,B,C,D),fc_MetaApplyGoal(A,[E,F],D)):-'normalize::goal_from_expression'(B,E),'normalize::goal_from_expression'(C,F).
-'normalize::$impl_goal_from_expression'(A,B):-throw(fc_CompileError("Expected goal syntax in meta argument",fc_Loc(0.0,0.0))).
-'normalize::$impl_bind_meta_args'([],[],A,A):-true.
-'normalize::$impl_bind_meta_args'([fc_MetaParam(A,B,C)|D],[E|F],G,H):-(A="Goal"->((E=fc_CallExpr(I,J,K);E=fc_VarExpr(L,M);E=fc_MetaUnaryExpr(N,O,P);E=fc_MetaBinaryExpr(Q,R,S,T))->'normalize::goal_from_expression'(E,U);U=E);U=E),set_(G,B,U,V),'normalize::bind_meta_args'(D,F,V,H).
-'normalize::$impl_bind_meta_args'(A,B,C,D):-throw(fc_CompileError("Wrong meta arity",fc_Loc(0.0,0.0))).
-'normalize::$impl_substitute_list'([],A,[]):-true.
-'normalize::$impl_substitute_list'([A|B],C,[D|E]):-'normalize::substitute'(A,C,D),'normalize::substitute_list'(B,C,E).
-'normalize::$impl_substitute'(A,B,C):-A=fc_VarExpr(D,E),get_assoc(D,B,F)->C=F;A=fc_MetaRefGoal(D,G)->(get_assoc(D,B,F)->C=F;add_("Unknown meta template parameter: ",D,H),throw(fc_CompileError(H,G)));is_list(A)->'normalize::substitute_list'(A,B,C);compound(A)->cc_parts(A,D,I),'normalize::substitute_list'(I,B,J),cc_term(D,J,C);C=A.
-'normalize::$impl_expand_meta'(A,B,C,D,E,F):-(has_(E,A)->add_("Recursive meta expansion: ",A,G),throw(fc_CompileError(G,fc_Loc(0.0,0.0)));true),(get_assoc(A,D,fc_MetaDecl(H,I,J,K,L,M))->true;add_("Unknown meta operator: ",A,N),throw(fc_CompileError(N,fc_Loc(0.0,0.0)))),(has_(["unary","binary","goalUnary","goalBinary"],C)->(C="goalUnary"->O="unary",P="Goal";C="goalBinary"->O="binary",P="Goal";O=C,P="Expr"),(O=J->true;add_("Meta operator used with wrong fixity: ",A,Q),throw(fc_CompileError(Q,M))),(P=K->true;add_("Meta result category does not match use: ",A,R),throw(fc_CompileError(R,M)));(C="goal",K="Goal";C="expr",K="Expr")->true;add_("Meta result category does not match use: ",A,S),throw(fc_CompileError(S,M))),new(T),'normalize::bind_meta_args'(I,B,T,U),'normalize::substitute'(L,U,V),'normalize::expand_node'(V,D,[A|E],F).
-'normalize::$impl_expand_nodes'([],A,B,[]):-true.
-'normalize::$impl_expand_nodes'([A|B],C,D,[E|F]):-'normalize::expand_node'(A,C,D,E),'normalize::expand_nodes'(B,C,D,F).
-'normalize::$impl_expand_temporal'(A,B,C,D):-has_(["init","next"],A),B=[E]->D=fc_UnaryGoal(A,E,C);A="until",B=[F,E]->D=fc_ControlGoal("while",fc_UnaryGoal("not",F,C),E,fc_None,C);add_("Invalid temporal syntax constructor: ",A,G),throw(fc_CompileError(G,C)).
-'normalize::$impl_expand_node'(A,B,C,D):-A=fc_MetaApplyGoal(E,[F],G)->'normalize::expand_meta'(E,[F],"goalUnary",B,C,D);A=fc_MetaApplyGoal(E,[H,I],J)->'normalize::expand_meta'(E,[H,I],"goalBinary",B,C,D);A=fc_MetaUnaryExpr(E,F,K)->'normalize::expand_meta'(E,[F],"unary",B,C,D);A=fc_MetaBinaryExpr(E,H,I,L)->'normalize::expand_meta'(E,[H,I],"binary",B,C,D);A=fc_CallGoal(fc_VarExpr(E,M),N,O),get_assoc(E,B,P)->'normalize::expand_meta'(E,N,"goal",B,C,D);A=fc_CallExpr(fc_VarExpr(E,Q),N,R),get_assoc(E,B,S)->'normalize::expand_meta'(E,N,"expr",B,C,D);A=fc_TemporalGoal(T,N,U)->'normalize::expand_nodes'(N,B,C,V),'normalize::expand_temporal'(T,V,U,D);A=fc_MetaRefGoal(E,U)->add_("Meta parameter used outside a template: ",E,W),throw(fc_CompileError(W,U));is_list(A)->'normalize::expand_nodes'(A,B,C,D);compound(A)->cc_parts(A,E,N),'normalize::expand_nodes'(N,B,C,V),cc_term(E,V,D);D=A.
-'normalize::$impl_expand_program'(A,B):-new(C),'normalize::collect_metas'(A,C,D,E),'normalize::expand_nodes'(E,D,[],B).
 'normalize::$impl_fresh'(A,B):-cc_cell_get(A,C),(add_(C,1.0,D),cc_cell_set(A,D)),str(C,E),add_("$state_",E,F),B=F.
 'normalize::$impl_current'(A,B,C,D):-get_assoc(A,B,E)->D=fc_VarExpr(E,C);D=fc_VarExpr(A,C).
 'normalize::$impl_without'(A,B,C):-del_assoc(A,B,D,E)->C=E;C=B.
@@ -63,7 +44,7 @@
 'normalize::$impl_same_assignments'(A,B):-sort(A,C),sort(B,C).
 'normalize::$impl_temporal_rewrite'(A,B,C,D,E,F):-'normalize::temporal_boundary'(A)->E=A,F=D;A=fc_UnaryGoal("next",fc_UnifyGoal(fc_VarExpr(G,H),I,J),K)->(has_(D,G)->add_("Multiple next assignments for ",G,L),add_(L," on one loop path",M),throw(fc_CompileError(M,K));true),get_assoc(G,B,N),get_assoc(G,C,O),'normalize::temporal_rewrite'(I,B,C,D,P,Q),E=fc_AndGoal([fc_UnifyGoal(fc_StateExpr(fc_VarExpr(N,K),K),P,K),fc_UnifyGoal(fc_VarExpr(O,K),fc_VarExpr(N,K),K)]),F=[G|D];A=fc_NextExpr(fc_VarExpr(G,R),K)->(get_assoc(G,C,O)->E=fc_VarExpr(O,K),F=D;add_("next value requires a next assignment in this loop: ",G,S),throw(fc_CompileError(S,K)));A=fc_StateExpr(T,K)->throw(fc_CompileError("Use init/next instead of ! in a temporal loop",K));A=fc_ControlGoal(U,V,W,X,K)->'normalize::temporal_rewrite'(V,B,C,D,Y,Z),('normalize::same_assignments'(Z,D)->true;throw(fc_CompileError("next assignments are not allowed in conditions",K))),'normalize::temporal_alternatives'([W,X],B,C,D,[A1,B1],F),E=fc_ControlGoal(U,Y,A1,B1,K);A=fc_OrGoal(C1)->'normalize::temporal_alternatives'(C1,B,C,D,D1,F),E=fc_OrGoal(D1);A=fc_UnaryGoal(E1,F1,K),has_(["not","unsafeNot"],E1)->'normalize::temporal_rewrite'(F1,B,C,D,G1,H1),('normalize::same_assignments'(H1,D)->E=fc_UnaryGoal(E1,G1,K),F=D;throw(fc_CompileError("next assignments cannot escape negation",K)));is_list(A)->'normalize::temporal_sequence'(A,B,C,D,E,F);compound(A)->cc_parts(A,G,I1),'normalize::temporal_sequence'(I1,B,C,D,J1,F),cc_term(G,J1,E);E=A,F=D.
 'normalize::$impl_rewrite'(A,B,C,D,E):-A=fc_VarExpr(F,G)->'normalize::current'(F,B,G,D),E=B;A=fc_UnaryGoal("init",fc_UnifyGoal(fc_VarExpr(F,H),I,J),G)->'normalize::rewrite'(I,B,C,K,L),'normalize::fresh'(C,M),(add_("$init_",F,N),set_(L,N,M,E)),D=fc_UnifyGoal(fc_VarExpr(M,G),K,G);A=fc_UnaryGoal(O,P,G),has_(["init","next"],O)->throw(fc_CompileError("init requires a variable assignment; next is only valid inside a loop",G));A=fc_NextExpr(Q,G)->throw(fc_CompileError("next value is only valid in a loop body",G));A=fc_UnifyGoal(fc_StateExpr(fc_FieldExpr(R,S,G),T),I,U)->'normalize::rewrite'(fc_UnifyGoal(fc_StateExpr(R,G),fc_SetFieldExpr(fc_FieldExpr(R,S,G),I,G),G),B,C,D,E);A=fc_UnifyGoal(fc_StateExpr(fc_VarExpr(F,G),V),I,W)->'normalize::rewrite'(I,B,C,K,L),'normalize::fresh'(C,M),set_(L,F,M,E),D=fc_UnifyGoal(fc_VarExpr(M,G),K,G);A=fc_StateExpr(X,G)->throw(fc_CompileError("! requires a state parameter, call argument or assignment",G));A=fc_RelationDecl(Y,F,Z,A1,G)->'normalize::callable'(Z,A1,B,C,B1,C1),D=fc_RelationDecl(Y,F,B1,C1,G),E=B;A=fc_ClosureExpr(F,Z,A1,G)->'normalize::callable'(Z,A1,B,C,B1,C1),D=fc_ClosureExpr(F,B1,C1,G),E=B;(A=fc_CallGoal(D1,E1,G);A=fc_CallExpr(D1,E1,G))->'normalize::rewrite'(D1,B,C,F1,L),'normalize::arguments'(E1,L,C,G1,E),(A=fc_CallGoal(H1,I1,J1)->D=fc_CallGoal(F1,G1,G);D=fc_CallExpr(F1,G1,G));A=fc_AndGoal(K1)->'normalize::sequence'(K1,B,C,L1,E),D=fc_AndGoal(L1);A=fc_OrGoal([M1,N1|O1])->(O1=[]->P1=N1;P1=fc_OrGoal([N1|O1])),'normalize::branches'(M1,P1,B,C,Q1,R1,E),D=fc_OrGoal([Q1,R1]);A=fc_ForGoal(S1,T1,U1,A1,G)->'normalize::rewrite'(fc_AndGoal([S1,fc_ControlGoal("while",T1,fc_AndGoal([A1,U1]),fc_None,G)]),B,C,D,E);A=fc_ControlGoal("while",T1,A1,fc_None,G)->'normalize::loop'("while",T1,A1,B,C,G,D,E);A=fc_ControlGoal(Y,T1,V1,W1,G)->'normalize::rewrite'(T1,B,C,X1,Y1),(Y1=B->true;throw(fc_CompileError("State updates in conditions are not supported",G))),(W1=fc_None->Z1=fc_TrueGoal(G);Z1=W1),'normalize::branches'(V1,Z1,B,C,Q1,R1,E),D=fc_ControlGoal(Y,X1,Q1,R1,G);A=fc_ForInGoal(Y,S,I,A2,A1,G),has_(["for","for-in"],Y)->'normalize::foreach'(S,I,A2,A1,B,C,G,D,E);A=fc_ForInGoal(Y,S,I,A2,A1,G)->'normalize::rewrite'(A2,B,C,B2,L),'normalize::rewrite'(A1,L,C,C1,C2),(C2=L->D=fc_ForInGoal(Y,S,I,B2,C1,G),E=L;throw(fc_CompileError("Use a state-carrying loop instead of updating state in some",G)));A=fc_UnaryGoal(O,A1,G),has_(["not","unsafeNot"],O)->'normalize::rewrite'(A1,B,C,C1,C2),(C2=B->D=fc_UnaryGoal(O,C1,G),E=B;throw(fc_CompileError("State updates cannot escape negation",G)));is_list(A)->'normalize::sequence'(A,B,C,D,E);compound(A)->cc_parts(A,F,E1),'normalize::sequence'(E1,B,C,D2,E),cc_term(F,D2,D);D=A,E=B.
-'normalize::$impl_normalize'(A,B):-new(C),cc_cell(0.0,D),'normalize::expand_program'(A,E),'normalize::declared_modes'(E,C,F),'normalize::attach_modes'(E,F,G),'normalize::sequence'(G,C,D,B,H).
+'normalize::$impl_normalize'(A,B):-new(C),cc_cell(0.0,D),'normalize::declared_modes'(A,C,E),'normalize::attach_modes'(A,E,F),'normalize::sequence'(F,C,D,B,G).
 'normalize::$impl_declared_modes'([],A,A):-true.
 'normalize::$impl_declared_modes'([A|B],C,D):-(A=fc_TypedDecl(["Relation"|E],F,fc_None,G)->(get_assoc(F,C,H)->I=[E|H];I=[E]),set_(C,F,I,J);J=C),'normalize::declared_modes'(B,J,D).
 'normalize::$impl_mode_parameters'([],[],A,[]):-true.
@@ -73,26 +54,6 @@
 'normalize::$impl_attach_modes'([],A,[]):-true.
 'normalize::$impl_attach_modes'([A|B],C,[D|E]):-(A=fc_RelationDecl(F,G,H,I,J),get_assoc(G,C,K)->'normalize::mode_contracts'(K,H,J,L),(is_assoc(F)->M=F;new(N),set_(N,"category",F,O),set_(O,"determinism","nondet",P),M=P),set_(M,"contracts",L,Q),D=fc_RelationDecl(Q,G,H,I,J);D=A),'normalize::attach_modes'(B,C,E).
 normalize(A):-new(B),set_(B,"normalize",clos(upvals([]),'normalize::$value_normalize'),A).
-'normalize::collect_metas'(A,B,C,D):-'normalize::$impl_collect_metas'(A,B,C,D).
-'normalize::$value_collect_metas'(A,B,C,D,upvals([])):-'normalize::collect_metas'(A,B,C,D).
-'normalize::goal_from_expression'(A,B):-'normalize::$impl_goal_from_expression'(A,B).
-'normalize::$value_goal_from_expression'(A,B,upvals([])):-'normalize::goal_from_expression'(A,B).
-'normalize::bind_meta_args'(A,B,C,D):-'normalize::$impl_bind_meta_args'(A,B,C,D).
-'normalize::$value_bind_meta_args'(A,B,C,D,upvals([])):-'normalize::bind_meta_args'(A,B,C,D).
-'normalize::substitute_list'(A,B,C):-'normalize::$impl_substitute_list'(A,B,C).
-'normalize::$value_substitute_list'(A,B,C,upvals([])):-'normalize::substitute_list'(A,B,C).
-'normalize::substitute'(A,B,C):-'normalize::$impl_substitute'(A,B,C).
-'normalize::$value_substitute'(A,B,C,upvals([])):-'normalize::substitute'(A,B,C).
-'normalize::expand_meta'(A,B,C,D,E,F):-'normalize::$impl_expand_meta'(A,B,C,D,E,F).
-'normalize::$value_expand_meta'(A,B,C,D,E,F,upvals([])):-'normalize::expand_meta'(A,B,C,D,E,F).
-'normalize::expand_nodes'(A,B,C,D):-'normalize::$impl_expand_nodes'(A,B,C,D).
-'normalize::$value_expand_nodes'(A,B,C,D,upvals([])):-'normalize::expand_nodes'(A,B,C,D).
-'normalize::expand_temporal'(A,B,C,D):-'normalize::$impl_expand_temporal'(A,B,C,D).
-'normalize::$value_expand_temporal'(A,B,C,D,upvals([])):-'normalize::expand_temporal'(A,B,C,D).
-'normalize::expand_node'(A,B,C,D):-'normalize::$impl_expand_node'(A,B,C,D).
-'normalize::$value_expand_node'(A,B,C,D,upvals([])):-'normalize::expand_node'(A,B,C,D).
-'normalize::expand_program'(A,B):-'normalize::$impl_expand_program'(A,B).
-'normalize::$value_expand_program'(A,B,upvals([])):-'normalize::expand_program'(A,B).
 'normalize::fresh'(A,B):-'normalize::$impl_fresh'(A,B).
 'normalize::$value_fresh'(A,B,upvals([])):-'normalize::fresh'(A,B).
 'normalize::current'(A,B,C,D):-'normalize::$impl_current'(A,B,C,D).

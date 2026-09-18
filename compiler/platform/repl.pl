@@ -4,7 +4,7 @@
 :- initialization(main, main).
 
 version :- 
-	writeln("0.842").
+	writeln("0.82").
 
 main :-
     current_prolog_flag(argv, Arguments),
@@ -21,48 +21,34 @@ cosmos_main(['-d'|Arguments]) :- !,
 cosmos_main(['-v']) :- !,
     %writeln('Cosmos self-hosted compiler').
 	write('Cosmos self-hosted compiler'),
-	write(' '),version.
+	writeln(' 0.84').
 cosmos_main(['-h']) :- !, cosmos_help.
 cosmos_main(['--help']) :- !, cosmos_help.
 cosmos_main(['-q', Source|Arguments]) :- !,
     cosmos_query_variables(Arguments, Variables),
     repl_execute(Source, Variables).
-% Compile a source file and a one-shot fragment together.  This is not a
-% filename-specific shortcut: the fragment shares the file's ordinary lexical
-% scope, so relation captures (including require(...) values) are supplied by
-% the generated top-level entry just as they are in a normal program.
-cosmos_main(['-l', Source, '-q', Query|Arguments]) :- !,
-    cosmos_query_variables(Arguments, Variables),
-    cosmos_source_file(Source, Input),
-    read_file_to_string(Input, Program, []),
-    string_concat(Program, "\n", WithBreak),
-    string_concat(WithBreak, Query, Combined),
-    repl_execute(Combined, Variables).
 cosmos_main(['-r', Program|Rest]) :- !,
     cosmos_module_argument(Rest, Program, Module),
     cosmos_run(Program, Module).
 cosmos_main(['-b', Program|Rest]) :- !,
     cosmos_module_argument(Rest, Program, Module),
     cosmos_run(Program, Module).
-cosmos_main(['-l', Source|Options]) :- !,
+cosmos_main(['-l', Source]) :- !,
     cosmos_source_file(Source, Input),
     cosmos_output_file(Input, Output),
-    cosmos_compile_options(Options, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable),
-    ( Executable == true -> true ; cosmos_run(Output, Module) ).
-cosmos_main(['-c', Source|Options]) :- !,
+    cosmos_compile(Input, Output, Module),
+    cosmos_run(Output, Module).
+cosmos_main(['-c', Source]) :- !,
     cosmos_source_file(Source, Input),
     cosmos_output_file(Input, Output),
-    cosmos_compile_options(Options, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable),
+    cosmos_compile(Input, Output, _),
     format('Compiled ~w -> ~w~n', [Input, Output]).
 cosmos_main(['-f', Input, '-o', Output|Rest]) :- !,
-    cosmos_compile_options(Rest, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable).
-cosmos_main(['-f', Input|Options]) :- !,
+    cosmos_module_argument(Rest, Output, Module),
+    cosmos_compile(Input, Output, Module).
+cosmos_main(['-f', Input]) :- !,
     cosmos_output_file(Input, Output),
-    cosmos_compile_options(Options, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable).
+    cosmos_compile(Input, Output, _).
 cosmos_main([Input]) :- !,
     cosmos_source_file(Input, Source),
     cosmos_output_file(Source, Output),
@@ -84,10 +70,7 @@ cosmos_help :-
     format('  cosmos.bat -f input.co -o output.pl [module]~n', []),
     format('                                        Compile a source file.~n', []),
     format('  cosmos.bat -c name                    Compile name.co to name.pl.~n', []),
-    format('  cosmos.bat -c name [--main] [--exe]   Add argv-list main entry; --exe saves a standalone app.~n', []),
     format('  cosmos.bat -l name                    Compile name.co and run it.~n', []),
-    format('  cosmos.bat -l file.co -q "query" [--vars x,y]~n', []),
-    format('                                        Run a query in that file\'s source scope.~n', []),
     format('  cosmos.bat -r program.pl [module]     Run generated Prolog (-b is an alias).~n', []),
     format('  cosmos.bat -q "Cosmos source" [--vars x,y]~n', []),
     format('                                        Compile a query with selected results.~n', []),
@@ -122,16 +105,11 @@ cosmos_module_argument([], Path, Module) :-
     file_base_name(Path, Base),
     file_name_extension(Module, _, Base).
 
-cosmos_compile_options(Options, Output, Module, Main, Executable) :-
-    compiler_file_module(Output, DefaultModule),
-    compiler_cli_options(Options, DefaultModule, Module, Main, Executable).
-
 cosmos_compile(Input, Output, Module) :-
-    cosmos_compile(Input, Output, Module, false, false).
-cosmos_compile(Input, Output, Module, Main, Executable) :-
+    ( var(Module) -> cosmos_module_argument([], Output, Module) ; true ),
     compiler_platform(Here),
     directory_file_path(Here, '../generated', Stage),
-    compiler_compile_application(Stage, Input, Output, Module, Main, Executable).
+    compiler_compile_file(Stage, Input, Output, Module).
 
 cosmos_run(File, Module) :-
     compiler_platform(Here),
@@ -205,14 +183,10 @@ repl_compile(Stage, Source, Variables, Prefix, Code) :-
     getnil(Query, "prolog", Code).
 
 repl_run(Prefix) :-
-    % Do not capture the program's output.  Capturing postpones every log
-    % line until the query returns, which makes a running application appear
-    % silent forever.  The prompt marker is written first; program writes then
-    % flow straight to the terminal as they happen.
-    format('| ', []),
-    flush_output,
-    ( compiler_session_entry(Prefix, Output)
-    -> repl_print_result(Output)
+    ( with_output_to(string(Console), compiler_session_entry(Prefix, Output))
+    -> %(Output=[]->format('| true');true),
+		format('| ~s', [Console]),
+       repl_print_result(Output)
     ;  writeln(false)
     ).
 
