@@ -1,14 +1,6 @@
 :- style_check(-singleton).
-'compiler::$impl_compile'(A,B,C):-new(D),'compiler::compile_unit'(A,B,D,E),cosmos_get(E,"prolog",F),C=F.
-'compiler::$impl_compile_unit'(A,B,C,D):-cosmos_require("parser",E),cosmos_require("resolve",F),cosmos_require("emit_prolog",G),cosmos_require("check",H),cosmos_require("normalize",I),cosmos_method(E,"parse",[A,fc_Program(J)]),cosmos_method(I,"normalize",[J,K]),cosmos_method(H,"imported_functors",[C,L]),append(L,K,M),cosmos_method(H,"analyze",[M,C,N,O]),cosmos_method(F,"analyze",[M,P]),set_(P,"schemas",N,Q),cosmos_method(G,"generate",[Q,B,F,R]),cosmos_method(H,"interface",[M,B,N,O,S]),new(T),set_(T,"prolog",R,U),set_(U,"interface",S,V),D=V.
-'compiler::$impl_imports'(A,B):-cosmos_require("parser",C),cosmos_require("check",D),cosmos_method(C,"parse",[A,fc_Program(E)]),cosmos_method(D,"imports",[E,B]).
-'compiler::$impl_compile_query'(A,B,C,D):-cc_compile_query(A,B,C,E),new(F),set_(F,"module",C,G),set_(G,"entry",C,H),set_(H,"variables",B,I),set_(I,"source",A,J),set_(J,"prolog",E,K),D=K.
-compiler(A):-new(B),set_(B,"compile",clos(upvals([]),'compiler::$value_compile'),C),set_(C,"compile_query",clos(upvals([]),'compiler::$value_compile_query'),D),set_(D,"compile_unit",clos(upvals([]),'compiler::$value_compile_unit'),E),set_(E,"imports",clos(upvals([]),'compiler::$value_imports'),A).
-'compiler::compile'(A,B,C):-'compiler::$impl_compile'(A,B,C).
-'compiler::$value_compile'(A,B,C,upvals([])):-'compiler::compile'(A,B,C).
-'compiler::compile_unit'(A,B,C,D):-'compiler::$impl_compile_unit'(A,B,C,D).
-'compiler::$value_compile_unit'(A,B,C,D,upvals([])):-'compiler::compile_unit'(A,B,C,D).
-'compiler::imports'(A,B):-'compiler::$impl_imports'(A,B).
-'compiler::$value_imports'(A,B,upvals([])):-'compiler::imports'(A,B).
-'compiler::compile_query'(A,B,C,D):-'compiler::$impl_compile_query'(A,B,C,D).
-'compiler::$value_compile_query'(A,B,C,D,upvals([])):-'compiler::compile_query'(A,B,C,D).
+cosmos_compiler__compile(_source, _module, _text) :- crequire("parser", _parser, _), crequire("resolve", _analysis, _), crequire("emit_prolog", _emitter, _), crequire("check", _checker, _), crequire("normalize", _normalizer, _), getnil(_parser, "parse", T1), call_cl(T1, [_source, fc_Program(_surface)]), getnil(_normalizer, "normalize", T2), call_cl(T2, [_surface, _items]), getnil(_checker, "check", T3), call_cl(T3, [_items, _schemas]), getnil(_analysis, "analyze", T4), call_cl(T4, [_items, _program]), set_(_program, "schemas", _schemas, _checked), getnil(_emitter, "generate", T5), call_cl(T5, [_checked, _module, _analysis, _text]).
+cosmos_compiler__compile_query(_source, _variables, _module, _query) :- cc_compile_query(_source, _variables, _module, _text), new(T6), set_(T6, "module", _module, T7), set_(T7, "entry", _module, T8), set_(T8, "variables", _variables, T9), set_(T9, "source", _source, T10), set_(T10, "prolog", _text, T11), _query = T11.
+cosmos_compiler__value_compile(V1, V2, V3, _upvals) :- cosmos_compiler__compile(V1, V2, V3).
+cosmos_compiler__value_compile_query(V1, V2, V3, V4, _upvals) :- cosmos_compiler__compile_query(V1, V2, V3, V4).
+compiler(T14) :- new(T12), set_(T12, "compile", clos(upvals, cosmos_compiler__value_compile), T13), set_(T13, "compile_query", clos(upvals, cosmos_compiler__value_compile_query), T14).

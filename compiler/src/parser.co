@@ -34,7 +34,6 @@ functor(ForInGoal, Functor)
 functor(CaseGoal, Functor)
 functor(VarExpr, Functor)
 functor(LiteralExpr, Functor)
-functor(RawFunctorExpr, Functor)
 functor(CallExpr, Functor)
 functor(BinaryExpr, Functor)
 functor(UnaryExpr, Functor)
@@ -1019,18 +1018,7 @@ rel parse_arguments(tokens, args, rest)
             rest = t1
 
 rel parse_primary(tokens, expression, rest)
-    choose(is_token(tokens, ':'))
-        eat(tokens, ':', t1, Token(_,_,line,column))
-        eat(t1, 'ID', t2, Token(_,name,_,_))
-        choose(is_token(t2, '('))
-            eat(t2, '(', t3, _)
-            parse_arguments(t3, args, t4)
-            eat(t4, ')', rest, _)
-        else
-            args=[]
-            rest=t2
-        expression = RawFunctorExpr(name, args, Loc(line,column))
-    elseif(token_type(tokens, 'NUMBER'))
+    choose(token_type(tokens, 'NUMBER'))
         eat(tokens, 'NUMBER', rest, Token(_,text,line,column))
         value = num(text)
         expression = LiteralExpr(value, Loc(line,column))

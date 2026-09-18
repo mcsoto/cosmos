@@ -6,7 +6,6 @@ functor(TypedDecl,Functor)
 functor(VarExpr,Functor)
 functor(LiteralExpr,Functor)
 functor(CallExpr,Functor)
-functor(RawFunctorExpr,Functor)
 functor(ListExpr,Functor)
 functor(DictExpr,Functor)
 functor(CompileError,Functor)
@@ -199,9 +198,6 @@ rel expression_type(node,schemas,env,typeName)
                 throw(CompileError('Functor needs arguments: '+name,spec.location))
         else
             typeName='Any'
-    elseif(node=RawFunctorExpr(_,args,_))
-        walk(args,schemas,env)
-        typeName='Functor'
     elseif(node=CallExpr(VarExpr(name,_),args,loc)
         and pl::get_assoc(name,schemas,spec) and unsafeNot(pl::get_assoc('kind',spec,_)))
         choose(spec.open=1)

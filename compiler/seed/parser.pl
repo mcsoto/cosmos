@@ -1,337 +1,248 @@
 :- style_check(-singleton).
-'parser::$impl_char_at'(A,B,C,D):-r_lt(C,B),cosmos_receiver("string",E),cosmos_method(E,"at",[A,C,D]).
-'parser::$impl_two_at'(A,B,C,D):-(add_(C,1.0,E),r_lt(E,B)),add_(C,2.0,F),cosmos_receiver("string",G),cosmos_method(G,"slice",[A,C,F,D]).
-'parser::$impl_char_code_between'(A,B,C):-(cosmos_receiver("string",D),cosmos_method(D,"code",[A,E])),r_ge(E,B),r_le(E,C).
-'parser::$impl_digit'(A):-'parser::char_code_between'(A,48.0,57.0).
-'parser::$impl_letter'(A):-'parser::char_code_between'(A,65.0,90.0);'parser::char_code_between'(A,97.0,122.0);A="_".
-'parser::$impl_identifier_char'(A):-'parser::letter'(A);'parser::digit'(A).
-'parser::$impl_horizontal_space'(A):-A=" ";A="\t".
-'parser::$impl_opening'(A):-A="(";A="[";A="{".
-'parser::$impl_closing'(A):-A=")";A="]";A="}".
-'parser::$impl_punctuation'(A):-has_(["(",")","[","]","{","}",",",";","|",".","+","-","*","/","%","=","<",">","!","#",":"],A).
-'parser::$impl_scan_indent'(A,B,C,D,E,F,G):-'parser::char_at'(A,B,C,H),H=" "->(add_(C,1.0,I),add_(D,1.0,J),'parser::scan_indent'(A,B,I,J,E,F,K)),add_(K,1.0,L),G=L;'parser::char_at'(A,B,C,H),H="\t"->(add_(C,1.0,M),add_(D,4.0,N),'parser::scan_indent'(A,B,M,N,E,F,K)),add_(K,4.0,O),G=O;E=C,F=D,G=0.0.
-'parser::$impl_skip_line_comment'(A,B,C,D):-'parser::char_at'(A,B,C,E),dif(E,"\n")->add_(C,1.0,F),'parser::skip_line_comment'(A,B,F,D);D=C.
-'parser::$impl_escaped_char'(A,B):-A="n"->B="\n";A="r"->B="\r";A="t"->B="\t";B=A.
-'parser::$impl_scan_string'(A,B,C,D,E,F,G,H,I,J,K):-r_ge(C,B)->throw("Unclosed string");(cosmos_receiver("string",L),cosmos_method(L,"at",[A,C,M])),(M=F->(add_(C,1.0,N),H=N),I=D,(add_(E,1.0,O),J=O),K=G;M="\\"->(add_(C,1.0,P),r_lt(P,B)->(add_(C,1.0,Q),cosmos_receiver("string",L),cosmos_method(L,"at",[A,Q,R])),'parser::escaped_char'(R,S),(cosmos_receiver("string",L),cosmos_method(L,"concat",[G,S,T])),add_(C,2.0,U),add_(E,2.0,V),'parser::scan_string'(A,B,U,D,V,F,T,H,I,J,K);throw("Unclosed string escape"));M="\n"->(cosmos_receiver("string",L),cosmos_method(L,"concat",[G,M,T])),add_(C,1.0,W),add_(D,1.0,X),'parser::scan_string'(A,B,W,X,1.0,F,T,H,I,J,K);(cosmos_receiver("string",L),cosmos_method(L,"concat",[G,M,T])),add_(C,1.0,Y),add_(E,1.0,Z),'parser::scan_string'(A,B,Y,D,Z,F,T,H,I,J,K)).
-'parser::$impl_scan_number'(A,B,C,D):-'parser::char_at'(A,B,C,E),('parser::digit'(E);E=".")->add_(C,1.0,F),'parser::scan_number'(A,B,F,D);D=C.
-'parser::$impl_scan_identifier'(A,B,C,D):-'parser::char_at'(A,B,C,E),'parser::identifier_char'(E)->add_(C,1.0,F),'parser::scan_identifier'(A,B,F,D);D=C.
-'parser::$impl_scan_block_comment'(A,B,C,D,E,F,G,H,I):-r_ge(C,B)->throw("Unclosed block comment");'parser::two_at'(A,B,C,J),J="/*"->add_(C,2.0,K),add_(E,2.0,L),add_(F,1.0,M),'parser::scan_block_comment'(A,B,K,D,L,M,G,H,I);'parser::two_at'(A,B,C,J),J="*/"->(F=1.0->(add_(C,2.0,N),G=N),H=D,add_(E,2.0,O),I=O;add_(C,2.0,P),add_(E,2.0,Q),r_sub(F,1.0,R),'parser::scan_block_comment'(A,B,P,D,Q,R,G,H,I));(cosmos_receiver("string",S),cosmos_method(S,"at",[A,C,T])),(T="\n"->add_(C,1.0,U),add_(D,1.0,V),'parser::scan_block_comment'(A,B,U,V,1.0,F,G,H,I);add_(C,1.0,W),add_(E,1.0,X),'parser::scan_block_comment'(A,B,W,D,X,F,G,H,I)).
-'parser::$impl_line_starts_comment'(A,B,C):-'parser::two_at'(A,B,C,D),(D="//";D="--").
-'parser::$impl_layout_tokens'(A,[B|C],D,E):-r_gt(A,B)->D=[fc_Token("INDENT","INDENT",0.0,0.0)],E=[A,B|C];A=B->D=[],E=[B|C];B=0.0->throw("Invalid dedent");'parser::layout_tokens'(A,C,F,E),D=[fc_Token("DEDENT","DEDENT",0.0,0.0)|F].
-'parser::$impl_eof_dedents'(A,B,C,D):-A=[0.0]->D=[fc_Token("EOF","EOF",B,C)];A=[E|F],'parser::eof_dedents'(F,B,C,G),D=[fc_Token("DEDENT","DEDENT",B,C)|G].
-'parser::$impl_finish_lex'(A,B,C,D,E,F):-dif(B,0.0)->throw("Unclosed delimiter");A=1.0->'parser::eof_dedents'(C,D,E,F);'parser::eof_dedents'(C,D,E,G),F=[fc_Token("NEWLINE","NEWLINE",D,E)|G].
-'parser::$impl_lex_line_start'(A,B,C,D,E,F,G,H):-'parser::scan_indent'(A,B,C,E,I,J,K),(r_ge(I,B)->'parser::finish_lex'(1.0,F,G,D,J,H);'parser::char_at'(A,B,I,L),L="\n"->'parser::lex_loop'(A,B,I,D,J,0.0,F,G,H);'parser::line_starts_comment'(A,B,I)->'parser::lex_loop'(A,B,I,D,J,0.0,F,G,H);'parser::two_at'(A,B,I,M),M="/*"->'parser::lex_loop'(A,B,I,D,J,0.0,F,G,H);'parser::layout_tokens'(K,G,N,O),'parser::lex_loop'(A,B,I,D,J,0.0,F,O,P),append(N,P,H)).
-'parser::$impl_lex_identifier'(A,B,C,D,E,F,G,H):-'parser::scan_identifier'(A,B,C,I),(cosmos_receiver("string",J),cosmos_method(J,"slice",[A,C,I,K])),(K="for",(add_(I,2.0,L),r_lt(L,B)),add_(I,3.0,M),cosmos_receiver("string",J),cosmos_method(J,"slice",[A,I,M,"-in"])->N=fc_Token("ID","for-in",D,E),add_(I,3.0,O),add_(E,I,P),r_sub(P,C,Q),add_(Q,3.0,R),'parser::lex_loop'(A,B,O,D,R,0.0,F,G,S);N=fc_Token("ID",K,D,E),add_(E,I,T),r_sub(T,C,U),'parser::lex_loop'(A,B,I,D,U,0.0,F,G,S)),H=[N|S].
-'parser::$impl_lex_punctuation'(A,B,C,D,E,F,G,H):-(cosmos_receiver("string",I),cosmos_method(I,"at",[A,C,J])),('parser::opening'(J)->add_(F,1.0,K),L=K;'parser::closing'(J)->(r_gt(F,0.0)->r_sub(F,1.0,M),L=M;throw("Unexpected closing delimiter"));L=F),N=fc_Token(J,J,D,E),(add_(C,1.0,O),add_(E,1.0,P),'parser::lex_loop'(A,B,O,D,P,0.0,L,G,Q)),H=[N|Q].
-'parser::$impl_lex_loop'(A,B,C,D,E,F,G,H,I):-r_ge(C,B)->'parser::finish_lex'(F,G,H,D,E,I);F=1.0,G=0.0->'parser::lex_line_start'(A,B,C,D,E,G,H,I);(cosmos_receiver("string",J),cosmos_method(J,"at",[A,C,K])),((K=" ";K="\t")->add_(C,1.0,L),add_(E,1.0,M),'parser::lex_loop'(A,B,L,D,M,F,G,H,I);K="\n"->(G=0.0->(add_(C,1.0,N),add_(D,1.0,O),'parser::lex_loop'(A,B,N,O,1.0,1.0,G,H,P)),I=[fc_Token("NEWLINE","NEWLINE",D,E)|P];add_(C,1.0,Q),add_(D,1.0,R),'parser::lex_loop'(A,B,Q,R,1.0,1.0,G,H,I));'parser::line_starts_comment'(A,B,C)->(add_(C,2.0,S),'parser::skip_line_comment'(A,B,S,T)),add_(E,T,U),r_sub(U,C,V),'parser::lex_loop'(A,B,T,D,V,F,G,H,I);'parser::two_at'(A,B,C,W),W="/*"->(add_(C,2.0,X),add_(E,2.0,Y),'parser::scan_block_comment'(A,B,X,D,Y,1.0,T,Z,A1)),'parser::lex_loop'(A,B,T,Z,A1,F,G,H,I);(K="'";K="\"")->(add_(C,1.0,B1),add_(E,1.0,C1),'parser::scan_string'(A,B,B1,D,C1,K,"",T,Z,A1,D1)),'parser::lex_loop'(A,B,T,Z,A1,0.0,G,H,P),I=[fc_Token("STRING",D1,D,E)|P];'parser::digit'(K)->'parser::scan_number'(A,B,C,T),(cosmos_receiver("string",J),cosmos_method(J,"slice",[A,C,T,E1])),(add_(E,T,F1),r_sub(F1,C,G1),'parser::lex_loop'(A,B,T,D,G1,0.0,G,H,P)),I=[fc_Token("NUMBER",E1,D,E)|P];'parser::letter'(K)->'parser::lex_identifier'(A,B,C,D,E,G,H,I);'parser::two_at'(A,B,C,W),has_(["<=",">=","!=","==","::","+=","-=","*=","/=","%="],W)->(add_(C,2.0,H1),add_(E,2.0,I1),'parser::lex_loop'(A,B,H1,D,I1,0.0,G,H,P)),I=[fc_Token(W,W,D,E)|P];'parser::punctuation'(K)->'parser::lex_punctuation'(A,B,C,D,E,G,H,I);throw("Unexpected character")).
-'parser::$impl_lex'(A,B):-(cosmos_receiver("string",C),cosmos_method(C,"size",[A,D])),'parser::lex_loop'(A,D,0.0,1.0,1.0,1.0,0.0,[0.0],B).
-'parser::$impl_token_type'([fc_Token(A,B,C,D)|E],A):-true.
-'parser::$impl_token_value'([fc_Token(A,B,C,D)|E],B):-true.
-'parser::$impl_token_loc'([fc_Token(A,B,C,D)|E],fc_Loc(C,D)):-true.
-'parser::$impl_token_position'([fc_Token(A,B,C,D)|E],C,D):-true.
-'parser::$impl_is_token'(A,B):-A=[fc_Token(C,D,E,F)|G],(C=B;C="ID",D=B).
-'parser::$impl_next_is_token'([A|B],C):-'parser::is_token'(B,C).
-'parser::$impl_eat'(A,B,C,D):-A=[E|F],'parser::is_token'(A,B)->D=E,C=F;throw(fc_ParseError("Unexpected token",B,A)).
-'parser::$impl_skip_newlines'(A,B):-'parser::is_token'(A,"NEWLINE")->'parser::eat'(A,"NEWLINE",C,D),'parser::skip_newlines'(C,B);B=A.
-'parser::$impl_optional_token'(A,B,C):-'parser::is_token'(A,B)->'parser::eat'(A,B,C,D);C=A.
-'parser::$impl_make_and'([],A):-A=fc_TrueGoal.
-'parser::$impl_make_and'([A],A):-true.
-'parser::$impl_make_and'([A,B|C],D):-D=fc_AndGoal([A,B|C]).
-'parser::$impl_make_or'([A],A):-true.
-'parser::$impl_make_or'([A,B|C],D):-D=fc_OrGoal([A,B|C]).
-'parser::$impl_relation_keyword'(A):-has_(["rel","fun","bool","function","void"],A).
-'parser::$impl_type_keyword'(A):-has_(["Any","Number","String","Functor","Relation","Integer","Real","List","Table","Host","In","Out","InOut"],A).
-'parser::$impl_type_name'(A):-'parser::type_keyword'(A)->true;(cosmos_receiver("string",B),cosmos_method(B,"slice",[A,0.0,1.0,C])),string_upper(C,C),string_lower(C,D),dif(C,D).
-'parser::$impl_starts_relation'(A):-'parser::token_type'(A,"ID"),'parser::token_value'(A,B),'parser::relation_keyword'(B).
-'parser::$impl_starts_typed_declaration'(A):-'parser::token_type'(A,"ID"),'parser::token_value'(A,B),'parser::type_name'(B),'parser::next_is_token'(A,"ID").
-'parser::$impl_parse'(A,B):-'parser::lex'(A,C),'parser::parseTokens'(C,B).
-'parser::$impl_parseTokens'(A,B):-'parser::skip_newlines'(A,C),'parser::parse_program_items'(C,D,E),'parser::eat'(E,"EOF",F,G),'parser::skip_newlines'(F,H),B=fc_Program(D).
-'parser::$impl_parse_program_items'(A,B,C):-'parser::skip_newlines'(A,D),('parser::is_token'(D,"EOF")->B=[],C=D;'parser::parse_program_item'(D,E,F),'parser::skip_newlines'(F,G),('parser::is_token'(G,"and")->'parser::eat'(G,"and",H,I);H=G),'parser::parse_program_items'(H,J,C),B=[E|J]).
-'parser::$impl_parse_program_item'(A,B,C):-'parser::starts_relation'(A)->'parser::parse_relation_declaration'(A,B,C);'parser::is_token'(A,"functor")->'parser::parse_functor_declaration'(A,B,C);'parser::is_token'(A,"protocol")->'parser::parse_protocol'(A,B,C);'parser::is_token'(A,"class")->'parser::token_loc'(A,D),'parser::eat'(A,"class",E,F),'parser::eat'(E,"(",G,H),'parser::eat'(G,"ID",I,fc_Token(J,K,L,M)),'parser::eat'(I,",",N,O),'parser::parse_term'(N,P,Q),'parser::eat'(Q,")",C,R),B=fc_ClassDecl(K,P,D);'parser::is_token'(A,"export")->'parser::parse_export_declaration'(A,B,C);'parser::starts_typed_declaration'(A)->'parser::parse_typed_declaration'(A,B,C);'parser::parse_goal'(A,B,C).
-'parser::$impl_parse_id_words_until_paren'(A,B,C):-'parser::is_token'(A,")")->B=[],C=A;'parser::eat'(A,"ID",D,fc_Token(E,F,G,H)),'parser::parse_id_words_until_paren'(D,I,C),B=[F|I].
-'parser::$impl_parse_protocol'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"protocol",E,F),'parser::eat'(E,"(",G,H),'parser::eat'(G,"ID",I,fc_Token(J,K,L,M)),'parser::eat'(I,",",N,O),'parser::eat'(N,"{",P,Q),'parser::protocol_members'(P,R,S),'parser::eat'(S,"}",T,U),'parser::eat'(T,")",C,V),B=fc_ProtocolDecl(K,R,D).
-'parser::$impl_protocol_words'(A,B,C,D):-A=[fc_Token("ID",E,B,F)|G]->'parser::protocol_words'(G,B,H,D),C=[E|H];C=[],D=A.
-'parser::$impl_protocol_members'(A,B,C):-'parser::is_token'(A,"}")->B=[],C=A;'parser::is_token'(A,",")->'parser::eat'(A,",",D,E),'parser::protocol_members'(D,B,C);'parser::starts_relation'(A)->'parser::parse_table_closure'(A,F,D),'parser::protocol_members'(D,G,C),B=[F|G];'parser::token_loc'(A,H),H=fc_Loc(I,J),'parser::protocol_words'(A,I,K,D),(append(L,[M],K),dif(L,[])->'parser::protocol_members'(D,G,C),B=[fc_TypedDecl(L,M,fc_None,H)|G];throw(fc_ParseError("Expected protocol member declaration",A))).
-'parser::$impl_parse_functor_declaration'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"functor",E,F),'parser::eat'(E,"(",G,H),'parser::eat'(G,"ID",I,fc_Token(J,K,L,M)),('parser::is_token'(I,",")->'parser::eat'(I,",",N,O),'parser::parse_id_words_until_paren'(N,P,Q);P=[],Q=I),'parser::eat'(Q,")",C,R),B=fc_FunctorDecl(K,P,D).
-'parser::$impl_parse_export_declaration'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"export",E,F),'parser::eat'(E,"(",G,H),'parser::parse_term'(G,I,J),'parser::eat'(J,")",C,K),B=fc_ExportDecl(I,D).
-'parser::$impl_parse_type_words'(A,B,C,D):-'parser::eat'(A,"ID",E,fc_Token(F,G,H,I)),('parser::is_token'(E,"ID")->'parser::parse_type_words'(E,J,C,D),B=[G|J];B=[],C=G,D=E).
-'parser::$impl_parse_typed_declaration'(A,B,C):-'parser::token_loc'(A,D),'parser::parse_type_words'(A,E,F,G),('parser::is_token'(G,"=")->'parser::eat'(G,"=",H,I),'parser::parse_term'(H,J,C);J=fc_None,C=G),B=fc_TypedDecl(E,F,J,D).
-'parser::$impl_parse_relation_declaration'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"ID",E,fc_Token(F,G,H,I)),'parser::eat'(E,"ID",J,fc_Token(K,L,M,N)),'parser::eat'(J,"(",O,P),'parser::parse_parameters'(O,Q,R),'parser::eat'(R,")",S,T),('parser::token_value'(S,U),has_(["det","semidet","multi","nondet"],U)->'parser::eat'(S,"ID",V,W),new(X),set_(X,"category",G,Y),set_(Y,"determinism",U,Z),A1=Z;V=S,A1=G),'parser::parse_body'(V,B1,C),B=fc_RelationDecl(A1,L,Q,B1,D).
-'parser::$impl_parse_parameters'(A,B,C):-'parser::is_token'(A,")")->B=[],C=A;'parser::parse_parameter'(A,D,E),('parser::is_token'(E,",")->'parser::eat'(E,",",F,G),'parser::parse_parameters'(F,H,C),B=[D|H];B=[D],C=E).
-'parser::$impl_parse_parameter'(A,B,C):-'parser::parse_term'(A,D,E),(D=fc_VarExpr(F,G),'parser::is_token'(E,"ID")->'parser::parse_parameter_type_tail'(E,[F],H,I,C),B=fc_TypedParam(H,I,G);B=D,C=E).
-'parser::$impl_parse_parameter_type_tail'(A,B,C,D,E):-'parser::eat'(A,"ID",F,fc_Token(G,H,I,J)),('parser::is_token'(F,"ID")->append(B,[H],K),'parser::parse_parameter_type_tail'(F,K,C,D,E);C=B,D=H,E=F).
-'parser::$impl_parse_body'(A,B,C):-'parser::is_token'(A,"NEWLINE")->'parser::skip_newlines'(A,D),'parser::eat'(D,"INDENT",E,F),'parser::skip_newlines'(E,G),'parser::parse_body_items'(G,H,I),'parser::eat'(I,"DEDENT",C,J),'parser::make_and'(H,B);'parser::parse_goal'(A,B,D),'parser::optional_token'(D,";",E),'parser::skip_newlines'(E,C).
-'parser::$impl_parse_body_items'(A,B,C):-'parser::skip_newlines'(A,D),('parser::is_token'(D,"DEDENT")->B=[],C=D;'parser::is_token'(D,"case")->'parser::parse_case_group'(D,E,F),'parser::skip_newlines'(F,G),'parser::parse_body_items'(G,H,C),B=[E|H];'parser::starts_relation'(D)->'parser::parse_closure'(D,I,F),I=fc_ClosureExpr(J,K,L,M),'parser::closure_name'(J,N),(N="_"->throw("Nested relation needs a name");E=fc_UnifyGoal(fc_VarExpr(N,M),I,M),'parser::skip_newlines'(F,G),'parser::parse_body_items'(G,H,C),B=[E|H]);'parser::starts_typed_declaration'(D)->'parser::parse_typed_declaration'(D,E,F),'parser::skip_newlines'(F,G),'parser::parse_body_items'(G,H,C),B=[E|H];'parser::parse_goal'(D,E,F),'parser::skip_newlines'(F,G),'parser::parse_body_items'(G,H,C),B=[E|H]).
-'parser::$impl_parse_goal'(A,B,C):-'parser::parse_or_goal'(A,B,C).
-'parser::$impl_parse_or_goal'(A,B,C):-'parser::parse_and_goal'(A,D,E),'parser::parse_or_tail'(E,F,C),'parser::make_or'([D|F],B).
-'parser::$impl_parse_or_tail'(A,B,C):-'parser::is_token'(A,"or")->'parser::eat'(A,"or",D,E),'parser::skip_newlines'(D,F),'parser::parse_and_goal'(F,G,H),'parser::parse_or_tail'(H,I,C),B=[G|I];B=[],C=A.
-'parser::$impl_parse_and_goal'(A,B,C):-'parser::parse_unary_goal'(A,D,E),'parser::parse_and_tail'(E,F,C),'parser::make_and'([D|F],B).
-'parser::$impl_parse_and_tail'(A,B,C):-'parser::is_token'(A,"and")->'parser::eat'(A,"and",D,E),'parser::skip_newlines'(D,F),'parser::parse_unary_goal'(F,G,H),'parser::parse_and_tail'(H,I,C),B=[G|I];B=[],C=A.
-'parser::$impl_prefix_goal_keyword'(A):-has_(["not","unsafeNot","once"],A).
-'parser::$impl_control_keyword'(A):-has_(["if","when","choose","soft_if","while","for","for-in","some"],A).
-'parser::$impl_parse_unary_goal'(A,B,C):-'parser::is_token'(A,"assert")->'parser::token_loc'(A,D),'parser::eat'(A,"assert",E,F),('parser::is_token'(E,"(")->'parser::eat'(E,"(",G,H),'parser::parse_goal'(G,I,J),('parser::is_token'(J,",")->'parser::eat'(J,",",K,L),'parser::parse_term'(K,M,N);M=fc_LiteralExpr("assert error",D),N=J),'parser::eat'(N,")",C,O);'parser::parse_unary_goal'(E,I,C),M=fc_LiteralExpr("assert error",D)),B=fc_AssertGoal(I,M,D);'parser::token_type'(A,"ID"),'parser::token_value'(A,P),has_(["init","next"],P),\+'parser::next_is_token'(A,"(")->'parser::token_loc'(A,D),'parser::eat'(A,"ID",E,Q),'parser::parse_term'(E,R,G),('parser::is_token'(G,"+=")->'parser::eat'(G,"+=",J,S),'parser::parse_term'(J,T,C),U=fc_BinaryExpr("+",R,T,D);'parser::eat'(G,"=",J,V),'parser::parse_term'(J,U,C)),(P="next",R=fc_FieldExpr(W,X,Y)->Z=fc_UnifyGoal(W,fc_SetFieldExpr(fc_FieldExpr(W,X,D),U,D),D);Z=fc_UnifyGoal(R,U,D)),B=fc_UnaryGoal(P,Z,D);'parser::token_type'(A,"ID"),'parser::token_value'(A,P),'parser::prefix_goal_keyword'(P)->'parser::token_loc'(A,D),'parser::eat'(A,"ID",E,A1),'parser::parse_unary_goal'(E,Z,C),B=fc_UnaryGoal(P,Z,D);'parser::token_type'(A,"ID"),'parser::token_value'(A,P),'parser::control_keyword'(P)->'parser::parse_control'(A,B,C);'parser::is_token'(A,"case")->'parser::parse_case_group'(A,B,C);'parser::is_token'(A,"true")->'parser::token_loc'(A,D),'parser::eat'(A,"true",C,B1),B=fc_TrueGoal(D);('parser::is_token'(A,"false");'parser::is_token'(A,"fail"))->'parser::token_loc'(A,D),'parser::eat'(A,"ID",C,C1),B=fc_FalseGoal(D);'parser::is_token'(A,"cut")->'parser::token_loc'(A,D),'parser::eat'(A,"cut",C,D1),B=fc_CutGoal(D);'parser::is_token'(A,"(")->'parser::eat'(A,"(",E,E1),'parser::parse_goal'(E,B,G),'parser::eat'(G,")",C,F1);'parser::parse_atomic_goal'(A,B,C).
-'parser::$impl_parse_atomic_goal'(A,B,C):-'parser::parse_term'(A,D,E),('parser::token_value'(E,F),has_(["+=","-=","*=","/=","%="],F)->'parser::eat'(E,F,G,H),'parser::parse_term'(G,I,C),'parser::expression_loc'(D,J),(D=fc_StateExpr(K,L)->(cosmos_receiver("string",M),cosmos_method(M,"slice",[F,0.0,1.0,N])),B=fc_UnifyGoal(D,fc_BinaryExpr(N,K,I,J),J);throw(fc_ParseError("Compound assignment requires !",E)));'parser::is_token'(E,"=")->'parser::eat'(E,"=",G,O),'parser::parse_term'(G,I,C),'parser::expression_loc'(D,J),B=fc_UnifyGoal(D,I,J);'parser::is_token'(E,"in")->'parser::eat'(E,"in",G,P),'parser::parse_term'(G,Q,C),'parser::expression_loc'(D,J),B=fc_HasGoal(D,Q,J);'parser::is_comparison'(E,N)->'parser::eat'(E,N,G,R),'parser::parse_term'(G,I,C),'parser::expression_loc'(D,J),B=fc_CompareGoal(N,D,I,J);'parser::is_token'(E,"is")->'parser::eat'(E,"is",G,S),'parser::eat'(G,"ID",C,fc_Token(T,U,V,W)),'parser::expression_loc'(D,J),B=fc_IsGoal(D,U,J);D=fc_CallExpr(X,Y,J)->B=fc_CallGoal(X,Y,J),C=E;throw(fc_ParseError("Expected goal operator",E))).
-'parser::$impl_is_comparison'(A,B):-has_(["!=","<","<=",">",">="],B),'parser::is_token'(A,B).
-'parser::$impl_parse_case_group'(A,B,C):-'parser::parse_case_branch'(A,D,E),'parser::skip_newlines'(E,F),'parser::parse_more_cases'(F,G,C),'parser::make_or'([D|G],H),'parser::token_loc'(A,I),B=fc_CaseGoal(H,I).
-'parser::$impl_parse_more_cases'(A,B,C):-'parser::is_token'(A,"case")->'parser::parse_case_branch'(A,D,E),'parser::skip_newlines'(E,F),'parser::parse_more_cases'(F,G,C),B=[D|G];B=[],C=A.
-'parser::$impl_parse_case_branch'(A,B,C):-'parser::eat'(A,"case",D,E),'parser::eat'(D,"NEWLINE",F,G),'parser::skip_newlines'(F,H),'parser::eat'(H,"INDENT",I,J),'parser::skip_newlines'(I,K),'parser::parse_body_items'(K,L,M),'parser::eat'(M,"DEDENT",C,N),'parser::make_and'(L,B).
-'parser::$impl_header_has_semicolon'(A,B):-A=[fc_Token(C,D,E,F)|G],(C=";",B=0.0->true;has_(["(","[","{"],C)->add_(B,1.0,H),'parser::header_has_semicolon'(G,H);has_([")","]","}"],C),r_gt(B,0.0)->r_sub(B,1.0,I),'parser::header_has_semicolon'(G,I);C=")",B=0.0->fail;'parser::header_has_semicolon'(G,B)).
-'parser::$impl_for_header_has_semicolon'(A):-'parser::eat'(A,"(",B,C),'parser::header_has_semicolon'(B,0.0).
-'parser::$impl_parse_control'(A,B,C):-'parser::token_loc'(A,D),'parser::token_value'(A,E),'parser::eat'(A,"ID",F,G),(E="for",'parser::is_token'(F,"("),'parser::for_header_has_semicolon'(F)->'parser::parse_for_control'(F,D,B,C);has_(["for","for-in","some"],E)->'parser::parse_for_in_control'(E,F,D,B,C);'parser::eat'(F,"(",H,I),'parser::parse_goal'(H,J,K),'parser::eat'(K,")",L,M),'parser::parse_body'(L,N,O),'parser::parse_control_tail'(E,O,P,C),B=fc_ControlGoal(E,J,N,P,D)).
-'parser::$impl_parse_for_control'(A,B,C,D):-'parser::eat'(A,"(",E,F),'parser::parse_goal'(E,G,H),'parser::eat'(H,";",I,J),'parser::parse_goal'(I,K,L),'parser::eat'(L,";",M,N),'parser::parse_goal'(M,O,P),'parser::optional_token'(P,";",Q),'parser::eat'(Q,")",R,S),'parser::parse_body'(R,T,D),C=fc_ForGoal(G,K,O,T,B).
-'parser::$impl_parse_for_in_control'(A,B,C,D,E):-'parser::eat'(B,"(",F,G),'parser::parse_term'(F,H,I),('parser::is_token'(I,",")->'parser::eat'(I,",",J,K),'parser::parse_term'(J,L,M),N=H;N=fc_None,L=H,M=I),'parser::eat'(M,"in",O,P),'parser::parse_term'(O,Q,R),'parser::eat'(R,")",S,T),'parser::parse_body'(S,U,E),D=fc_ForInGoal(A,N,L,Q,U,C).
-'parser::$impl_parse_control_tail'(A,B,C,D):-'parser::skip_newlines'(B,E),('parser::is_token'(E,"elseif")->'parser::token_loc'(E,F),'parser::eat'(E,"elseif",G,H),'parser::eat'(G,"(",I,J),'parser::parse_goal'(I,K,L),'parser::eat'(L,")",M,N),'parser::parse_body'(M,O,P),'parser::parse_control_tail'(A,P,Q,D),C=fc_ControlGoal(A,K,O,Q,F);'parser::is_token'(E,"else")->'parser::eat'(E,"else",G,R),'parser::parse_body'(G,C,D);C=fc_None,D=E).
-'parser::$impl_expression_loc'(fc_VarExpr(A,B),B):-true.
-'parser::$impl_expression_loc'(fc_LiteralExpr(A,B),B):-true.
-'parser::$impl_expression_loc'(fc_CallExpr(A,B,C),C):-true.
-'parser::$impl_expression_loc'(fc_BinaryExpr(A,B,C,D),D):-true.
-'parser::$impl_expression_loc'(fc_UnaryExpr(A,B,C),C):-true.
-'parser::$impl_expression_loc'(fc_SizeExpr(A,B),B):-true.
-'parser::$impl_expression_loc'(fc_NextExpr(A,B),B):-true.
-'parser::$impl_expression_loc'(fc_StateExpr(A,B),B):-true.
-'parser::$impl_expression_loc'(fc_NewExpr(A,B,C),C):-true.
-'parser::$impl_expression_loc'(fc_FieldExpr(A,B,C),C):-true.
-'parser::$impl_expression_loc'(fc_IndexExpr(A,B,C),C):-true.
-'parser::$impl_expression_loc'(fc_SetFieldExpr(A,B,C),C):-true.
-'parser::$impl_expression_loc'(fc_ListExpr(A,B,C),C):-true.
-'parser::$impl_expression_loc'(fc_DictExpr(A,B),B):-true.
-'parser::$impl_expression_loc'(fc_ClosureExpr(A,B,C,D),D):-true.
-'parser::$impl_parse_term'(A,B,C):-'parser::parse_additive'(A,B,C).
-'parser::$impl_parse_additive'(A,B,C):-'parser::parse_multiplicative'(A,D,E),'parser::parse_additive_tail'(E,D,B,C).
-'parser::$impl_parse_additive_tail'(A,B,C,D):-('parser::is_token'(A,"+");'parser::is_token'(A,"-"))->'parser::token_value'(A,E),'parser::eat'(A,E,F,G),'parser::parse_multiplicative'(F,H,I),'parser::expression_loc'(B,J),K=fc_BinaryExpr(E,B,H,J),'parser::parse_additive_tail'(I,K,C,D);C=B,D=A.
-'parser::$impl_parse_multiplicative'(A,B,C):-'parser::parse_prefix_expression'(A,D,E),'parser::parse_multiplicative_tail'(E,D,B,C).
-'parser::$impl_parse_multiplicative_tail'(A,B,C,D):-('parser::is_token'(A,"*");'parser::is_token'(A,"/");'parser::is_token'(A,"%"))->'parser::token_value'(A,E),'parser::eat'(A,E,F,G),'parser::parse_prefix_expression'(F,H,I),'parser::expression_loc'(B,J),K=fc_BinaryExpr(E,B,H,J),'parser::parse_multiplicative_tail'(I,K,C,D);C=B,D=A.
-'parser::$impl_parse_prefix_expression'(A,B,C):-'parser::is_token'(A,"new")->'parser::token_loc'(A,D),'parser::eat'(A,"new",E,F),'parser::eat'(E,"ID",G,fc_Token(H,I,J,K)),'parser::eat'(G,"(",L,M),'parser::parse_arguments'(L,N,O),'parser::eat'(O,")",C,P),B=fc_NewExpr(fc_VarExpr(I,D),N,D);'parser::is_token'(A,"!")->'parser::token_loc'(A,D),'parser::eat'(A,"!",E,Q),'parser::parse_prefix_expression'(E,R,C),B=fc_StateExpr(R,D);'parser::is_token'(A,"+")->'parser::eat'(A,"+",E,S),'parser::parse_prefix_expression'(E,B,C);'parser::is_token'(A,"-")->'parser::token_loc'(A,D),'parser::eat'(A,"-",E,T),'parser::parse_prefix_expression'(E,R,C),B=fc_UnaryExpr("-",R,D);'parser::is_token'(A,"#")->'parser::token_loc'(A,D),'parser::eat'(A,"#",E,U),'parser::parse_prefix_expression'(E,R,C),B=fc_SizeExpr(R,D);'parser::is_token'(A,"next"),\+'parser::next_is_token'(A,"(")->'parser::token_loc'(A,D),'parser::eat'(A,"next",E,V),'parser::parse_primary'(E,R,G),'parser::parse_postfix_tail'(G,fc_NextExpr(R,D),B,C);'parser::parse_postfix'(A,B,C).
-'parser::$impl_parse_postfix'(A,B,C):-'parser::parse_primary'(A,D,E),'parser::parse_postfix_tail'(E,D,B,C).
-'parser::$impl_parse_postfix_tail'(A,B,C,D):-'parser::is_token'(A,"(")->'parser::eat'(A,"(",E,F),'parser::parse_arguments'(E,G,H),'parser::eat'(H,")",I,J),'parser::expression_loc'(B,K),L=fc_CallExpr(B,G,K),'parser::parse_postfix_tail'(I,L,C,D);'parser::is_token'(A,".")->'parser::eat'(A,".",E,M),'parser::eat'(E,"ID",H,fc_Token(N,O,P,Q)),L=fc_FieldExpr(B,O,fc_Loc(P,Q)),'parser::parse_postfix_tail'(H,L,C,D);'parser::is_token'(A,"[")->'parser::token_loc'(A,K),'parser::eat'(A,"[",E,R),'parser::parse_term'(E,S,H),'parser::eat'(H,"]",I,T),L=fc_IndexExpr(B,S,K),'parser::parse_postfix_tail'(I,L,C,D);'parser::is_token'(A,":")->'parser::token_loc'(A,K),'parser::eat'(A,":",E,U),'parser::parse_term'(E,V,H),L=fc_SetFieldExpr(B,V,K),'parser::parse_postfix_tail'(H,L,C,D);C=B,D=A.
-'parser::$impl_parse_arguments'(A,B,C):-'parser::is_token'(A,")")->B=[],C=A;'parser::parse_term'(A,D,E),('parser::is_token'(E,",")->'parser::eat'(E,",",F,G),'parser::parse_arguments'(F,H,C),B=[D|H];B=[D],C=E).
-'parser::$impl_parse_primary'(A,B,C):-'parser::is_token'(A,":")->'parser::eat'(A,":",D,fc_Token(E,F,G,H)),'parser::eat'(D,"ID",I,fc_Token(J,K,L,M)),('parser::is_token'(I,"(")->'parser::eat'(I,"(",N,O),'parser::parse_arguments'(N,P,Q),'parser::eat'(Q,")",C,R);P=[],C=I),B=fc_RawFunctorExpr(K,P,fc_Loc(G,H));'parser::token_type'(A,"NUMBER")->'parser::eat'(A,"NUMBER",C,fc_Token(S,T,G,H)),(num(T,U),V=U),B=fc_LiteralExpr(V,fc_Loc(G,H));'parser::token_type'(A,"STRING")->'parser::eat'(A,"STRING",C,fc_Token(W,V,G,H)),B=fc_LiteralExpr(V,fc_Loc(G,H));'parser::starts_relation'(A)->'parser::parse_closure'(A,B,C);'parser::token_type'(A,"ID")->'parser::eat'(A,"ID",D,fc_Token(X,K,G,H)),('parser::is_token'(D,"::")->'parser::eat'(D,"::",I,Y),'parser::eat'(I,"ID",C,fc_Token(Z,A1,B1,C1)),add_(K,"::",D1),add_(D1,A1,E1),B=fc_VarExpr(E1,fc_Loc(G,H));B=fc_VarExpr(K,fc_Loc(G,H)),C=D);'parser::is_token'(A,"(")->'parser::eat'(A,"(",D,F1),'parser::parse_term'(D,B,I),'parser::eat'(I,")",C,G1);'parser::is_token'(A,"[")->'parser::parse_list'(A,B,C);'parser::is_token'(A,"{")->'parser::parse_dictionary'(A,B,C);throw(fc_ParseError("Expected term",A)).
-'parser::$impl_parse_list'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"[",E,F),('parser::is_token'(E,"]")->G=[],H=fc_None,I=E;'parser::parse_list_items'(E,G,H,I)),'parser::eat'(I,"]",C,J),B=fc_ListExpr(G,H,D).
-'parser::$impl_parse_list_items'(A,B,C,D):-'parser::parse_term'(A,E,F),('parser::is_token'(F,",")->'parser::eat'(F,",",G,H),'parser::parse_list_items'(G,I,C,D),B=[E|I];'parser::is_token'(F,"|")->'parser::eat'(F,"|",G,J),'parser::parse_term'(G,C,D),B=[E];B=[E],C=fc_None,D=F).
-'parser::$impl_dictionary_key'(A,B):-A=fc_VarExpr(C,D)->B=fc_LiteralExpr(C,D);B=A.
-'parser::$impl_parse_dictionary'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"{",E,F),'parser::parse_dictionary_entries'(E,0.0,G,H),'parser::eat'(H,"}",C,I),B=fc_DictExpr(G,D).
-'parser::$impl_parse_dictionary_entries'(A,B,C,D):-'parser::is_token'(A,"}")->C=[],D=A;'parser::starts_relation'(A)->'parser::parse_table_closure'(A,E,F),E=fc_ClosureExpr(G,H,I,J),'parser::closure_name'(G,K),(K="_"->throw("A relation inside a table needs a name");L=fc_LiteralExpr(K,J),('parser::is_token'(F,",")->'parser::eat'(F,",",M,N);'parser::is_token'(F,"and")->'parser::eat'(F,"and",M,O);M=F),'parser::parse_dictionary_entries'(M,B,P,D),C=[fc_Entry(L,E)|P]);'parser::parse_dictionary_head'(A,Q,F),('parser::is_token'(F,"=")->'parser::eat'(F,"=",M,R),'parser::parse_term'(M,S,T),'parser::dictionary_key'(Q,L),U=B;S=Q,L=fc_LiteralExpr(B,fc_Loc(0.0,0.0)),(add_(B,1.0,V),U=V),T=F),('parser::is_token'(T,",")->'parser::eat'(T,",",W,X);'parser::is_token'(T,"and")->'parser::eat'(T,"and",W,Y);W=T),'parser::parse_dictionary_entries'(W,U,P,D),C=[fc_Entry(L,S)|P].
-'parser::$impl_parse_dictionary_head'(A,B,C):-'parser::token_type'(A,"ID"),'parser::next_is_token'(A,"=")->'parser::eat'(A,"ID",C,fc_Token(D,E,F,G)),B=fc_VarExpr(E,fc_Loc(F,G));'parser::parse_term'(A,B,C).
-'parser::$impl_table_outdented'(A,B,C):-'parser::token_position'(A,D,E),r_gt(D,B),r_le(E,C).
-'parser::$impl_parse_table_closure'(A,B,C):-'parser::token_loc'(A,D),D=fc_Loc(E,F),'parser::eat'(A,"ID",G,fc_Token(H,I,J,K)),'parser::eat'(G,"ID",L,fc_Token(M,N,O,P)),'parser::eat'(L,"(",Q,R),'parser::parse_parameters'(Q,S,T),'parser::eat'(T,")",U,V),'parser::closure_annotation'(U,N,I,W,X),'parser::parse_table_relation_goals'(X,E,F,Y,C),'parser::make_and'(Y,Z),B=fc_ClosureExpr(W,S,Z,D).
-'parser::$impl_parse_table_relation_goals'(A,B,C,D,E):-('parser::is_token'(A,"}");'parser::starts_relation'(A);'parser::table_outdented'(A,B,C))->D=[],E=A;'parser::parse_table_goal'(A,F,G),'parser::parse_table_relation_goals'(G,B,C,H,E),D=[F|H].
-'parser::$impl_parse_table_goal'(A,B,C):-'parser::token_type'(A,"ID"),'parser::token_value'(A,D),has_(["if","when","choose","soft_if","while"],D)->'parser::parse_table_control'(A,B,C);'parser::parse_goal'(A,B,C).
-'parser::$impl_parse_table_control'(A,B,C):-'parser::token_loc'(A,D),D=fc_Loc(E,F),'parser::token_value'(A,G),'parser::eat'(A,"ID",H,I),'parser::eat'(H,"(",J,K),'parser::parse_goal'(J,L,M),'parser::eat'(M,")",N,O),'parser::parse_table_branch_goals'(N,E,F,P,Q),'parser::make_and'(P,R),'parser::parse_table_control_tail'(G,Q,S,C),B=fc_ControlGoal(G,L,R,S,D).
-'parser::$impl_parse_table_branch_goals'(A,B,C,D,E):-('parser::is_token'(A,"}");'parser::starts_relation'(A);'parser::is_token'(A,"else");'parser::is_token'(A,"elseif");'parser::table_outdented'(A,B,C))->D=[],E=A;'parser::parse_table_goal'(A,F,G),'parser::parse_table_branch_goals'(G,B,C,H,E),D=[F|H].
-'parser::$impl_parse_table_control_tail'(A,B,C,D):-'parser::is_token'(B,"elseif")->'parser::token_loc'(B,E),E=fc_Loc(F,G),'parser::eat'(B,"elseif",H,I),'parser::eat'(H,"(",J,K),'parser::parse_goal'(J,L,M),'parser::eat'(M,")",N,O),'parser::parse_table_branch_goals'(N,F,G,P,Q),'parser::make_and'(P,R),'parser::parse_table_control_tail'(A,Q,S,D),C=fc_ControlGoal(A,L,R,S,E);'parser::is_token'(B,"else")->'parser::token_loc'(B,fc_Loc(F,G)),'parser::eat'(B,"else",H,T),'parser::parse_table_branch_goals'(H,F,G,U,D),'parser::make_and'(U,C);C=fc_None,D=B.
-'parser::$impl_parse_closure'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"ID",E,fc_Token(F,G,H,I)),('parser::token_type'(E,"ID")->'parser::eat'(E,"ID",J,fc_Token(K,L,M,N));L="_",J=E),'parser::eat'(J,"(",O,P),'parser::parse_parameters'(O,Q,R),'parser::eat'(R,")",S,T),'parser::closure_annotation'(S,L,G,U,V),'parser::parse_body'(V,W,C),B=fc_ClosureExpr(U,Q,W,D).
-'parser::$impl_closure_name'(A,B):-is_assoc(A)->cosmos_get(A,"name",C),B=C;B=A.
-'parser::$impl_closure_annotation'(A,B,C,D,E):-'parser::token_value'(A,F),has_(["det","semidet","multi","nondet"],F)->'parser::eat'(A,"ID",E,G),new(H),set_(H,"name",B,I),set_(I,"category",C,J),set_(J,"determinism",F,K),D=K;C="rel"->D=B,E=A;(new(L),set_(L,"name",B,M),set_(M,"category",C,N),set_(N,"determinism","nondet",O),D=O),E=A.
-parser(A):-new(B),set_(B,"lex",clos(upvals([]),'parser::$value_lex'),C),set_(C,"parseTokens",clos(upvals([]),'parser::$value_parseTokens'),D),set_(D,"parse",clos(upvals([]),'parser::$value_parse'),E),A=E.
-'parser::char_at'(A,B,C,D):-'parser::$impl_char_at'(A,B,C,D).
-'parser::$value_char_at'(A,B,C,D,upvals([])):-'parser::char_at'(A,B,C,D).
-'parser::two_at'(A,B,C,D):-'parser::$impl_two_at'(A,B,C,D).
-'parser::$value_two_at'(A,B,C,D,upvals([])):-'parser::two_at'(A,B,C,D).
-'parser::char_code_between'(A,B,C):-'parser::$impl_char_code_between'(A,B,C).
-'parser::$value_char_code_between'(A,B,C,upvals([])):-'parser::char_code_between'(A,B,C).
-'parser::digit'(A):-'parser::$impl_digit'(A).
-'parser::$value_digit'(A,upvals([])):-'parser::digit'(A).
-'parser::letter'(A):-'parser::$impl_letter'(A).
-'parser::$value_letter'(A,upvals([])):-'parser::letter'(A).
-'parser::identifier_char'(A):-'parser::$impl_identifier_char'(A).
-'parser::$value_identifier_char'(A,upvals([])):-'parser::identifier_char'(A).
-'parser::horizontal_space'(A):-'parser::$impl_horizontal_space'(A).
-'parser::$value_horizontal_space'(A,upvals([])):-'parser::horizontal_space'(A).
-'parser::opening'(A):-'parser::$impl_opening'(A).
-'parser::$value_opening'(A,upvals([])):-'parser::opening'(A).
-'parser::closing'(A):-'parser::$impl_closing'(A).
-'parser::$value_closing'(A,upvals([])):-'parser::closing'(A).
-'parser::punctuation'(A):-'parser::$impl_punctuation'(A).
-'parser::$value_punctuation'(A,upvals([])):-'parser::punctuation'(A).
-'parser::scan_indent'(A,B,C,D,E,F,G):-'parser::$impl_scan_indent'(A,B,C,D,E,F,G).
-'parser::$value_scan_indent'(A,B,C,D,E,F,G,upvals([])):-'parser::scan_indent'(A,B,C,D,E,F,G).
-'parser::skip_line_comment'(A,B,C,D):-'parser::$impl_skip_line_comment'(A,B,C,D).
-'parser::$value_skip_line_comment'(A,B,C,D,upvals([])):-'parser::skip_line_comment'(A,B,C,D).
-'parser::escaped_char'(A,B):-'parser::$impl_escaped_char'(A,B).
-'parser::$value_escaped_char'(A,B,upvals([])):-'parser::escaped_char'(A,B).
-'parser::scan_string'(A,B,C,D,E,F,G,H,I,J,K):-'parser::$impl_scan_string'(A,B,C,D,E,F,G,H,I,J,K).
-'parser::$value_scan_string'(A,B,C,D,E,F,G,H,I,J,K,upvals([])):-'parser::scan_string'(A,B,C,D,E,F,G,H,I,J,K).
-'parser::scan_number'(A,B,C,D):-'parser::$impl_scan_number'(A,B,C,D).
-'parser::$value_scan_number'(A,B,C,D,upvals([])):-'parser::scan_number'(A,B,C,D).
-'parser::scan_identifier'(A,B,C,D):-'parser::$impl_scan_identifier'(A,B,C,D).
-'parser::$value_scan_identifier'(A,B,C,D,upvals([])):-'parser::scan_identifier'(A,B,C,D).
-'parser::scan_block_comment'(A,B,C,D,E,F,G,H,I):-'parser::$impl_scan_block_comment'(A,B,C,D,E,F,G,H,I).
-'parser::$value_scan_block_comment'(A,B,C,D,E,F,G,H,I,upvals([])):-'parser::scan_block_comment'(A,B,C,D,E,F,G,H,I).
-'parser::line_starts_comment'(A,B,C):-'parser::$impl_line_starts_comment'(A,B,C).
-'parser::$value_line_starts_comment'(A,B,C,upvals([])):-'parser::line_starts_comment'(A,B,C).
-'parser::layout_tokens'(A,B,C,D):-'parser::$impl_layout_tokens'(A,B,C,D).
-'parser::$value_layout_tokens'(A,B,C,D,upvals([])):-'parser::layout_tokens'(A,B,C,D).
-'parser::eof_dedents'(A,B,C,D):-'parser::$impl_eof_dedents'(A,B,C,D).
-'parser::$value_eof_dedents'(A,B,C,D,upvals([])):-'parser::eof_dedents'(A,B,C,D).
-'parser::finish_lex'(A,B,C,D,E,F):-'parser::$impl_finish_lex'(A,B,C,D,E,F).
-'parser::$value_finish_lex'(A,B,C,D,E,F,upvals([])):-'parser::finish_lex'(A,B,C,D,E,F).
-'parser::lex_line_start'(A,B,C,D,E,F,G,H):-'parser::$impl_lex_line_start'(A,B,C,D,E,F,G,H).
-'parser::$value_lex_line_start'(A,B,C,D,E,F,G,H,upvals([])):-'parser::lex_line_start'(A,B,C,D,E,F,G,H).
-'parser::lex_identifier'(A,B,C,D,E,F,G,H):-'parser::$impl_lex_identifier'(A,B,C,D,E,F,G,H).
-'parser::$value_lex_identifier'(A,B,C,D,E,F,G,H,upvals([])):-'parser::lex_identifier'(A,B,C,D,E,F,G,H).
-'parser::lex_punctuation'(A,B,C,D,E,F,G,H):-'parser::$impl_lex_punctuation'(A,B,C,D,E,F,G,H).
-'parser::$value_lex_punctuation'(A,B,C,D,E,F,G,H,upvals([])):-'parser::lex_punctuation'(A,B,C,D,E,F,G,H).
-'parser::lex_loop'(A,B,C,D,E,F,G,H,I):-'parser::$impl_lex_loop'(A,B,C,D,E,F,G,H,I).
-'parser::$value_lex_loop'(A,B,C,D,E,F,G,H,I,upvals([])):-'parser::lex_loop'(A,B,C,D,E,F,G,H,I).
-'parser::lex'(A,B):-'parser::$impl_lex'(A,B).
-'parser::$value_lex'(A,B,upvals([])):-'parser::lex'(A,B).
-'parser::token_type'(A,B):-'parser::$impl_token_type'(A,B).
-'parser::$value_token_type'(A,B,upvals([])):-'parser::token_type'(A,B).
-'parser::token_value'(A,B):-'parser::$impl_token_value'(A,B).
-'parser::$value_token_value'(A,B,upvals([])):-'parser::token_value'(A,B).
-'parser::token_loc'(A,B):-'parser::$impl_token_loc'(A,B).
-'parser::$value_token_loc'(A,B,upvals([])):-'parser::token_loc'(A,B).
-'parser::token_position'(A,B,C):-'parser::$impl_token_position'(A,B,C).
-'parser::$value_token_position'(A,B,C,upvals([])):-'parser::token_position'(A,B,C).
-'parser::is_token'(A,B):-'parser::$impl_is_token'(A,B).
-'parser::$value_is_token'(A,B,upvals([])):-'parser::is_token'(A,B).
-'parser::next_is_token'(A,B):-'parser::$impl_next_is_token'(A,B).
-'parser::$value_next_is_token'(A,B,upvals([])):-'parser::next_is_token'(A,B).
-'parser::eat'(A,B,C,D):-'parser::$impl_eat'(A,B,C,D).
-'parser::$value_eat'(A,B,C,D,upvals([])):-'parser::eat'(A,B,C,D).
-'parser::skip_newlines'(A,B):-'parser::$impl_skip_newlines'(A,B).
-'parser::$value_skip_newlines'(A,B,upvals([])):-'parser::skip_newlines'(A,B).
-'parser::optional_token'(A,B,C):-'parser::$impl_optional_token'(A,B,C).
-'parser::$value_optional_token'(A,B,C,upvals([])):-'parser::optional_token'(A,B,C).
-'parser::make_and'(A,B):-'parser::$impl_make_and'(A,B).
-'parser::$value_make_and'(A,B,upvals([])):-'parser::make_and'(A,B).
-'parser::make_or'(A,B):-'parser::$impl_make_or'(A,B).
-'parser::$value_make_or'(A,B,upvals([])):-'parser::make_or'(A,B).
-'parser::relation_keyword'(A):-'parser::$impl_relation_keyword'(A).
-'parser::$value_relation_keyword'(A,upvals([])):-'parser::relation_keyword'(A).
-'parser::type_keyword'(A):-'parser::$impl_type_keyword'(A).
-'parser::$value_type_keyword'(A,upvals([])):-'parser::type_keyword'(A).
-'parser::type_name'(A):-'parser::$impl_type_name'(A).
-'parser::$value_type_name'(A,upvals([])):-'parser::type_name'(A).
-'parser::starts_relation'(A):-'parser::$impl_starts_relation'(A).
-'parser::$value_starts_relation'(A,upvals([])):-'parser::starts_relation'(A).
-'parser::starts_typed_declaration'(A):-'parser::$impl_starts_typed_declaration'(A).
-'parser::$value_starts_typed_declaration'(A,upvals([])):-'parser::starts_typed_declaration'(A).
-'parser::parse'(A,B):-'parser::$impl_parse'(A,B).
-'parser::$value_parse'(A,B,upvals([])):-'parser::parse'(A,B).
-'parser::parseTokens'(A,B):-'parser::$impl_parseTokens'(A,B).
-'parser::$value_parseTokens'(A,B,upvals([])):-'parser::parseTokens'(A,B).
-'parser::parse_program_items'(A,B,C):-'parser::$impl_parse_program_items'(A,B,C).
-'parser::$value_parse_program_items'(A,B,C,upvals([])):-'parser::parse_program_items'(A,B,C).
-'parser::parse_program_item'(A,B,C):-'parser::$impl_parse_program_item'(A,B,C).
-'parser::$value_parse_program_item'(A,B,C,upvals([])):-'parser::parse_program_item'(A,B,C).
-'parser::parse_id_words_until_paren'(A,B,C):-'parser::$impl_parse_id_words_until_paren'(A,B,C).
-'parser::$value_parse_id_words_until_paren'(A,B,C,upvals([])):-'parser::parse_id_words_until_paren'(A,B,C).
-'parser::parse_protocol'(A,B,C):-'parser::$impl_parse_protocol'(A,B,C).
-'parser::$value_parse_protocol'(A,B,C,upvals([])):-'parser::parse_protocol'(A,B,C).
-'parser::protocol_words'(A,B,C,D):-'parser::$impl_protocol_words'(A,B,C,D).
-'parser::$value_protocol_words'(A,B,C,D,upvals([])):-'parser::protocol_words'(A,B,C,D).
-'parser::protocol_members'(A,B,C):-'parser::$impl_protocol_members'(A,B,C).
-'parser::$value_protocol_members'(A,B,C,upvals([])):-'parser::protocol_members'(A,B,C).
-'parser::parse_functor_declaration'(A,B,C):-'parser::$impl_parse_functor_declaration'(A,B,C).
-'parser::$value_parse_functor_declaration'(A,B,C,upvals([])):-'parser::parse_functor_declaration'(A,B,C).
-'parser::parse_export_declaration'(A,B,C):-'parser::$impl_parse_export_declaration'(A,B,C).
-'parser::$value_parse_export_declaration'(A,B,C,upvals([])):-'parser::parse_export_declaration'(A,B,C).
-'parser::parse_type_words'(A,B,C,D):-'parser::$impl_parse_type_words'(A,B,C,D).
-'parser::$value_parse_type_words'(A,B,C,D,upvals([])):-'parser::parse_type_words'(A,B,C,D).
-'parser::parse_typed_declaration'(A,B,C):-'parser::$impl_parse_typed_declaration'(A,B,C).
-'parser::$value_parse_typed_declaration'(A,B,C,upvals([])):-'parser::parse_typed_declaration'(A,B,C).
-'parser::parse_relation_declaration'(A,B,C):-'parser::$impl_parse_relation_declaration'(A,B,C).
-'parser::$value_parse_relation_declaration'(A,B,C,upvals([])):-'parser::parse_relation_declaration'(A,B,C).
-'parser::parse_parameters'(A,B,C):-'parser::$impl_parse_parameters'(A,B,C).
-'parser::$value_parse_parameters'(A,B,C,upvals([])):-'parser::parse_parameters'(A,B,C).
-'parser::parse_parameter'(A,B,C):-'parser::$impl_parse_parameter'(A,B,C).
-'parser::$value_parse_parameter'(A,B,C,upvals([])):-'parser::parse_parameter'(A,B,C).
-'parser::parse_parameter_type_tail'(A,B,C,D,E):-'parser::$impl_parse_parameter_type_tail'(A,B,C,D,E).
-'parser::$value_parse_parameter_type_tail'(A,B,C,D,E,upvals([])):-'parser::parse_parameter_type_tail'(A,B,C,D,E).
-'parser::parse_body'(A,B,C):-'parser::$impl_parse_body'(A,B,C).
-'parser::$value_parse_body'(A,B,C,upvals([])):-'parser::parse_body'(A,B,C).
-'parser::parse_body_items'(A,B,C):-'parser::$impl_parse_body_items'(A,B,C).
-'parser::$value_parse_body_items'(A,B,C,upvals([])):-'parser::parse_body_items'(A,B,C).
-'parser::parse_goal'(A,B,C):-'parser::$impl_parse_goal'(A,B,C).
-'parser::$value_parse_goal'(A,B,C,upvals([])):-'parser::parse_goal'(A,B,C).
-'parser::parse_or_goal'(A,B,C):-'parser::$impl_parse_or_goal'(A,B,C).
-'parser::$value_parse_or_goal'(A,B,C,upvals([])):-'parser::parse_or_goal'(A,B,C).
-'parser::parse_or_tail'(A,B,C):-'parser::$impl_parse_or_tail'(A,B,C).
-'parser::$value_parse_or_tail'(A,B,C,upvals([])):-'parser::parse_or_tail'(A,B,C).
-'parser::parse_and_goal'(A,B,C):-'parser::$impl_parse_and_goal'(A,B,C).
-'parser::$value_parse_and_goal'(A,B,C,upvals([])):-'parser::parse_and_goal'(A,B,C).
-'parser::parse_and_tail'(A,B,C):-'parser::$impl_parse_and_tail'(A,B,C).
-'parser::$value_parse_and_tail'(A,B,C,upvals([])):-'parser::parse_and_tail'(A,B,C).
-'parser::prefix_goal_keyword'(A):-'parser::$impl_prefix_goal_keyword'(A).
-'parser::$value_prefix_goal_keyword'(A,upvals([])):-'parser::prefix_goal_keyword'(A).
-'parser::control_keyword'(A):-'parser::$impl_control_keyword'(A).
-'parser::$value_control_keyword'(A,upvals([])):-'parser::control_keyword'(A).
-'parser::parse_unary_goal'(A,B,C):-'parser::$impl_parse_unary_goal'(A,B,C).
-'parser::$value_parse_unary_goal'(A,B,C,upvals([])):-'parser::parse_unary_goal'(A,B,C).
-'parser::parse_atomic_goal'(A,B,C):-'parser::$impl_parse_atomic_goal'(A,B,C).
-'parser::$value_parse_atomic_goal'(A,B,C,upvals([])):-'parser::parse_atomic_goal'(A,B,C).
-'parser::is_comparison'(A,B):-'parser::$impl_is_comparison'(A,B).
-'parser::$value_is_comparison'(A,B,upvals([])):-'parser::is_comparison'(A,B).
-'parser::parse_case_group'(A,B,C):-'parser::$impl_parse_case_group'(A,B,C).
-'parser::$value_parse_case_group'(A,B,C,upvals([])):-'parser::parse_case_group'(A,B,C).
-'parser::parse_more_cases'(A,B,C):-'parser::$impl_parse_more_cases'(A,B,C).
-'parser::$value_parse_more_cases'(A,B,C,upvals([])):-'parser::parse_more_cases'(A,B,C).
-'parser::parse_case_branch'(A,B,C):-'parser::$impl_parse_case_branch'(A,B,C).
-'parser::$value_parse_case_branch'(A,B,C,upvals([])):-'parser::parse_case_branch'(A,B,C).
-'parser::header_has_semicolon'(A,B):-'parser::$impl_header_has_semicolon'(A,B).
-'parser::$value_header_has_semicolon'(A,B,upvals([])):-'parser::header_has_semicolon'(A,B).
-'parser::for_header_has_semicolon'(A):-'parser::$impl_for_header_has_semicolon'(A).
-'parser::$value_for_header_has_semicolon'(A,upvals([])):-'parser::for_header_has_semicolon'(A).
-'parser::parse_control'(A,B,C):-'parser::$impl_parse_control'(A,B,C).
-'parser::$value_parse_control'(A,B,C,upvals([])):-'parser::parse_control'(A,B,C).
-'parser::parse_for_control'(A,B,C,D):-'parser::$impl_parse_for_control'(A,B,C,D).
-'parser::$value_parse_for_control'(A,B,C,D,upvals([])):-'parser::parse_for_control'(A,B,C,D).
-'parser::parse_for_in_control'(A,B,C,D,E):-'parser::$impl_parse_for_in_control'(A,B,C,D,E).
-'parser::$value_parse_for_in_control'(A,B,C,D,E,upvals([])):-'parser::parse_for_in_control'(A,B,C,D,E).
-'parser::parse_control_tail'(A,B,C,D):-'parser::$impl_parse_control_tail'(A,B,C,D).
-'parser::$value_parse_control_tail'(A,B,C,D,upvals([])):-'parser::parse_control_tail'(A,B,C,D).
-'parser::expression_loc'(A,B):-'parser::$impl_expression_loc'(A,B).
-'parser::$value_expression_loc'(A,B,upvals([])):-'parser::expression_loc'(A,B).
-'parser::parse_term'(A,B,C):-'parser::$impl_parse_term'(A,B,C).
-'parser::$value_parse_term'(A,B,C,upvals([])):-'parser::parse_term'(A,B,C).
-'parser::parse_additive'(A,B,C):-'parser::$impl_parse_additive'(A,B,C).
-'parser::$value_parse_additive'(A,B,C,upvals([])):-'parser::parse_additive'(A,B,C).
-'parser::parse_additive_tail'(A,B,C,D):-'parser::$impl_parse_additive_tail'(A,B,C,D).
-'parser::$value_parse_additive_tail'(A,B,C,D,upvals([])):-'parser::parse_additive_tail'(A,B,C,D).
-'parser::parse_multiplicative'(A,B,C):-'parser::$impl_parse_multiplicative'(A,B,C).
-'parser::$value_parse_multiplicative'(A,B,C,upvals([])):-'parser::parse_multiplicative'(A,B,C).
-'parser::parse_multiplicative_tail'(A,B,C,D):-'parser::$impl_parse_multiplicative_tail'(A,B,C,D).
-'parser::$value_parse_multiplicative_tail'(A,B,C,D,upvals([])):-'parser::parse_multiplicative_tail'(A,B,C,D).
-'parser::parse_prefix_expression'(A,B,C):-'parser::$impl_parse_prefix_expression'(A,B,C).
-'parser::$value_parse_prefix_expression'(A,B,C,upvals([])):-'parser::parse_prefix_expression'(A,B,C).
-'parser::parse_postfix'(A,B,C):-'parser::$impl_parse_postfix'(A,B,C).
-'parser::$value_parse_postfix'(A,B,C,upvals([])):-'parser::parse_postfix'(A,B,C).
-'parser::parse_postfix_tail'(A,B,C,D):-'parser::$impl_parse_postfix_tail'(A,B,C,D).
-'parser::$value_parse_postfix_tail'(A,B,C,D,upvals([])):-'parser::parse_postfix_tail'(A,B,C,D).
-'parser::parse_arguments'(A,B,C):-'parser::$impl_parse_arguments'(A,B,C).
-'parser::$value_parse_arguments'(A,B,C,upvals([])):-'parser::parse_arguments'(A,B,C).
-'parser::parse_primary'(A,B,C):-'parser::$impl_parse_primary'(A,B,C).
-'parser::$value_parse_primary'(A,B,C,upvals([])):-'parser::parse_primary'(A,B,C).
-'parser::parse_list'(A,B,C):-'parser::$impl_parse_list'(A,B,C).
-'parser::$value_parse_list'(A,B,C,upvals([])):-'parser::parse_list'(A,B,C).
-'parser::parse_list_items'(A,B,C,D):-'parser::$impl_parse_list_items'(A,B,C,D).
-'parser::$value_parse_list_items'(A,B,C,D,upvals([])):-'parser::parse_list_items'(A,B,C,D).
-'parser::dictionary_key'(A,B):-'parser::$impl_dictionary_key'(A,B).
-'parser::$value_dictionary_key'(A,B,upvals([])):-'parser::dictionary_key'(A,B).
-'parser::parse_dictionary'(A,B,C):-'parser::$impl_parse_dictionary'(A,B,C).
-'parser::$value_parse_dictionary'(A,B,C,upvals([])):-'parser::parse_dictionary'(A,B,C).
-'parser::parse_dictionary_entries'(A,B,C,D):-'parser::$impl_parse_dictionary_entries'(A,B,C,D).
-'parser::$value_parse_dictionary_entries'(A,B,C,D,upvals([])):-'parser::parse_dictionary_entries'(A,B,C,D).
-'parser::parse_dictionary_head'(A,B,C):-'parser::$impl_parse_dictionary_head'(A,B,C).
-'parser::$value_parse_dictionary_head'(A,B,C,upvals([])):-'parser::parse_dictionary_head'(A,B,C).
-'parser::table_outdented'(A,B,C):-'parser::$impl_table_outdented'(A,B,C).
-'parser::$value_table_outdented'(A,B,C,upvals([])):-'parser::table_outdented'(A,B,C).
-'parser::parse_table_closure'(A,B,C):-'parser::$impl_parse_table_closure'(A,B,C).
-'parser::$value_parse_table_closure'(A,B,C,upvals([])):-'parser::parse_table_closure'(A,B,C).
-'parser::parse_table_relation_goals'(A,B,C,D,E):-'parser::$impl_parse_table_relation_goals'(A,B,C,D,E).
-'parser::$value_parse_table_relation_goals'(A,B,C,D,E,upvals([])):-'parser::parse_table_relation_goals'(A,B,C,D,E).
-'parser::parse_table_goal'(A,B,C):-'parser::$impl_parse_table_goal'(A,B,C).
-'parser::$value_parse_table_goal'(A,B,C,upvals([])):-'parser::parse_table_goal'(A,B,C).
-'parser::parse_table_control'(A,B,C):-'parser::$impl_parse_table_control'(A,B,C).
-'parser::$value_parse_table_control'(A,B,C,upvals([])):-'parser::parse_table_control'(A,B,C).
-'parser::parse_table_branch_goals'(A,B,C,D,E):-'parser::$impl_parse_table_branch_goals'(A,B,C,D,E).
-'parser::$value_parse_table_branch_goals'(A,B,C,D,E,upvals([])):-'parser::parse_table_branch_goals'(A,B,C,D,E).
-'parser::parse_table_control_tail'(A,B,C,D):-'parser::$impl_parse_table_control_tail'(A,B,C,D).
-'parser::$value_parse_table_control_tail'(A,B,C,D,upvals([])):-'parser::parse_table_control_tail'(A,B,C,D).
-'parser::parse_closure'(A,B,C):-'parser::$impl_parse_closure'(A,B,C).
-'parser::$value_parse_closure'(A,B,C,upvals([])):-'parser::parse_closure'(A,B,C).
-'parser::closure_name'(A,B):-'parser::$impl_closure_name'(A,B).
-'parser::$value_closure_name'(A,B,upvals([])):-'parser::closure_name'(A,B).
-'parser::closure_annotation'(A,B,C,D,E):-'parser::$impl_closure_annotation'(A,B,C,D,E).
-'parser::$value_closure_annotation'(A,B,C,D,E,upvals([])):-'parser::closure_annotation'(A,B,C,D,E).
+cosmos_parser__char_at(_source, _length, _index, _char) :- {_index < _length}, default_lib("string", _string), getnil(_string, "at", T1), call_cl(T1, [_source, _index, _char]).
+cosmos_parser__two_at(_source, _length, _index, _pair) :- add_(_index, 1.0, T2), {T2 < _length}, add_(_index, 2.0, T3), default_lib("string", _string), getnil(_string, "slice", T4), call_cl(T4, [_source, _index, T3, _pair]).
+cosmos_parser__char_code_between(_char, _low, _high) :- default_lib("string", _string), getnil(_string, "code", T5), call_cl(T5, [_char, _code]), {_code >= _low}, {_code =< _high}.
+cosmos_parser__digit(_char) :- cosmos_parser__char_code_between(_char, 48.0, 57.0).
+cosmos_parser__letter(_char) :- (cosmos_parser__char_code_between(_char, 65.0, 90.0) ; cosmos_parser__char_code_between(_char, 97.0, 122.0) ; _char = "_").
+cosmos_parser__identifier_char(_char) :- (cosmos_parser__letter(_char) ; cosmos_parser__digit(_char)).
+cosmos_parser__horizontal_space(_char) :- (_char = " " ; _char = "\t").
+cosmos_parser__opening(_char) :- (_char = "(" ; _char = "[" ; _char = "{").
+cosmos_parser__closing(_char) :- (_char = ")" ; _char = "]" ; _char = "}").
+cosmos_parser__punctuation(_char) :- has_(["("|[")"|["["|["]"|["{"|["}"|[","|[";"|["|"|["."|["+"|["-"|["*"|["/"|["%"|["="|["<"|[">"|["!"|["#"|[":"|[]]]]]]]]]]]]]]]]]]]]]], _char).
+cosmos_parser__scan_indent(_source, _length, _index, _column, _next_index, _next_column, _indent) :- (cosmos_parser__char_at(_source, _length, _index, _char), _char = " " -> add_(_index, 1.0, T6), add_(_column, 1.0, T7), cosmos_parser__scan_indent(_source, _length, T6, T7, _next_index, _next_column, _tail_indent), add_(_tail_indent, 1.0, T8), _indent = T8 ; (cosmos_parser__char_at(_source, _length, _index, _char), _char = "\t" -> add_(_index, 1.0, T9), add_(_column, 4.0, T10), cosmos_parser__scan_indent(_source, _length, T9, T10, _next_index, _next_column, _tail_indent), add_(_tail_indent, 4.0, T11), _indent = T11 ; _next_index = _index, _next_column = _column, _indent = 0.0)).
+cosmos_parser__skip_line_comment(_source, _length, _index, _next_index) :- (cosmos_parser__char_at(_source, _length, _index, _char), dif(_char, "\n") -> add_(_index, 1.0, T12), cosmos_parser__skip_line_comment(_source, _length, T12, _next_index) ; _next_index = _index).
+cosmos_parser__escaped_char(_code, _value) :- (_code = "n" -> _value = "\n" ; (_code = "r" -> _value = "\r" ; (_code = "t" -> _value = "\t" ; _value = _code))).
+cosmos_parser__scan_string(_source, _length, _index, _line, _column, _quote, _acc, _next_index, _next_line, _next_column, _value) :- ({_index >= _length} -> throw("Unclosed string") ; default_lib("string", _string), getnil(_string, "at", T13), call_cl(T13, [_source, _index, _char]), (_char = _quote -> add_(_index, 1.0, T14), _next_index = T14, _next_line = _line, add_(_column, 1.0, T15), _next_column = T15, _value = _acc ; (_char = "\\" -> (add_(_index, 1.0, T16), {T16 < _length} -> add_(_index, 1.0, T17), default_lib("string", _string), getnil(_string, "at", T18), call_cl(T18, [_source, T17, _escaped]), cosmos_parser__escaped_char(_escaped, _decoded), default_lib("string", _string), getnil(_string, "concat", T19), call_cl(T19, [_acc, _decoded, _acc2]), add_(_index, 2.0, T20), add_(_column, 2.0, T21), cosmos_parser__scan_string(_source, _length, T20, _line, T21, _quote, _acc2, _next_index, _next_line, _next_column, _value) ; throw("Unclosed string escape")) ; (_char = "\n" -> default_lib("string", _string), getnil(_string, "concat", T22), call_cl(T22, [_acc, _char, _acc2]), add_(_index, 1.0, T23), add_(_line, 1.0, T24), cosmos_parser__scan_string(_source, _length, T23, T24, 1.0, _quote, _acc2, _next_index, _next_line, _next_column, _value) ; default_lib("string", _string), getnil(_string, "concat", T25), call_cl(T25, [_acc, _char, _acc2]), add_(_index, 1.0, T26), add_(_column, 1.0, T27), cosmos_parser__scan_string(_source, _length, T26, _line, T27, _quote, _acc2, _next_index, _next_line, _next_column, _value))))).
+cosmos_parser__scan_number(_source, _length, _index, _next_index) :- (cosmos_parser__char_at(_source, _length, _index, _char), (cosmos_parser__digit(_char) ; _char = ".") -> add_(_index, 1.0, T28), cosmos_parser__scan_number(_source, _length, T28, _next_index) ; _next_index = _index).
+cosmos_parser__scan_identifier(_source, _length, _index, _next_index) :- (cosmos_parser__char_at(_source, _length, _index, _char), cosmos_parser__identifier_char(_char) -> add_(_index, 1.0, T29), cosmos_parser__scan_identifier(_source, _length, T29, _next_index) ; _next_index = _index).
+cosmos_parser__scan_block_comment(_source, _length, _index, _line, _column, _depth, _next_index, _next_line, _next_column) :- ({_index >= _length} -> throw("Unclosed block comment") ; (cosmos_parser__two_at(_source, _length, _index, _pair), _pair = "/*" -> add_(_index, 2.0, T30), add_(_column, 2.0, T31), add_(_depth, 1.0, T32), cosmos_parser__scan_block_comment(_source, _length, T30, _line, T31, T32, _next_index, _next_line, _next_column) ; (cosmos_parser__two_at(_source, _length, _index, _pair), _pair = "*/" -> (_depth = 1.0 -> add_(_index, 2.0, T33), _next_index = T33, _next_line = _line, add_(_column, 2.0, T34), _next_column = T34 ; add_(_index, 2.0, T35), add_(_column, 2.0, T36), r_sub(_depth, 1.0, T37), cosmos_parser__scan_block_comment(_source, _length, T35, _line, T36, T37, _next_index, _next_line, _next_column)) ; default_lib("string", _string), getnil(_string, "at", T38), call_cl(T38, [_source, _index, _char]), (_char = "\n" -> add_(_index, 1.0, T39), add_(_line, 1.0, T40), cosmos_parser__scan_block_comment(_source, _length, T39, T40, 1.0, _depth, _next_index, _next_line, _next_column) ; add_(_index, 1.0, T41), add_(_column, 1.0, T42), cosmos_parser__scan_block_comment(_source, _length, T41, _line, T42, _depth, _next_index, _next_line, _next_column))))).
+cosmos_parser__line_starts_comment(_source, _length, _index) :- cosmos_parser__two_at(_source, _length, _index, _pair), (_pair = "//" ; _pair = "--").
+cosmos_parser__layout_tokens(_indent, [_level|_levels], _tokens, _new_levels) :- ({_indent > _level} -> _tokens = [fc_Token("INDENT","INDENT",0.0,0.0)|[]], _new_levels = [_indent|[_level|_levels]] ; (_indent = _level -> _tokens = [], _new_levels = [_level|_levels] ; (_level = 0.0 -> throw("Invalid dedent") ; cosmos_parser__layout_tokens(_indent, _levels, _tail_tokens, _new_levels), _tokens = [fc_Token("DEDENT","DEDENT",0.0,0.0)|_tail_tokens]))).
+cosmos_parser__eof_dedents(_levels, _line, _column, _tokens) :- (_levels = [0.0|[]] -> _tokens = [fc_Token("EOF","EOF",_line,_column)|[]] ; _levels = [_|_tail], cosmos_parser__eof_dedents(_tail, _line, _column, _rest), _tokens = [fc_Token("DEDENT","DEDENT",_line,_column)|_rest]).
+cosmos_parser__finish_lex(_at_line, _depth, _levels, _line, _column, _tokens) :- (dif(_depth, 0.0) -> throw("Unclosed delimiter") ; (_at_line = 1.0 -> cosmos_parser__eof_dedents(_levels, _line, _column, _tokens) ; cosmos_parser__eof_dedents(_levels, _line, _column, _rest), _tokens = [fc_Token("NEWLINE","NEWLINE",_line,_column)|_rest])).
+cosmos_parser__lex_line_start(_source, _length, _index, _line, _column, _depth, _levels, _tokens) :- cosmos_parser__scan_indent(_source, _length, _index, _column, _code_index, _code_column, _indent), ({_code_index >= _length} -> cosmos_parser__finish_lex(1.0, _depth, _levels, _line, _code_column, _tokens) ; (cosmos_parser__char_at(_source, _length, _code_index, _char), _char = "\n" -> cosmos_parser__lex_loop(_source, _length, _code_index, _line, _code_column, 0.0, _depth, _levels, _tokens) ; (cosmos_parser__line_starts_comment(_source, _length, _code_index) -> cosmos_parser__lex_loop(_source, _length, _code_index, _line, _code_column, 0.0, _depth, _levels, _tokens) ; (cosmos_parser__two_at(_source, _length, _code_index, _pair), _pair = "/*" -> cosmos_parser__lex_loop(_source, _length, _code_index, _line, _code_column, 0.0, _depth, _levels, _tokens) ; cosmos_parser__layout_tokens(_indent, _levels, _layout, _levels2), cosmos_parser__lex_loop(_source, _length, _code_index, _line, _code_column, 0.0, _depth, _levels2, _tail), append(_layout, _tail, _tokens))))).
+cosmos_parser__lex_identifier(_source, _length, _index, _line, _column, _depth, _levels, _tokens) :- cosmos_parser__scan_identifier(_source, _length, _index, _end_index), default_lib("string", _string), getnil(_string, "slice", T43), call_cl(T43, [_source, _index, _end_index, _text]), (_text = "for", add_(_end_index, 2.0, T44), {T44 < _length}, add_(_end_index, 3.0, T45), default_lib("string", _string), getnil(_string, "slice", T46), call_cl(T46, [_source, _end_index, T45, "-in"]) -> _token = fc_Token("ID","for-in",_line,_column), add_(_end_index, 3.0, T47), add_(_column, _end_index, T48), r_sub(T48, _index, T49), add_(T49, 3.0, T50), cosmos_parser__lex_loop(_source, _length, T47, _line, T50, 0.0, _depth, _levels, _rest) ; _token = fc_Token("ID",_text,_line,_column), add_(_column, _end_index, T51), r_sub(T51, _index, T52), cosmos_parser__lex_loop(_source, _length, _end_index, _line, T52, 0.0, _depth, _levels, _rest)), _tokens = [_token|_rest].
+cosmos_parser__lex_punctuation(_source, _length, _index, _line, _column, _depth, _levels, _tokens) :- default_lib("string", _string), getnil(_string, "at", T53), call_cl(T53, [_source, _index, _char]), (cosmos_parser__opening(_char) -> add_(_depth, 1.0, T54), _depth2 = T54 ; (cosmos_parser__closing(_char) -> ({_depth > 0.0} -> r_sub(_depth, 1.0, T55), _depth2 = T55 ; throw("Unexpected closing delimiter")) ; _depth2 = _depth)), _token = fc_Token(_char,_char,_line,_column), add_(_index, 1.0, T56), add_(_column, 1.0, T57), cosmos_parser__lex_loop(_source, _length, T56, _line, T57, 0.0, _depth2, _levels, _rest), _tokens = [_token|_rest].
+cosmos_parser__lex_loop(_source, _length, _index, _line, _column, _at_line, _depth, _levels, _tokens) :- ({_index >= _length} -> cosmos_parser__finish_lex(_at_line, _depth, _levels, _line, _column, _tokens) ; (_at_line = 1.0, _depth = 0.0 -> cosmos_parser__lex_line_start(_source, _length, _index, _line, _column, _depth, _levels, _tokens) ; default_lib("string", _string), getnil(_string, "at", T58), call_cl(T58, [_source, _index, _char]), ((_char = " " ; _char = "\t") -> add_(_index, 1.0, T59), add_(_column, 1.0, T60), cosmos_parser__lex_loop(_source, _length, T59, _line, T60, _at_line, _depth, _levels, _tokens) ; (_char = "\n" -> (_depth = 0.0 -> add_(_index, 1.0, T61), add_(_line, 1.0, T62), cosmos_parser__lex_loop(_source, _length, T61, T62, 1.0, 1.0, _depth, _levels, _rest), _tokens = [fc_Token("NEWLINE","NEWLINE",_line,_column)|_rest] ; add_(_index, 1.0, T63), add_(_line, 1.0, T64), cosmos_parser__lex_loop(_source, _length, T63, T64, 1.0, 1.0, _depth, _levels, _tokens)) ; (cosmos_parser__line_starts_comment(_source, _length, _index) -> add_(_index, 2.0, T65), cosmos_parser__skip_line_comment(_source, _length, T65, _next_index), add_(_column, _next_index, T66), r_sub(T66, _index, T67), cosmos_parser__lex_loop(_source, _length, _next_index, _line, T67, _at_line, _depth, _levels, _tokens) ; (cosmos_parser__two_at(_source, _length, _index, _pair), _pair = "/*" -> add_(_index, 2.0, T68), add_(_column, 2.0, T69), cosmos_parser__scan_block_comment(_source, _length, T68, _line, T69, 1.0, _next_index, _next_line, _next_column), cosmos_parser__lex_loop(_source, _length, _next_index, _next_line, _next_column, _at_line, _depth, _levels, _tokens) ; ((_char = "'" ; _char = "\"") -> add_(_index, 1.0, T70), add_(_column, 1.0, T71), cosmos_parser__scan_string(_source, _length, T70, _line, T71, _char, "", _next_index, _next_line, _next_column, _value), cosmos_parser__lex_loop(_source, _length, _next_index, _next_line, _next_column, 0.0, _depth, _levels, _rest), _tokens = [fc_Token("STRING",_value,_line,_column)|_rest] ; (cosmos_parser__digit(_char) -> cosmos_parser__scan_number(_source, _length, _index, _next_index), default_lib("string", _string), getnil(_string, "slice", T72), call_cl(T72, [_source, _index, _next_index, _text]), add_(_column, _next_index, T73), r_sub(T73, _index, T74), cosmos_parser__lex_loop(_source, _length, _next_index, _line, T74, 0.0, _depth, _levels, _rest), _tokens = [fc_Token("NUMBER",_text,_line,_column)|_rest] ; (cosmos_parser__letter(_char) -> cosmos_parser__lex_identifier(_source, _length, _index, _line, _column, _depth, _levels, _tokens) ; (cosmos_parser__two_at(_source, _length, _index, _pair), has_(["<="|[">="|["!="|["=="|["::"|["+="|["-="|["*="|["/="|["%="|[]]]]]]]]]]], _pair) -> add_(_index, 2.0, T75), add_(_column, 2.0, T76), cosmos_parser__lex_loop(_source, _length, T75, _line, T76, 0.0, _depth, _levels, _rest), _tokens = [fc_Token(_pair,_pair,_line,_column)|_rest] ; (cosmos_parser__punctuation(_char) -> cosmos_parser__lex_punctuation(_source, _length, _index, _line, _column, _depth, _levels, _tokens) ; throw("Unexpected character")))))))))))).
+cosmos_parser__lex(_source, _tokens) :- default_lib("string", _string), getnil(_string, "size", T77), call_cl(T77, [_source, _length]), cosmos_parser__lex_loop(_source, _length, 0.0, 1.0, 1.0, 1.0, 0.0, [0.0|[]], _tokens).
+cosmos_parser__token_type([fc_Token(_type, _, _, _)|_], _type) :- true.
+cosmos_parser__token_value([fc_Token(_, _value, _, _)|_], _value) :- true.
+cosmos_parser__token_loc([fc_Token(_, _, _line, _column)|_], fc_Loc(_line, _column)) :- true.
+cosmos_parser__token_position([fc_Token(_, _, _line, _column)|_], _line, _column) :- true.
+cosmos_parser__is_token(_tokens, _expected) :- _tokens = [fc_Token(_type,_value,_,_)|_], (_type = _expected ; _type = "ID", _value = _expected).
+cosmos_parser__next_is_token([_|_tail], _expected) :- cosmos_parser__is_token(_tail, _expected).
+cosmos_parser__eat(_tokens, _expected, _rest, _token) :- (_tokens = [_head|_tail], cosmos_parser__is_token(_tokens, _expected) -> _token = _head, _rest = _tail ; throw(fc_ParseError("Unexpected token",_expected,_tokens))).
+cosmos_parser__skip_newlines(_tokens, _rest) :- (cosmos_parser__is_token(_tokens, "NEWLINE") -> cosmos_parser__eat(_tokens, "NEWLINE", _tail, _), cosmos_parser__skip_newlines(_tail, _rest) ; _rest = _tokens).
+cosmos_parser__optional_token(_tokens, _expected, _rest) :- (cosmos_parser__is_token(_tokens, _expected) -> cosmos_parser__eat(_tokens, _expected, _rest, _) ; _rest = _tokens).
+cosmos_parser__make_and([], _goal) :- _goal = fc_TrueGoal.
+cosmos_parser__make_and([_goal|[]], _goal) :- true.
+cosmos_parser__make_and([_head|[_second|_tail]], _goal) :- _goal = fc_AndGoal([_head|[_second|_tail]]).
+cosmos_parser__make_or([_goal|[]], _goal) :- true.
+cosmos_parser__make_or([_head|[_second|_tail]], _goal) :- _goal = fc_OrGoal([_head|[_second|_tail]]).
+cosmos_parser__relation_keyword(_value) :- has_(["rel"|["fun"|["bool"|["function"|["void"|[]]]]]], _value).
+cosmos_parser__type_keyword(_value) :- has_(["Any"|["Number"|["String"|["Functor"|["Relation"|["Integer"|["Real"|["List"|["Table"|["Host"|["In"|["Out"|["InOut"|[]]]]]]]]]]]]]], _value).
+cosmos_parser__type_name(_value) :- (cosmos_parser__type_keyword(_value) -> true ; default_lib("string", _string), getnil(_string, "slice", T78), call_cl(T78, [_value, 0.0, 1.0, _first]), string_upper(_first, _first), string_lower(_first, _lower), dif(_first, _lower)).
+cosmos_parser__starts_relation(_tokens) :- cosmos_parser__token_type(_tokens, "ID"), cosmos_parser__token_value(_tokens, _value), cosmos_parser__relation_keyword(_value).
+cosmos_parser__starts_typed_declaration(_tokens) :- cosmos_parser__token_type(_tokens, "ID"), cosmos_parser__token_value(_tokens, _value), cosmos_parser__type_name(_value), cosmos_parser__next_is_token(_tokens, "ID").
+cosmos_parser__parse(_source, _program) :- cosmos_parser__lex(_source, _tokens), cosmos_parser__parseTokens(_tokens, _program).
+cosmos_parser__parseTokens(_tokens, _program) :- cosmos_parser__skip_newlines(_tokens, _start), cosmos_parser__parse_program_items(_start, _items, _rest), cosmos_parser__eat(_rest, "EOF", _tail, _), cosmos_parser__skip_newlines(_tail, _), _program = fc_Program(_items).
+cosmos_parser__parse_program_items(_tokens, _items, _rest) :- cosmos_parser__skip_newlines(_tokens, _start), (cosmos_parser__is_token(_start, "EOF") -> _items = [], _rest = _start ; cosmos_parser__parse_program_item(_start, _item, _after_item), cosmos_parser__skip_newlines(_after_item, _after_breaks), (cosmos_parser__is_token(_after_breaks, "and") -> cosmos_parser__eat(_after_breaks, "and", _after_and, _) ; _after_and = _after_breaks), cosmos_parser__parse_program_items(_after_and, _tail, _rest), _items = [_item|_tail]).
+cosmos_parser__parse_program_item(_tokens, _item, _rest) :- (cosmos_parser__starts_relation(_tokens) -> cosmos_parser__parse_relation_declaration(_tokens, _item, _rest) ; (cosmos_parser__is_token(_tokens, "functor") -> cosmos_parser__parse_functor_declaration(_tokens, _item, _rest) ; (cosmos_parser__is_token(_tokens, "protocol") -> cosmos_parser__parse_protocol(_tokens, _item, _rest) ; (cosmos_parser__is_token(_tokens, "class") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "class", _t1, _), cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__eat(_t2, "ID", _t3, fc_Token(_,_name,_,_)), cosmos_parser__eat(_t3, ",", _t4, _), cosmos_parser__parse_term(_t4, _value, _t5), cosmos_parser__eat(_t5, ")", _rest, _), _item = fc_ClassDecl(_name,_value,_loc) ; (cosmos_parser__is_token(_tokens, "export") -> cosmos_parser__parse_export_declaration(_tokens, _item, _rest) ; (cosmos_parser__starts_typed_declaration(_tokens) -> cosmos_parser__parse_typed_declaration(_tokens, _item, _rest) ; cosmos_parser__parse_goal(_tokens, _item, _rest))))))).
+cosmos_parser__parse_id_words_until_paren(_tokens, _words, _rest) :- (cosmos_parser__is_token(_tokens, ")") -> _words = [], _rest = _tokens ; cosmos_parser__eat(_tokens, "ID", _after, fc_Token(_,_word,_,_)), cosmos_parser__parse_id_words_until_paren(_after, _tail, _rest), _words = [_word|_tail]).
+cosmos_parser__parse_protocol(_tokens, _result, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "protocol", _t1, _), cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__eat(_t2, "ID", _t3, fc_Token(_,_name,_,_)), cosmos_parser__eat(_t3, ",", _t4, _), cosmos_parser__eat(_t4, "{", _t5, _), cosmos_parser__protocol_members(_t5, _members, _t6), cosmos_parser__eat(_t6, "}", _t7, _), cosmos_parser__eat(_t7, ")", _rest, _), _result = fc_ProtocolDecl(_name,_members,_loc).
+cosmos_parser__protocol_words(_tokens, _line, _words, _rest) :- (_tokens = [fc_Token("ID",_word,_line,_)|_tail] -> cosmos_parser__protocol_words(_tail, _line, _others, _rest), _words = [_word|_others] ; _words = [], _rest = _tokens).
+cosmos_parser__protocol_members(_tokens, _members, _rest) :- (cosmos_parser__is_token(_tokens, "}") -> _members = [], _rest = _tokens ; (cosmos_parser__is_token(_tokens, ",") -> cosmos_parser__eat(_tokens, ",", _t1, _), cosmos_parser__protocol_members(_t1, _members, _rest) ; (cosmos_parser__starts_relation(_tokens) -> cosmos_parser__parse_table_closure(_tokens, _method, _t1), cosmos_parser__protocol_members(_t1, _tail, _rest), _members = [_method|_tail] ; cosmos_parser__token_loc(_tokens, _loc), _loc = fc_Loc(_line,_), cosmos_parser__protocol_words(_tokens, _line, _words, _t1), (append(_types, [_name|[]], _words), dif(_types, []) -> cosmos_parser__protocol_members(_t1, _tail, _rest), _members = [fc_TypedDecl(_types,_name,fc_None,_loc)|_tail] ; throw(fc_ParseError("Expected protocol member declaration",_tokens)))))).
+cosmos_parser__parse_functor_declaration(_tokens, _declaration, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "functor", _t1, _), cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__eat(_t2, "ID", _t3, fc_Token(_,_name,_,_)), (cosmos_parser__is_token(_t3, ",") -> cosmos_parser__eat(_t3, ",", _t4, _), cosmos_parser__parse_id_words_until_paren(_t4, _types, _t5) ; _types = [], _t5 = _t3), cosmos_parser__eat(_t5, ")", _rest, _), _declaration = fc_FunctorDecl(_name,_types,_loc).
+cosmos_parser__parse_export_declaration(_tokens, _declaration, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "export", _t1, _), cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__parse_term(_t2, _value, _t3), cosmos_parser__eat(_t3, ")", _rest, _), _declaration = fc_ExportDecl(_value,_loc).
+cosmos_parser__parse_type_words(_tokens, _words, _name, _rest) :- cosmos_parser__eat(_tokens, "ID", _t1, fc_Token(_,_word,_,_)), (cosmos_parser__is_token(_t1, "ID") -> cosmos_parser__parse_type_words(_t1, _tail_words, _name, _rest), _words = [_word|_tail_words] ; _words = [], _name = _word, _rest = _t1).
+cosmos_parser__parse_typed_declaration(_tokens, _declaration, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__parse_type_words(_tokens, _words, _name, _t1), (cosmos_parser__is_token(_t1, "=") -> cosmos_parser__eat(_t1, "=", _t2, _), cosmos_parser__parse_term(_t2, _value, _rest) ; _value = fc_None, _rest = _t1), _declaration = fc_TypedDecl(_words,_name,_value,_loc).
+cosmos_parser__parse_relation_declaration(_tokens, _declaration, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "ID", _t1, fc_Token(_,_kind,_,_)), cosmos_parser__eat(_t1, "ID", _t2, fc_Token(_,_name,_,_)), cosmos_parser__eat(_t2, "(", _t3, _), cosmos_parser__parse_parameters(_t3, _params, _t4), cosmos_parser__eat(_t4, ")", _t5, _), (cosmos_parser__token_value(_t5, _determinism), has_(["det"|["semidet"|["multi"|["nondet"|[]]]]], _determinism) -> cosmos_parser__eat(_t5, "ID", _t6, _), new(T79), set_(T79, "category", _kind, T80), set_(T80, "determinism", _determinism, T81), _annotation = T81 ; _t6 = _t5, _annotation = _kind), cosmos_parser__parse_body(_t6, _body, _rest), _declaration = fc_RelationDecl(_annotation,_name,_params,_body,_loc).
+cosmos_parser__parse_parameters(_tokens, _params, _rest) :- (cosmos_parser__is_token(_tokens, ")") -> _params = [], _rest = _tokens ; cosmos_parser__parse_parameter(_tokens, _param, _t1), (cosmos_parser__is_token(_t1, ",") -> cosmos_parser__eat(_t1, ",", _t2, _), cosmos_parser__parse_parameters(_t2, _tail, _rest), _params = [_param|_tail] ; _params = [_param|[]], _rest = _t1)).
+cosmos_parser__parse_parameter(_tokens, _param, _rest) :- cosmos_parser__parse_term(_tokens, _first, _t1), (_first = fc_VarExpr(_first_name,_loc), cosmos_parser__is_token(_t1, "ID") -> cosmos_parser__parse_parameter_type_tail(_t1, [_first_name|[]], _words, _name, _rest), _param = fc_TypedParam(_words,_name,_loc) ; _param = _first, _rest = _t1).
+cosmos_parser__parse_parameter_type_tail(_tokens, _prefix, _words, _name, _rest) :- cosmos_parser__eat(_tokens, "ID", _t1, fc_Token(_,_word,_,_)), (cosmos_parser__is_token(_t1, "ID") -> append(_prefix, [_word|[]], _prefix2), cosmos_parser__parse_parameter_type_tail(_t1, _prefix2, _words, _name, _rest) ; _words = _prefix, _name = _word, _rest = _t1).
+cosmos_parser__parse_body(_tokens, _body, _rest) :- (cosmos_parser__is_token(_tokens, "NEWLINE") -> cosmos_parser__skip_newlines(_tokens, _t1), cosmos_parser__eat(_t1, "INDENT", _t2, _), cosmos_parser__skip_newlines(_t2, _t3), cosmos_parser__parse_body_items(_t3, _goals, _t4), cosmos_parser__eat(_t4, "DEDENT", _rest, _), cosmos_parser__make_and(_goals, _body) ; cosmos_parser__parse_goal(_tokens, _body, _t1), cosmos_parser__optional_token(_t1, ";", _t2), cosmos_parser__skip_newlines(_t2, _rest)).
+cosmos_parser__parse_body_items(_tokens, _goals, _rest) :- cosmos_parser__skip_newlines(_tokens, _start), (cosmos_parser__is_token(_start, "DEDENT") -> _goals = [], _rest = _start ; (cosmos_parser__is_token(_start, "case") -> cosmos_parser__parse_case_group(_start, _goal, _t1), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_body_items(_t2, _tail, _rest), _goals = [_goal|_tail] ; (cosmos_parser__starts_relation(_start) -> cosmos_parser__parse_closure(_start, _closure, _t1), _closure = fc_ClosureExpr(_annotation,_,_,_loc), cosmos_parser__closure_name(_annotation, _name), (_name = "_" -> throw("Nested relation needs a name") ; _goal = fc_UnifyGoal(fc_VarExpr(_name,_loc),_closure,_loc), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_body_items(_t2, _tail, _rest), _goals = [_goal|_tail]) ; (cosmos_parser__starts_typed_declaration(_start) -> cosmos_parser__parse_typed_declaration(_start, _goal, _t1), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_body_items(_t2, _tail, _rest), _goals = [_goal|_tail] ; cosmos_parser__parse_goal(_start, _goal, _t1), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_body_items(_t2, _tail, _rest), _goals = [_goal|_tail])))).
+cosmos_parser__parse_goal(_tokens, _goal, _rest) :- cosmos_parser__parse_or_goal(_tokens, _goal, _rest).
+cosmos_parser__parse_or_goal(_tokens, _goal, _rest) :- cosmos_parser__parse_and_goal(_tokens, _first, _t1), cosmos_parser__parse_or_tail(_t1, _tail, _rest), cosmos_parser__make_or([_first|_tail], _goal).
+cosmos_parser__parse_or_tail(_tokens, _goals, _rest) :- (cosmos_parser__is_token(_tokens, "or") -> cosmos_parser__eat(_tokens, "or", _t1, _), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_and_goal(_t2, _goal, _t3), cosmos_parser__parse_or_tail(_t3, _tail, _rest), _goals = [_goal|_tail] ; _goals = [], _rest = _tokens).
+cosmos_parser__parse_and_goal(_tokens, _goal, _rest) :- cosmos_parser__parse_unary_goal(_tokens, _first, _t1), cosmos_parser__parse_and_tail(_t1, _tail, _rest), cosmos_parser__make_and([_first|_tail], _goal).
+cosmos_parser__parse_and_tail(_tokens, _goals, _rest) :- (cosmos_parser__is_token(_tokens, "and") -> cosmos_parser__eat(_tokens, "and", _t1, _), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_unary_goal(_t2, _goal, _t3), cosmos_parser__parse_and_tail(_t3, _tail, _rest), _goals = [_goal|_tail] ; _goals = [], _rest = _tokens).
+cosmos_parser__prefix_goal_keyword(_word) :- has_(["not"|["unsafeNot"|["once"|[]]]], _word).
+cosmos_parser__control_keyword(_word) :- has_(["if"|["when"|["choose"|["soft_if"|["while"|["for"|["for-in"|["some"|[]]]]]]]]], _word).
+cosmos_parser__parse_unary_goal(_tokens, _goal, _rest) :- (cosmos_parser__is_token(_tokens, "assert") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "assert", _t1, _), (cosmos_parser__is_token(_t1, "(") -> cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__parse_goal(_t2, _body, _t3), (cosmos_parser__is_token(_t3, ",") -> cosmos_parser__eat(_t3, ",", _t4, _), cosmos_parser__parse_term(_t4, _message, _t5) ; _message = fc_LiteralExpr("assert error",_loc), _t5 = _t3), cosmos_parser__eat(_t5, ")", _rest, _) ; cosmos_parser__parse_unary_goal(_t1, _body, _rest), _message = fc_LiteralExpr("assert error",_loc)), _goal = fc_AssertGoal(_body,_message,_loc) ; (cosmos_parser__token_type(_tokens, "ID"), cosmos_parser__token_value(_tokens, _word), has_(["init"|["next"|[]]], _word), \+(cosmos_parser__next_is_token(_tokens, "(")) -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "ID", _t1, _), cosmos_parser__parse_term(_t1, _target, _t2), (cosmos_parser__is_token(_t2, "+=") -> cosmos_parser__eat(_t2, "+=", _t3, _), cosmos_parser__parse_term(_t3, _value, _rest), _rhs = fc_BinaryExpr("+",_target,_value,_loc) ; cosmos_parser__eat(_t2, "=", _t3, _), cosmos_parser__parse_term(_t3, _rhs, _rest)), (_word = "next", _target = fc_FieldExpr(_owner,_key,_) -> _child = fc_UnifyGoal(_owner,fc_SetFieldExpr(fc_FieldExpr(_owner,_key,_loc),_rhs,_loc),_loc) ; _child = fc_UnifyGoal(_target,_rhs,_loc)), _goal = fc_UnaryGoal(_word,_child,_loc) ; (cosmos_parser__token_type(_tokens, "ID"), cosmos_parser__token_value(_tokens, _word), cosmos_parser__prefix_goal_keyword(_word) -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "ID", _t1, _), cosmos_parser__parse_unary_goal(_t1, _child, _rest), _goal = fc_UnaryGoal(_word,_child,_loc) ; (cosmos_parser__token_type(_tokens, "ID"), cosmos_parser__token_value(_tokens, _word), cosmos_parser__control_keyword(_word) -> cosmos_parser__parse_control(_tokens, _goal, _rest) ; (cosmos_parser__is_token(_tokens, "case") -> cosmos_parser__parse_case_group(_tokens, _goal, _rest) ; (cosmos_parser__is_token(_tokens, "true") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "true", _rest, _), _goal = fc_TrueGoal(_loc) ; ((cosmos_parser__is_token(_tokens, "false") ; cosmos_parser__is_token(_tokens, "fail")) -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "ID", _rest, _), _goal = fc_FalseGoal(_loc) ; (cosmos_parser__is_token(_tokens, "cut") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "cut", _rest, _), _goal = fc_CutGoal(_loc) ; (cosmos_parser__is_token(_tokens, "(") -> cosmos_parser__eat(_tokens, "(", _t1, _), cosmos_parser__parse_goal(_t1, _goal, _t2), cosmos_parser__eat(_t2, ")", _rest, _) ; cosmos_parser__parse_atomic_goal(_tokens, _goal, _rest)))))))))).
+cosmos_parser__parse_atomic_goal(_tokens, _goal, _rest) :- cosmos_parser__parse_term(_tokens, _left, _t1), (cosmos_parser__token_value(_t1, _assignment), has_(["+="|["-="|["*="|["/="|["%="|[]]]]]], _assignment) -> cosmos_parser__eat(_t1, _assignment, _t2, _), cosmos_parser__parse_term(_t2, _right, _rest), cosmos_parser__expression_loc(_left, _loc), (_left = fc_StateExpr(_current,_) -> default_lib("string", _string), getnil(_string, "slice", T82), call_cl(T82, [_assignment, 0.0, 1.0, _op]), _goal = fc_UnifyGoal(_left,fc_BinaryExpr(_op,_current,_right,_loc),_loc) ; throw(fc_ParseError("Compound assignment requires !",_t1))) ; (cosmos_parser__is_token(_t1, "=") -> cosmos_parser__eat(_t1, "=", _t2, _), cosmos_parser__parse_term(_t2, _right, _rest), cosmos_parser__expression_loc(_left, _loc), _goal = fc_UnifyGoal(_left,_right,_loc) ; (cosmos_parser__is_token(_t1, "in") -> cosmos_parser__eat(_t1, "in", _t2, _), cosmos_parser__parse_term(_t2, _collection, _rest), cosmos_parser__expression_loc(_left, _loc), _goal = fc_HasGoal(_left,_collection,_loc) ; (cosmos_parser__is_comparison(_t1, _op) -> cosmos_parser__eat(_t1, _op, _t2, _), cosmos_parser__parse_term(_t2, _right, _rest), cosmos_parser__expression_loc(_left, _loc), _goal = fc_CompareGoal(_op,_left,_right,_loc) ; (cosmos_parser__is_token(_t1, "is") -> cosmos_parser__eat(_t1, "is", _t2, _), cosmos_parser__eat(_t2, "ID", _rest, fc_Token(_,_typeName,_,_)), cosmos_parser__expression_loc(_left, _loc), _goal = fc_IsGoal(_left,_typeName,_loc) ; (_left = fc_CallExpr(_fn,_args,_loc) -> _goal = fc_CallGoal(_fn,_args,_loc), _rest = _t1 ; throw(fc_ParseError("Expected goal operator",_t1)))))))).
+cosmos_parser__is_comparison(_tokens, _op) :- has_(["!="|["<"|["<="|[">"|[">="|[]]]]]], _op), cosmos_parser__is_token(_tokens, _op).
+cosmos_parser__parse_case_group(_tokens, _goal, _rest) :- cosmos_parser__parse_case_branch(_tokens, _first, _t1), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_more_cases(_t2, _tail, _rest), cosmos_parser__make_or([_first|_tail], _branches), cosmos_parser__token_loc(_tokens, _loc), _goal = fc_CaseGoal(_branches,_loc).
+cosmos_parser__parse_more_cases(_tokens, _branches, _rest) :- (cosmos_parser__is_token(_tokens, "case") -> cosmos_parser__parse_case_branch(_tokens, _branch, _t1), cosmos_parser__skip_newlines(_t1, _t2), cosmos_parser__parse_more_cases(_t2, _tail, _rest), _branches = [_branch|_tail] ; _branches = [], _rest = _tokens).
+cosmos_parser__parse_case_branch(_tokens, _branch, _rest) :- cosmos_parser__eat(_tokens, "case", _t1, _), cosmos_parser__eat(_t1, "NEWLINE", _t2, _), cosmos_parser__skip_newlines(_t2, _t3), cosmos_parser__eat(_t3, "INDENT", _t4, _), cosmos_parser__skip_newlines(_t4, _t5), cosmos_parser__parse_body_items(_t5, _goals, _t6), cosmos_parser__eat(_t6, "DEDENT", _rest, _), cosmos_parser__make_and(_goals, _branch).
+cosmos_parser__header_has_semicolon(_tokens, _depth) :- _tokens = [fc_Token(_type,_,_,_)|_tail], (_type = ";", _depth = 0.0 -> true ; (has_(["("|["["|["{"|[]]]], _type) -> add_(_depth, 1.0, T83), cosmos_parser__header_has_semicolon(_tail, T83) ; (has_([")"|["]"|["}"|[]]]], _type), {_depth > 0.0} -> r_sub(_depth, 1.0, T84), cosmos_parser__header_has_semicolon(_tail, T84) ; (_type = ")", _depth = 0.0 -> false ; cosmos_parser__header_has_semicolon(_tail, _depth))))).
+cosmos_parser__for_header_has_semicolon(_tokens) :- cosmos_parser__eat(_tokens, "(", _header, _), cosmos_parser__header_has_semicolon(_header, 0.0).
+cosmos_parser__parse_control(_tokens, _goal, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__token_value(_tokens, _kind), cosmos_parser__eat(_tokens, "ID", _t1, _), (_kind = "for", cosmos_parser__is_token(_t1, "("), cosmos_parser__for_header_has_semicolon(_t1) -> cosmos_parser__parse_for_control(_t1, _loc, _goal, _rest) ; (has_(["for"|["for-in"|["some"|[]]]], _kind) -> cosmos_parser__parse_for_in_control(_kind, _t1, _loc, _goal, _rest) ; cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__parse_goal(_t2, _condition, _t3), cosmos_parser__eat(_t3, ")", _t4, _), cosmos_parser__parse_body(_t4, _yes, _t5), cosmos_parser__parse_control_tail(_kind, _t5, _no, _rest), _goal = fc_ControlGoal(_kind,_condition,_yes,_no,_loc))).
+cosmos_parser__parse_for_control(_tokens, _loc, _goal, _rest) :- cosmos_parser__eat(_tokens, "(", _t1, _), cosmos_parser__parse_goal(_t1, _initial, _t2), cosmos_parser__eat(_t2, ";", _t3, _), cosmos_parser__parse_goal(_t3, _condition, _t4), cosmos_parser__eat(_t4, ";", _t5, _), cosmos_parser__parse_goal(_t5, _advance, _t6), cosmos_parser__optional_token(_t6, ";", _t7), cosmos_parser__eat(_t7, ")", _t8, _), cosmos_parser__parse_body(_t8, _body, _rest), _goal = fc_ForGoal(_initial,_condition,_advance,_body,_loc).
+cosmos_parser__parse_for_in_control(_kind, _tokens, _loc, _goal, _rest) :- cosmos_parser__eat(_tokens, "(", _t1, _), cosmos_parser__parse_term(_t1, _first, _t2), (cosmos_parser__is_token(_t2, ",") -> cosmos_parser__eat(_t2, ",", _t3, _), cosmos_parser__parse_term(_t3, _value, _t4), _key = _first ; _key = fc_None, _value = _first, _t4 = _t2), cosmos_parser__eat(_t4, "in", _t5, _), cosmos_parser__parse_term(_t5, _collection, _t6), cosmos_parser__eat(_t6, ")", _t7, _), cosmos_parser__parse_body(_t7, _body, _rest), _goal = fc_ForInGoal(_kind,_key,_value,_collection,_body,_loc).
+cosmos_parser__parse_control_tail(_kind, _tokens, _no, _rest) :- cosmos_parser__skip_newlines(_tokens, _start), (cosmos_parser__is_token(_start, "elseif") -> cosmos_parser__token_loc(_start, _loc), cosmos_parser__eat(_start, "elseif", _t1, _), cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__parse_goal(_t2, _condition, _t3), cosmos_parser__eat(_t3, ")", _t4, _), cosmos_parser__parse_body(_t4, _yes, _t5), cosmos_parser__parse_control_tail(_kind, _t5, _nested_no, _rest), _no = fc_ControlGoal(_kind,_condition,_yes,_nested_no,_loc) ; (cosmos_parser__is_token(_start, "else") -> cosmos_parser__eat(_start, "else", _t1, _), cosmos_parser__parse_body(_t1, _no, _rest) ; _no = fc_None, _rest = _start)).
+cosmos_parser__expression_loc(fc_VarExpr(_, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_LiteralExpr(_, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_CallExpr(_, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_BinaryExpr(_, _, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_UnaryExpr(_, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_SizeExpr(_, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_NextExpr(_, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_StateExpr(_, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_NewExpr(_, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_FieldExpr(_, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_IndexExpr(_, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_SetFieldExpr(_, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_ListExpr(_, _, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_DictExpr(_, _loc), _loc) :- true.
+cosmos_parser__expression_loc(fc_ClosureExpr(_, _, _, _loc), _loc) :- true.
+cosmos_parser__parse_term(_tokens, _expression, _rest) :- cosmos_parser__parse_additive(_tokens, _expression, _rest).
+cosmos_parser__parse_additive(_tokens, _expression, _rest) :- cosmos_parser__parse_multiplicative(_tokens, _first, _t1), cosmos_parser__parse_additive_tail(_t1, _first, _expression, _rest).
+cosmos_parser__parse_additive_tail(_tokens, _left, _expression, _rest) :- ((cosmos_parser__is_token(_tokens, "+") ; cosmos_parser__is_token(_tokens, "-")) -> cosmos_parser__token_value(_tokens, _op), cosmos_parser__eat(_tokens, _op, _t1, _), cosmos_parser__parse_multiplicative(_t1, _right, _t2), cosmos_parser__expression_loc(_left, _loc), _combined = fc_BinaryExpr(_op,_left,_right,_loc), cosmos_parser__parse_additive_tail(_t2, _combined, _expression, _rest) ; _expression = _left, _rest = _tokens).
+cosmos_parser__parse_multiplicative(_tokens, _expression, _rest) :- cosmos_parser__parse_prefix_expression(_tokens, _first, _t1), cosmos_parser__parse_multiplicative_tail(_t1, _first, _expression, _rest).
+cosmos_parser__parse_multiplicative_tail(_tokens, _left, _expression, _rest) :- ((cosmos_parser__is_token(_tokens, "*") ; cosmos_parser__is_token(_tokens, "/") ; cosmos_parser__is_token(_tokens, "%")) -> cosmos_parser__token_value(_tokens, _op), cosmos_parser__eat(_tokens, _op, _t1, _), cosmos_parser__parse_prefix_expression(_t1, _right, _t2), cosmos_parser__expression_loc(_left, _loc), _combined = fc_BinaryExpr(_op,_left,_right,_loc), cosmos_parser__parse_multiplicative_tail(_t2, _combined, _expression, _rest) ; _expression = _left, _rest = _tokens).
+cosmos_parser__parse_prefix_expression(_tokens, _expression, _rest) :- (cosmos_parser__is_token(_tokens, "new") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "new", _t1, _), cosmos_parser__eat(_t1, "ID", _t2, fc_Token(_,_name,_,_)), cosmos_parser__eat(_t2, "(", _t3, _), cosmos_parser__parse_arguments(_t3, _args, _t4), cosmos_parser__eat(_t4, ")", _rest, _), _expression = fc_NewExpr(fc_VarExpr(_name,_loc),_args,_loc) ; (cosmos_parser__is_token(_tokens, "!") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "!", _t1, _), cosmos_parser__parse_prefix_expression(_t1, _child, _rest), _expression = fc_StateExpr(_child,_loc) ; (cosmos_parser__is_token(_tokens, "+") -> cosmos_parser__eat(_tokens, "+", _t1, _), cosmos_parser__parse_prefix_expression(_t1, _expression, _rest) ; (cosmos_parser__is_token(_tokens, "-") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "-", _t1, _), cosmos_parser__parse_prefix_expression(_t1, _child, _rest), _expression = fc_UnaryExpr("-",_child,_loc) ; (cosmos_parser__is_token(_tokens, "#") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "#", _t1, _), cosmos_parser__parse_prefix_expression(_t1, _child, _rest), _expression = fc_SizeExpr(_child,_loc) ; (cosmos_parser__is_token(_tokens, "next"), \+(cosmos_parser__next_is_token(_tokens, "(")) -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "next", _t1, _), cosmos_parser__parse_primary(_t1, _child, _t2), cosmos_parser__parse_postfix_tail(_t2, fc_NextExpr(_child,_loc), _expression, _rest) ; cosmos_parser__parse_postfix(_tokens, _expression, _rest))))))).
+cosmos_parser__parse_postfix(_tokens, _expression, _rest) :- cosmos_parser__parse_primary(_tokens, _first, _t1), cosmos_parser__parse_postfix_tail(_t1, _first, _expression, _rest).
+cosmos_parser__parse_postfix_tail(_tokens, _base, _expression, _rest) :- (cosmos_parser__is_token(_tokens, "(") -> cosmos_parser__eat(_tokens, "(", _t1, _), cosmos_parser__parse_arguments(_t1, _args, _t2), cosmos_parser__eat(_t2, ")", _t3, _), cosmos_parser__expression_loc(_base, _loc), _combined = fc_CallExpr(_base,_args,_loc), cosmos_parser__parse_postfix_tail(_t3, _combined, _expression, _rest) ; (cosmos_parser__is_token(_tokens, ".") -> cosmos_parser__eat(_tokens, ".", _t1, _), cosmos_parser__eat(_t1, "ID", _t2, fc_Token(_,_name,_line,_column)), _combined = fc_FieldExpr(_base,_name,fc_Loc(_line,_column)), cosmos_parser__parse_postfix_tail(_t2, _combined, _expression, _rest) ; (cosmos_parser__is_token(_tokens, "[") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "[", _t1, _), cosmos_parser__parse_term(_t1, _index, _t2), cosmos_parser__eat(_t2, "]", _t3, _), _combined = fc_IndexExpr(_base,_index,_loc), cosmos_parser__parse_postfix_tail(_t3, _combined, _expression, _rest) ; (cosmos_parser__is_token(_tokens, ":") -> cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, ":", _t1, _), cosmos_parser__parse_term(_t1, _value, _t2), _combined = fc_SetFieldExpr(_base,_value,_loc), cosmos_parser__parse_postfix_tail(_t2, _combined, _expression, _rest) ; _expression = _base, _rest = _tokens)))).
+cosmos_parser__parse_arguments(_tokens, _args, _rest) :- (cosmos_parser__is_token(_tokens, ")") -> _args = [], _rest = _tokens ; cosmos_parser__parse_term(_tokens, _first, _t1), (cosmos_parser__is_token(_t1, ",") -> cosmos_parser__eat(_t1, ",", _t2, _), cosmos_parser__parse_arguments(_t2, _tail, _rest), _args = [_first|_tail] ; _args = [_first|[]], _rest = _t1)).
+cosmos_parser__parse_primary(_tokens, _expression, _rest) :- (cosmos_parser__token_type(_tokens, "NUMBER") -> cosmos_parser__eat(_tokens, "NUMBER", _rest, fc_Token(_,_text,_line,_column)), num(_text, T85), _value = T85, _expression = fc_LiteralExpr(_value,fc_Loc(_line,_column)) ; (cosmos_parser__token_type(_tokens, "STRING") -> cosmos_parser__eat(_tokens, "STRING", _rest, fc_Token(_,_value,_line,_column)), _expression = fc_LiteralExpr(_value,fc_Loc(_line,_column)) ; (cosmos_parser__starts_relation(_tokens) -> cosmos_parser__parse_closure(_tokens, _expression, _rest) ; (cosmos_parser__token_type(_tokens, "ID") -> cosmos_parser__eat(_tokens, "ID", _t1, fc_Token(_,_name,_line,_column)), (cosmos_parser__is_token(_t1, "::") -> cosmos_parser__eat(_t1, "::", _t2, _), cosmos_parser__eat(_t2, "ID", _rest, fc_Token(_,_host_name,_,_)), add_(_name, "::", T86), add_(T86, _host_name, T87), _expression = fc_VarExpr(T87,fc_Loc(_line,_column)) ; _expression = fc_VarExpr(_name,fc_Loc(_line,_column)), _rest = _t1) ; (cosmos_parser__is_token(_tokens, "(") -> cosmos_parser__eat(_tokens, "(", _t1, _), cosmos_parser__parse_term(_t1, _expression, _t2), cosmos_parser__eat(_t2, ")", _rest, _) ; (cosmos_parser__is_token(_tokens, "[") -> cosmos_parser__parse_list(_tokens, _expression, _rest) ; (cosmos_parser__is_token(_tokens, "{") -> cosmos_parser__parse_dictionary(_tokens, _expression, _rest) ; throw(fc_ParseError("Expected term",_tokens))))))))).
+cosmos_parser__parse_list(_tokens, _expression, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "[", _t1, _), (cosmos_parser__is_token(_t1, "]") -> _items = [], _tail = fc_None, _t2 = _t1 ; cosmos_parser__parse_list_items(_t1, _items, _tail, _t2)), cosmos_parser__eat(_t2, "]", _rest, _), _expression = fc_ListExpr(_items,_tail,_loc).
+cosmos_parser__parse_list_items(_tokens, _items, _tail, _rest) :- cosmos_parser__parse_term(_tokens, _first, _t1), (cosmos_parser__is_token(_t1, ",") -> cosmos_parser__eat(_t1, ",", _t2, _), cosmos_parser__parse_list_items(_t2, _more, _tail, _rest), _items = [_first|_more] ; (cosmos_parser__is_token(_t1, "|") -> cosmos_parser__eat(_t1, "|", _t2, _), cosmos_parser__parse_term(_t2, _tail, _rest), _items = [_first|[]] ; _items = [_first|[]], _tail = fc_None, _rest = _t1)).
+cosmos_parser__dictionary_key(_expression, _key) :- (_expression = fc_VarExpr(_name,_loc) -> _key = fc_LiteralExpr(_name,_loc) ; _key = _expression).
+cosmos_parser__parse_dictionary(_tokens, _expression, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "{", _t1, _), cosmos_parser__parse_dictionary_entries(_t1, 0.0, _entries, _t2), cosmos_parser__eat(_t2, "}", _rest, _), _expression = fc_DictExpr(_entries,_loc).
+cosmos_parser__parse_dictionary_entries(_tokens, _position, _entries, _rest) :- (cosmos_parser__is_token(_tokens, "}") -> _entries = [], _rest = _tokens ; (cosmos_parser__starts_relation(_tokens) -> cosmos_parser__parse_table_closure(_tokens, _closure, _t1), _closure = fc_ClosureExpr(_annotation,_,_,_loc), cosmos_parser__closure_name(_annotation, _name), (_name = "_" -> throw("A relation inside a table needs a name") ; _key = fc_LiteralExpr(_name,_loc), (cosmos_parser__is_token(_t1, ",") -> cosmos_parser__eat(_t1, ",", _t2, _) ; (cosmos_parser__is_token(_t1, "and") -> cosmos_parser__eat(_t1, "and", _t2, _) ; _t2 = _t1)), cosmos_parser__parse_dictionary_entries(_t2, _position, _tail, _rest), _entries = [fc_Entry(_key,_closure)|_tail]) ; cosmos_parser__parse_dictionary_head(_tokens, _first, _t1), (cosmos_parser__is_token(_t1, "=") -> cosmos_parser__eat(_t1, "=", _t2, _), cosmos_parser__parse_term(_t2, _value, _t3), cosmos_parser__dictionary_key(_first, _key), _next_position = _position ; _value = _first, _key = fc_LiteralExpr(_position,fc_Loc(0.0,0.0)), add_(_position, 1.0, T88), _next_position = T88, _t3 = _t1), (cosmos_parser__is_token(_t3, ",") -> cosmos_parser__eat(_t3, ",", _t4, _) ; (cosmos_parser__is_token(_t3, "and") -> cosmos_parser__eat(_t3, "and", _t4, _) ; _t4 = _t3)), cosmos_parser__parse_dictionary_entries(_t4, _next_position, _tail, _rest), _entries = [fc_Entry(_key,_value)|_tail])).
+cosmos_parser__parse_dictionary_head(_tokens, _expression, _rest) :- (cosmos_parser__token_type(_tokens, "ID"), cosmos_parser__next_is_token(_tokens, "=") -> cosmos_parser__eat(_tokens, "ID", _rest, fc_Token(_,_name,_line,_column)), _expression = fc_VarExpr(_name,fc_Loc(_line,_column)) ; cosmos_parser__parse_term(_tokens, _expression, _rest)).
+cosmos_parser__table_outdented(_tokens, _start_line, _start_column) :- cosmos_parser__token_position(_tokens, _line, _column), {_line > _start_line}, {_column =< _start_column}.
+cosmos_parser__parse_table_closure(_tokens, _expression, _rest) :- cosmos_parser__token_loc(_tokens, _loc), _loc = fc_Loc(_start_line,_start_column), cosmos_parser__eat(_tokens, "ID", _t1, fc_Token(_,_kind,_,_)), cosmos_parser__eat(_t1, "ID", _t2, fc_Token(_,_name,_,_)), cosmos_parser__eat(_t2, "(", _t3, _), cosmos_parser__parse_parameters(_t3, _params, _t4), cosmos_parser__eat(_t4, ")", _t5, _), cosmos_parser__closure_annotation(_t5, _name, _kind, _annotation, _t6), cosmos_parser__parse_table_relation_goals(_t6, _start_line, _start_column, _goals, _rest), cosmos_parser__make_and(_goals, _body), _expression = fc_ClosureExpr(_annotation,_params,_body,_loc).
+cosmos_parser__parse_table_relation_goals(_tokens, _start_line, _start_column, _goals, _rest) :- ((cosmos_parser__is_token(_tokens, "}") ; cosmos_parser__starts_relation(_tokens) ; cosmos_parser__table_outdented(_tokens, _start_line, _start_column)) -> _goals = [], _rest = _tokens ; cosmos_parser__parse_table_goal(_tokens, _goal, _t1), cosmos_parser__parse_table_relation_goals(_t1, _start_line, _start_column, _tail, _rest), _goals = [_goal|_tail]).
+cosmos_parser__parse_table_goal(_tokens, _goal, _rest) :- (cosmos_parser__token_type(_tokens, "ID"), cosmos_parser__token_value(_tokens, _kind), has_(["if"|["when"|["choose"|["soft_if"|["while"|[]]]]]], _kind) -> cosmos_parser__parse_table_control(_tokens, _goal, _rest) ; cosmos_parser__parse_goal(_tokens, _goal, _rest)).
+cosmos_parser__parse_table_control(_tokens, _goal, _rest) :- cosmos_parser__token_loc(_tokens, _loc), _loc = fc_Loc(_start_line,_start_column), cosmos_parser__token_value(_tokens, _kind), cosmos_parser__eat(_tokens, "ID", _t1, _), cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__parse_goal(_t2, _condition, _t3), cosmos_parser__eat(_t3, ")", _t4, _), cosmos_parser__parse_table_branch_goals(_t4, _start_line, _start_column, _yes_goals, _t5), cosmos_parser__make_and(_yes_goals, _yes), cosmos_parser__parse_table_control_tail(_kind, _t5, _no, _rest), _goal = fc_ControlGoal(_kind,_condition,_yes,_no,_loc).
+cosmos_parser__parse_table_branch_goals(_tokens, _start_line, _start_column, _goals, _rest) :- ((cosmos_parser__is_token(_tokens, "}") ; cosmos_parser__starts_relation(_tokens) ; cosmos_parser__is_token(_tokens, "else") ; cosmos_parser__is_token(_tokens, "elseif") ; cosmos_parser__table_outdented(_tokens, _start_line, _start_column)) -> _goals = [], _rest = _tokens ; cosmos_parser__parse_table_goal(_tokens, _goal, _t1), cosmos_parser__parse_table_branch_goals(_t1, _start_line, _start_column, _tail, _rest), _goals = [_goal|_tail]).
+cosmos_parser__parse_table_control_tail(_kind, _tokens, _no, _rest) :- (cosmos_parser__is_token(_tokens, "elseif") -> cosmos_parser__token_loc(_tokens, _loc), _loc = fc_Loc(_start_line,_start_column), cosmos_parser__eat(_tokens, "elseif", _t1, _), cosmos_parser__eat(_t1, "(", _t2, _), cosmos_parser__parse_goal(_t2, _condition, _t3), cosmos_parser__eat(_t3, ")", _t4, _), cosmos_parser__parse_table_branch_goals(_t4, _start_line, _start_column, _yes_goals, _t5), cosmos_parser__make_and(_yes_goals, _yes), cosmos_parser__parse_table_control_tail(_kind, _t5, _nested_no, _rest), _no = fc_ControlGoal(_kind,_condition,_yes,_nested_no,_loc) ; (cosmos_parser__is_token(_tokens, "else") -> cosmos_parser__token_loc(_tokens, fc_Loc(_start_line,_start_column)), cosmos_parser__eat(_tokens, "else", _t1, _), cosmos_parser__parse_table_branch_goals(_t1, _start_line, _start_column, _no_goals, _rest), cosmos_parser__make_and(_no_goals, _no) ; _no = fc_None, _rest = _tokens)).
+cosmos_parser__parse_closure(_tokens, _expression, _rest) :- cosmos_parser__token_loc(_tokens, _loc), cosmos_parser__eat(_tokens, "ID", _t1, fc_Token(_,_kind,_,_)), (cosmos_parser__token_type(_t1, "ID") -> cosmos_parser__eat(_t1, "ID", _t2, fc_Token(_,_name,_,_)) ; _name = "_", _t2 = _t1), cosmos_parser__eat(_t2, "(", _t3, _), cosmos_parser__parse_parameters(_t3, _params, _t4), cosmos_parser__eat(_t4, ")", _t5, _), cosmos_parser__closure_annotation(_t5, _name, _kind, _annotation, _t6), cosmos_parser__parse_body(_t6, _body, _rest), _expression = fc_ClosureExpr(_annotation,_params,_body,_loc).
+cosmos_parser__closure_name(_annotation, _name) :- (is_assoc(_annotation) -> getnil(_annotation, "name", T89), _name = T89 ; _name = _annotation).
+cosmos_parser__closure_annotation(_tokens, _name, _kind, _annotation, _rest) :- (cosmos_parser__token_value(_tokens, _det), has_(["det"|["semidet"|["multi"|["nondet"|[]]]]], _det) -> cosmos_parser__eat(_tokens, "ID", _rest, _), new(T90), set_(T90, "name", _name, T91), set_(T91, "category", _kind, T92), set_(T92, "determinism", _det, T93), _annotation = T93 ; (_kind = "rel" -> _annotation = _name, _rest = _tokens ; new(T94), set_(T94, "name", _name, T95), set_(T95, "category", _kind, T96), set_(T96, "determinism", "nondet", T97), _annotation = T97, _rest = _tokens)).
+cosmos_parser__value_char_at(V1, V2, V3, V4, _upvals) :- cosmos_parser__char_at(V1, V2, V3, V4).
+cosmos_parser__value_two_at(V1, V2, V3, V4, _upvals) :- cosmos_parser__two_at(V1, V2, V3, V4).
+cosmos_parser__value_char_code_between(V1, V2, V3, _upvals) :- cosmos_parser__char_code_between(V1, V2, V3).
+cosmos_parser__value_digit(V1, _upvals) :- cosmos_parser__digit(V1).
+cosmos_parser__value_letter(V1, _upvals) :- cosmos_parser__letter(V1).
+cosmos_parser__value_identifier_char(V1, _upvals) :- cosmos_parser__identifier_char(V1).
+cosmos_parser__value_horizontal_space(V1, _upvals) :- cosmos_parser__horizontal_space(V1).
+cosmos_parser__value_opening(V1, _upvals) :- cosmos_parser__opening(V1).
+cosmos_parser__value_closing(V1, _upvals) :- cosmos_parser__closing(V1).
+cosmos_parser__value_punctuation(V1, _upvals) :- cosmos_parser__punctuation(V1).
+cosmos_parser__value_scan_indent(V1, V2, V3, V4, V5, V6, V7, _upvals) :- cosmos_parser__scan_indent(V1, V2, V3, V4, V5, V6, V7).
+cosmos_parser__value_skip_line_comment(V1, V2, V3, V4, _upvals) :- cosmos_parser__skip_line_comment(V1, V2, V3, V4).
+cosmos_parser__value_escaped_char(V1, V2, _upvals) :- cosmos_parser__escaped_char(V1, V2).
+cosmos_parser__value_scan_string(V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, _upvals) :- cosmos_parser__scan_string(V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11).
+cosmos_parser__value_scan_number(V1, V2, V3, V4, _upvals) :- cosmos_parser__scan_number(V1, V2, V3, V4).
+cosmos_parser__value_scan_identifier(V1, V2, V3, V4, _upvals) :- cosmos_parser__scan_identifier(V1, V2, V3, V4).
+cosmos_parser__value_scan_block_comment(V1, V2, V3, V4, V5, V6, V7, V8, V9, _upvals) :- cosmos_parser__scan_block_comment(V1, V2, V3, V4, V5, V6, V7, V8, V9).
+cosmos_parser__value_line_starts_comment(V1, V2, V3, _upvals) :- cosmos_parser__line_starts_comment(V1, V2, V3).
+cosmos_parser__value_layout_tokens(V1, V2, V3, V4, _upvals) :- cosmos_parser__layout_tokens(V1, V2, V3, V4).
+cosmos_parser__value_eof_dedents(V1, V2, V3, V4, _upvals) :- cosmos_parser__eof_dedents(V1, V2, V3, V4).
+cosmos_parser__value_finish_lex(V1, V2, V3, V4, V5, V6, _upvals) :- cosmos_parser__finish_lex(V1, V2, V3, V4, V5, V6).
+cosmos_parser__value_lex_line_start(V1, V2, V3, V4, V5, V6, V7, V8, _upvals) :- cosmos_parser__lex_line_start(V1, V2, V3, V4, V5, V6, V7, V8).
+cosmos_parser__value_lex_identifier(V1, V2, V3, V4, V5, V6, V7, V8, _upvals) :- cosmos_parser__lex_identifier(V1, V2, V3, V4, V5, V6, V7, V8).
+cosmos_parser__value_lex_punctuation(V1, V2, V3, V4, V5, V6, V7, V8, _upvals) :- cosmos_parser__lex_punctuation(V1, V2, V3, V4, V5, V6, V7, V8).
+cosmos_parser__value_lex_loop(V1, V2, V3, V4, V5, V6, V7, V8, V9, _upvals) :- cosmos_parser__lex_loop(V1, V2, V3, V4, V5, V6, V7, V8, V9).
+cosmos_parser__value_lex(V1, V2, _upvals) :- cosmos_parser__lex(V1, V2).
+cosmos_parser__value_token_type(V1, V2, _upvals) :- cosmos_parser__token_type(V1, V2).
+cosmos_parser__value_token_value(V1, V2, _upvals) :- cosmos_parser__token_value(V1, V2).
+cosmos_parser__value_token_loc(V1, V2, _upvals) :- cosmos_parser__token_loc(V1, V2).
+cosmos_parser__value_token_position(V1, V2, V3, _upvals) :- cosmos_parser__token_position(V1, V2, V3).
+cosmos_parser__value_is_token(V1, V2, _upvals) :- cosmos_parser__is_token(V1, V2).
+cosmos_parser__value_next_is_token(V1, V2, _upvals) :- cosmos_parser__next_is_token(V1, V2).
+cosmos_parser__value_eat(V1, V2, V3, V4, _upvals) :- cosmos_parser__eat(V1, V2, V3, V4).
+cosmos_parser__value_skip_newlines(V1, V2, _upvals) :- cosmos_parser__skip_newlines(V1, V2).
+cosmos_parser__value_optional_token(V1, V2, V3, _upvals) :- cosmos_parser__optional_token(V1, V2, V3).
+cosmos_parser__value_make_and(V1, V2, _upvals) :- cosmos_parser__make_and(V1, V2).
+cosmos_parser__value_make_and(V1, V2, _upvals) :- cosmos_parser__make_and(V1, V2).
+cosmos_parser__value_make_and(V1, V2, _upvals) :- cosmos_parser__make_and(V1, V2).
+cosmos_parser__value_make_or(V1, V2, _upvals) :- cosmos_parser__make_or(V1, V2).
+cosmos_parser__value_make_or(V1, V2, _upvals) :- cosmos_parser__make_or(V1, V2).
+cosmos_parser__value_relation_keyword(V1, _upvals) :- cosmos_parser__relation_keyword(V1).
+cosmos_parser__value_type_keyword(V1, _upvals) :- cosmos_parser__type_keyword(V1).
+cosmos_parser__value_type_name(V1, _upvals) :- cosmos_parser__type_name(V1).
+cosmos_parser__value_starts_relation(V1, _upvals) :- cosmos_parser__starts_relation(V1).
+cosmos_parser__value_starts_typed_declaration(V1, _upvals) :- cosmos_parser__starts_typed_declaration(V1).
+cosmos_parser__value_parse(V1, V2, _upvals) :- cosmos_parser__parse(V1, V2).
+cosmos_parser__value_parseTokens(V1, V2, _upvals) :- cosmos_parser__parseTokens(V1, V2).
+cosmos_parser__value_parse_program_items(V1, V2, V3, _upvals) :- cosmos_parser__parse_program_items(V1, V2, V3).
+cosmos_parser__value_parse_program_item(V1, V2, V3, _upvals) :- cosmos_parser__parse_program_item(V1, V2, V3).
+cosmos_parser__value_parse_id_words_until_paren(V1, V2, V3, _upvals) :- cosmos_parser__parse_id_words_until_paren(V1, V2, V3).
+cosmos_parser__value_parse_protocol(V1, V2, V3, _upvals) :- cosmos_parser__parse_protocol(V1, V2, V3).
+cosmos_parser__value_protocol_words(V1, V2, V3, V4, _upvals) :- cosmos_parser__protocol_words(V1, V2, V3, V4).
+cosmos_parser__value_protocol_members(V1, V2, V3, _upvals) :- cosmos_parser__protocol_members(V1, V2, V3).
+cosmos_parser__value_parse_functor_declaration(V1, V2, V3, _upvals) :- cosmos_parser__parse_functor_declaration(V1, V2, V3).
+cosmos_parser__value_parse_export_declaration(V1, V2, V3, _upvals) :- cosmos_parser__parse_export_declaration(V1, V2, V3).
+cosmos_parser__value_parse_type_words(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_type_words(V1, V2, V3, V4).
+cosmos_parser__value_parse_typed_declaration(V1, V2, V3, _upvals) :- cosmos_parser__parse_typed_declaration(V1, V2, V3).
+cosmos_parser__value_parse_relation_declaration(V1, V2, V3, _upvals) :- cosmos_parser__parse_relation_declaration(V1, V2, V3).
+cosmos_parser__value_parse_parameters(V1, V2, V3, _upvals) :- cosmos_parser__parse_parameters(V1, V2, V3).
+cosmos_parser__value_parse_parameter(V1, V2, V3, _upvals) :- cosmos_parser__parse_parameter(V1, V2, V3).
+cosmos_parser__value_parse_parameter_type_tail(V1, V2, V3, V4, V5, _upvals) :- cosmos_parser__parse_parameter_type_tail(V1, V2, V3, V4, V5).
+cosmos_parser__value_parse_body(V1, V2, V3, _upvals) :- cosmos_parser__parse_body(V1, V2, V3).
+cosmos_parser__value_parse_body_items(V1, V2, V3, _upvals) :- cosmos_parser__parse_body_items(V1, V2, V3).
+cosmos_parser__value_parse_goal(V1, V2, V3, _upvals) :- cosmos_parser__parse_goal(V1, V2, V3).
+cosmos_parser__value_parse_or_goal(V1, V2, V3, _upvals) :- cosmos_parser__parse_or_goal(V1, V2, V3).
+cosmos_parser__value_parse_or_tail(V1, V2, V3, _upvals) :- cosmos_parser__parse_or_tail(V1, V2, V3).
+cosmos_parser__value_parse_and_goal(V1, V2, V3, _upvals) :- cosmos_parser__parse_and_goal(V1, V2, V3).
+cosmos_parser__value_parse_and_tail(V1, V2, V3, _upvals) :- cosmos_parser__parse_and_tail(V1, V2, V3).
+cosmos_parser__value_prefix_goal_keyword(V1, _upvals) :- cosmos_parser__prefix_goal_keyword(V1).
+cosmos_parser__value_control_keyword(V1, _upvals) :- cosmos_parser__control_keyword(V1).
+cosmos_parser__value_parse_unary_goal(V1, V2, V3, _upvals) :- cosmos_parser__parse_unary_goal(V1, V2, V3).
+cosmos_parser__value_parse_atomic_goal(V1, V2, V3, _upvals) :- cosmos_parser__parse_atomic_goal(V1, V2, V3).
+cosmos_parser__value_is_comparison(V1, V2, _upvals) :- cosmos_parser__is_comparison(V1, V2).
+cosmos_parser__value_parse_case_group(V1, V2, V3, _upvals) :- cosmos_parser__parse_case_group(V1, V2, V3).
+cosmos_parser__value_parse_more_cases(V1, V2, V3, _upvals) :- cosmos_parser__parse_more_cases(V1, V2, V3).
+cosmos_parser__value_parse_case_branch(V1, V2, V3, _upvals) :- cosmos_parser__parse_case_branch(V1, V2, V3).
+cosmos_parser__value_header_has_semicolon(V1, V2, _upvals) :- cosmos_parser__header_has_semicolon(V1, V2).
+cosmos_parser__value_for_header_has_semicolon(V1, _upvals) :- cosmos_parser__for_header_has_semicolon(V1).
+cosmos_parser__value_parse_control(V1, V2, V3, _upvals) :- cosmos_parser__parse_control(V1, V2, V3).
+cosmos_parser__value_parse_for_control(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_for_control(V1, V2, V3, V4).
+cosmos_parser__value_parse_for_in_control(V1, V2, V3, V4, V5, _upvals) :- cosmos_parser__parse_for_in_control(V1, V2, V3, V4, V5).
+cosmos_parser__value_parse_control_tail(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_control_tail(V1, V2, V3, V4).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_expression_loc(V1, V2, _upvals) :- cosmos_parser__expression_loc(V1, V2).
+cosmos_parser__value_parse_term(V1, V2, V3, _upvals) :- cosmos_parser__parse_term(V1, V2, V3).
+cosmos_parser__value_parse_additive(V1, V2, V3, _upvals) :- cosmos_parser__parse_additive(V1, V2, V3).
+cosmos_parser__value_parse_additive_tail(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_additive_tail(V1, V2, V3, V4).
+cosmos_parser__value_parse_multiplicative(V1, V2, V3, _upvals) :- cosmos_parser__parse_multiplicative(V1, V2, V3).
+cosmos_parser__value_parse_multiplicative_tail(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_multiplicative_tail(V1, V2, V3, V4).
+cosmos_parser__value_parse_prefix_expression(V1, V2, V3, _upvals) :- cosmos_parser__parse_prefix_expression(V1, V2, V3).
+cosmos_parser__value_parse_postfix(V1, V2, V3, _upvals) :- cosmos_parser__parse_postfix(V1, V2, V3).
+cosmos_parser__value_parse_postfix_tail(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_postfix_tail(V1, V2, V3, V4).
+cosmos_parser__value_parse_arguments(V1, V2, V3, _upvals) :- cosmos_parser__parse_arguments(V1, V2, V3).
+cosmos_parser__value_parse_primary(V1, V2, V3, _upvals) :- cosmos_parser__parse_primary(V1, V2, V3).
+cosmos_parser__value_parse_list(V1, V2, V3, _upvals) :- cosmos_parser__parse_list(V1, V2, V3).
+cosmos_parser__value_parse_list_items(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_list_items(V1, V2, V3, V4).
+cosmos_parser__value_dictionary_key(V1, V2, _upvals) :- cosmos_parser__dictionary_key(V1, V2).
+cosmos_parser__value_parse_dictionary(V1, V2, V3, _upvals) :- cosmos_parser__parse_dictionary(V1, V2, V3).
+cosmos_parser__value_parse_dictionary_entries(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_dictionary_entries(V1, V2, V3, V4).
+cosmos_parser__value_parse_dictionary_head(V1, V2, V3, _upvals) :- cosmos_parser__parse_dictionary_head(V1, V2, V3).
+cosmos_parser__value_table_outdented(V1, V2, V3, _upvals) :- cosmos_parser__table_outdented(V1, V2, V3).
+cosmos_parser__value_parse_table_closure(V1, V2, V3, _upvals) :- cosmos_parser__parse_table_closure(V1, V2, V3).
+cosmos_parser__value_parse_table_relation_goals(V1, V2, V3, V4, V5, _upvals) :- cosmos_parser__parse_table_relation_goals(V1, V2, V3, V4, V5).
+cosmos_parser__value_parse_table_goal(V1, V2, V3, _upvals) :- cosmos_parser__parse_table_goal(V1, V2, V3).
+cosmos_parser__value_parse_table_control(V1, V2, V3, _upvals) :- cosmos_parser__parse_table_control(V1, V2, V3).
+cosmos_parser__value_parse_table_branch_goals(V1, V2, V3, V4, V5, _upvals) :- cosmos_parser__parse_table_branch_goals(V1, V2, V3, V4, V5).
+cosmos_parser__value_parse_table_control_tail(V1, V2, V3, V4, _upvals) :- cosmos_parser__parse_table_control_tail(V1, V2, V3, V4).
+cosmos_parser__value_parse_closure(V1, V2, V3, _upvals) :- cosmos_parser__parse_closure(V1, V2, V3).
+cosmos_parser__value_closure_name(V1, V2, _upvals) :- cosmos_parser__closure_name(V1, V2).
+cosmos_parser__value_closure_annotation(V1, V2, V3, V4, V5, _upvals) :- cosmos_parser__closure_annotation(V1, V2, V3, V4, V5).
+parser(_api) :- new(T98), set_(T98, "lex", clos(upvals, cosmos_parser__value_lex), T99), set_(T99, "parseTokens", clos(upvals, cosmos_parser__value_parseTokens), T100), set_(T100, "parse", clos(upvals, cosmos_parser__value_parse), T101), _api = T101.

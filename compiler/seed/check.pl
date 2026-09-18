@@ -1,248 +1,88 @@
 :- style_check(-singleton).
-'check::$impl_builtin'(A):-has_(["Any","Functor","String","Number","Integer","Real","List","Table","Relation","Host"],A).
-'check::$impl_declarations'([],A,A):-true.
-'check::$impl_declarations'([A|B],C,D):-(A=fc_FunctorDecl(E,F,G)->(F=[]->H="Functor",I=[],J=1.0;F=[H|I],(F=["Functor"]->J=1.0;J=0.0)),(new(K),set_(K,"parent",H,L),set_(L,"fields",I,M),set_(M,"open",J,N),set_(N,"location",G,O),P=O),(get_assoc(E,C,Q)->(cosmos_set_or_unify(Q,"parent",H),cosmos_set_or_unify(Q,"fields",I),cosmos_set_or_unify(Q,"open",J)->R=C;add_("Conflicting functor declaration: ",E,S),throw(fc_CompileError(S,G)));set_(C,E,P,R));A=fc_ProtocolDecl(E,T,G)->(new(U),set_(U,"kind","protocol",V),set_(V,"fields",T,W),set_(W,"location",G,X),P=X),set_(C,E,P,R);A=fc_ClassDecl(E,fc_DictExpr(Y,Z),G)->(new(A1),set_(A1,"kind","class",B1),set_(B1,"fields",Y,C1),set_(C1,"location",G,D1),P=D1),set_(C,E,P,R);A=fc_UnifyGoal(fc_VarExpr(E,E1),fc_DictExpr(Y,F1),G)->(new(G1),set_(G1,"kind","constructor",H1),set_(H1,"fields",Y,I1),set_(I1,"location",G,J1),P=J1),set_(C,E,P,R);R=C),'check::declarations'(B,R,D).
-'check::$impl_ancestry'(A,B,C,D):-A="Functor"->true;has_(C,A)->add_("Cyclic functor subtype: ",A,E),throw(fc_CompileError(E,D));get_assoc(A,B,F)->cosmos_get(F,"parent",G),'check::ancestry'(G,B,[A|C],D);add_("Unknown functor subtype: ",A,H),throw(fc_CompileError(H,D)).
-'check::$impl_field_types'([],A,B):-true.
-'check::$impl_field_types'([A|B],C,D):-(('check::builtin'(A);get_assoc(A,C,E))->true;add_("Unknown field type: ",A,F),throw(fc_CompileError(F,D))),'check::field_types'(B,C,D).
-'check::$impl_validate_specs'([],A):-true.
-'check::$impl_validate_specs'([A|B],C):-get_assoc(A,C,D),(get_assoc("kind",D,E)->true;(cosmos_get(D,"location",F),'check::ancestry'(A,C,[],F)),cosmos_get(D,"fields",G),cosmos_get(D,"location",H),'check::field_types'(G,C,H)),'check::validate_specs'(B,C).
-'check::$impl_subtype'(A,B,C):-(B="Any";A=B)->true;has_(["Integer","Real"],A),B="Number"->true;get_assoc(A,C,D),\+get_assoc("kind",D,E)->cosmos_get(D,"parent",F),'check::subtype'(F,B,C);fail.
-'check::$impl_compatible'(A,B,C,D):-(A="Any";'check::subtype'(A,B,C);get_assoc(B,C,E),get_assoc("kind",E,"protocol"))->true;add_("Expected ",B,F),add_(F,", got ",G),add_(G,A,H),throw(fc_CompileError(H,D)).
-'check::$impl_parameter_env'([],A,A):-true.
-'check::$impl_parameter_env'([A|B],C,D):-(A=fc_TypedParam(E,F,G)->subtract(E,["In","Out","InOut"],H),(H=[]->I="Any";H=["Relation"|J]->I="Relation";last(H,I)),set_(C,F,I,K);K=C),'check::parameter_env'(B,K,D).
-'check::$impl_arguments'([],[],A,B,C):-true.
-'check::$impl_arguments'([A|B],[C|D],E,F,G):-'check::expression_type'(A,E,F,H),'check::compatible'(H,C,E,G),'check::arguments'(B,D,E,F,G).
-'check::$impl_expression_type'(A,B,C,D):-A=fc_BinaryExpr(E,F,G,H)->'check::expression_type'(F,B,C,I),'check::expression_type'(G,B,C,J),(E="+",(I="String";J="String")->'check::string_operand'(I,B,H),'check::string_operand'(J,B,H),D="String";E="+",(I="List";J="List")->'check::compatible'(I,"List",B,H),'check::compatible'(J,"List",B,H),D="List";E="+",(I="Table";J="Table")->'check::compatible'(I,"Table",B,H),'check::compatible'(J,"Table",B,H),D="Table";I="Any",J="Any",E="+"->D="Any";'check::compatible'(I,"Number",B,H),'check::compatible'(J,"Number",B,H),D="Real");A=fc_UnaryExpr(K,L,H)->'check::expression_type'(L,B,C,M),'check::compatible'(M,"Number",B,H),D="Real";A=fc_SizeExpr(L,N)->'check::walk'(L,B,C),D="Real";A=fc_FieldExpr(O,P,H),'check::field_path'(A,Q),get_assoc("$imports",B,R),cosmos_get(R,"fields",S),get_assoc(Q,S,T)->D=T;A=fc_FieldExpr(U,V,H),'check::field_path'(A,Q),'check::imported_path'(Q,B)->add_("Unknown imported member: ",Q,W),throw(fc_CompileError(W,H));A=fc_NewExpr(fc_VarExpr(X,Y),Z,H)->(get_assoc(X,B,A1),cosmos_get(A1,"fields",B1),member(fc_Entry(fc_LiteralExpr("new",C1),D1),B1)->(D1=fc_ClosureExpr(E1,F1,G1,H1)->(cosmos_set_or_unify(A1,"kind","class")->size_(Z,I1),add_(I1,2.0,J1),K1=J1;size_(Z,L1),add_(L1,1.0,M1),K1=M1),(size_(F1,N1),N1=K1->true;add_("Wrong constructor arity: ",X,O1),throw(fc_CompileError(O1,H)));D1=fc_LiteralExpr(P1,Q1)->add_("Constructor is not callable: ",X,R1),throw(fc_CompileError(R1,H));true),'check::walk'(Z,B,C),D=X;add_("Cannot resolve constructor ",X,S1),add_(S1,".new",T1),throw(fc_CompileError(T1,H)));A=fc_LiteralExpr(U1,V1)->(string(U1)->D="String";number(U1)->D="Real";D="Any");A=fc_VarExpr(X,W1)->(get_assoc(X,C,X1)->D=X1;get_assoc(X,B,A1)->(get_assoc("kind",A1,Y1)->D="Any";(cosmos_set_or_unify(A1,"open",1.0);cosmos_set_or_unify(A1,"fields",[]))->D=X;add_("Functor needs arguments: ",X,Z1),cosmos_get(A1,"location",A2),throw(fc_CompileError(Z1,A2)));D="Any");A=fc_RawFunctorExpr(B2,Z,C2)->'check::walk'(Z,B,C),D="Functor";A=fc_CallExpr(fc_VarExpr(X,D2),Z,H),get_assoc(X,B,A1),\+get_assoc("kind",A1,E2)->(cosmos_set_or_unify(A1,"open",1.0)->'check::walk'(Z,B,C);(size_(Z,F2),cosmos_get(A1,"fields",G2),size_(G2,H2),F2=H2->true;add_("Wrong functor arity: ",X,I2),throw(fc_CompileError(I2,H))),cosmos_get(A1,"fields",J2),'check::arguments'(Z,J2,B,C,H)),D=X;A=fc_ListExpr(K2,L2,M2)->'check::walk'([K2,L2],B,C),D="List";A=fc_DictExpr(N2,O2)->'check::walk'(N2,B,C),D="Table";A=fc_ClosureExpr(P2,Q2,R2,S2)->'check::walk'(A,B,C),D="Relation";'check::children'(A,B,C),D="Any".
-'check::$impl_children'(A,B,C):-is_list(A)->'check::walk_list'(A,B,C);compound(A)->cc_parts(A,D,E),'check::walk_list'(E,B,C);true.
-'check::$impl_walk_list'([],A,B):-true.
-'check::$impl_walk_list'([A|B],C,D):-'check::walk'(A,C,D),'check::walk_list'(B,C,D).
-'check::$impl_protocol_entry'(A,B,C,D):-member(fc_Entry(fc_LiteralExpr(A,E),F),B)->D=F;add_("Missing protocol member: ",A,G),throw(fc_CompileError(G,C)).
-'check::$impl_protocol_shape'([],A,B,C,D):-true.
-'check::$impl_protocol_shape'([A|B],C,D,E,F):-(A=fc_TypedDecl(["Relation"|G],H,I,J)->'check::protocol_entry'(H,C,F,K),size_(G,L),'check::method_shape'(K,L,F);A=fc_TypedDecl(G,H,M,N)->'check::protocol_entry'(H,C,F,K),last(G,O),'check::expression_type'(K,D,E,P),'check::compatible'(P,O,D,F);A=fc_ClosureExpr(Q,R,S,T)->(is_assoc(Q)->cosmos_get(Q,"name",U),H=U;H=Q),'check::protocol_entry'(H,C,F,K),(size_(R,V),'check::method_shape'(K,V,F)),'check::method_modes'(K,R,D,F);true),'check::protocol_shape'(B,C,D,E,F).
-'check::$impl_method_shape'(A,B,C):-A=fc_ClosureExpr(D,E,F,G)->(size_(E,H),H=B->true;throw(fc_CompileError("Wrong protocol method arity",C)));A=fc_LiteralExpr(I,J)->throw(fc_CompileError("Protocol method is not callable",C));true.
-'check::$impl_parameter_spec'(A,B,C):-A=fc_TypedParam(D,E,F)->'check::annotation_type'(D,C),(D=[G|H],has_(["In","Out","InOut"],G)->B=G;B="Unspecified");B="Unspecified",C="Any".
-'check::$impl_method_modes'(A,B,C,D):-A=fc_ClosureExpr(E,F,G,H)->'check::compatible_parameters'(B,F,C,D);true.
-'check::$impl_compatible_parameters'([],[],A,B):-true.
-'check::$impl_compatible_parameters'([A|B],[C|D],E,F):-'check::parameter_spec'(A,G,H),'check::parameter_spec'(C,I,J),((G="In",I="Out";G="Out",I="In";has_(["InOut","Unspecified"],G),has_(["In","Out"],I))->add_("Incompatible protocol method mode: ",G,K),add_(K," versus ",L),add_(L,I,M),throw(fc_CompileError(M,F));true),(G="Out"->'check::compatible'(J,H,E,F);'check::compatible'(H,J,E,F)),'check::compatible_parameters'(B,D,E,F).
-'check::$impl_walk'(A,B,C):-(A=fc_RelationDecl(D,E,F,G,H);A=fc_ClosureExpr(I,F,G,J))->new(K),'check::parameter_env'(F,K,L),'check::walk'(F,B,L),'check::walk'(G,B,L);A=fc_TypedParam(M,N,O)->subtract(M,["In","Out","InOut","$Produced"],P),'check::field_types'(P,B,O);A=fc_TypedDecl(M,Q,R,O)->last(M,S),'check::expression_type'(R,B,C,T),'check::compatible'(T,S,B,O),(R=fc_DictExpr(U,V),get_assoc(S,B,W),get_assoc("kind",W,"protocol")->cosmos_get(W,"fields",X),'check::protocol_shape'(X,U,B,C,O);true);(A=fc_NewExpr(Y,Z,A1);A=fc_CallExpr(B1,C1,D1);A=fc_VarExpr(E1,F1))->'check::expression_type'(A,B,C,G1);'check::children'(A,B,C).
-'check::$impl_check'(A,B):-new(C),'check::analyze'(A,C,B,D).
-'check::$impl_analyze'(A,B,C,D):-new(E),assoc_to_values(B,F),'check::imported_schemas'(F,E,G),'check::declarations'(A,G,H),'check::import_field_info'(A,B,E,[],I,J),(new(K),set_(K,"kind","metadata",L),set_(L,"fields",I,M),set_(M,"modules",J,N),set_(H,"$imports",N,C)),assoc_to_keys(C,O),'check::validate_specs'(O,C),'check::binding_names'(A,P),cosmos_require("resolve",Q),cosmos_method(Q,"builtin_functors",[R]),append(P,R,S),'check::validate_calls'(A,S,C),'check::walk'(A,C,E),'check::imported_calls'(A,B,E,T),'check::callable_specs'(A,T,U),'check::walk'(U,C,E),'check::infer_fixed'(A,C,T,U,D),'check::flow'(A,C,D,E,[],V,W).
-'check::$impl_callable_specs'([],A,A):-true.
-'check::$impl_callable_specs'([A|B],C,D):-(A=fc_RelationDecl(E,F,G,H,I)->(is_assoc(E),get_assoc("contracts",E,J)->K=J;K=[G]),(get_assoc(F,C,L)->append(K,L,M);M=K),set_(C,F,M,N);N=C),'check::callable_specs'(B,N,D).
-'check::$impl_annotation_type'(A,B):-subtract(A,["In","Out","InOut","$Produced"],C),(C=[]->B="Any";C=["Relation"|D]->B="Relation";last(C,B)).
-'check::$impl_entry_bound'([],[]):-true.
-'check::$impl_entry_bound'([A|B],C):-'check::entry_bound'(B,D),(A=fc_TypedParam(["In"|E],F,G)->C=[F|D];A=fc_TypedParam(["Out"|H],F,I)->add_("$fresh_",F,J),C=[J|D];C=D).
-'check::$impl_fits'([],[],A,B,C):-true.
-'check::$impl_fits'([A|B],[C|D],E,F,G):-(A=fc_TypedParam(H,I,J)->'check::annotation_type'(H,K),'check::expression_type'(C,E,F,L),(L="Any";'check::subtype'(L,K,E);get_assoc(K,E,M),get_assoc("kind",M,"protocol")),(H=["Out"|N]->C=fc_VarExpr(O,P),\+has_(G,O);H=["In"|Q],C=fc_VarExpr(O,R)-> \+ (add_("$fresh_",O,S),has_(G,S));true);true),'check::fits'(B,D,E,F,G).
-'check::$impl_outputs'([],[],A,B,A,B):-true.
-'check::$impl_outputs'([A|B],[C|D],E,F,G,H):-(A=fc_TypedParam(I,J,K),C=fc_VarExpr(L,M)->'check::annotation_type'(I,N),(N="Any"->O=E;set_(E,L,N,O)),((I=["Out"|P];I=["$Produced"|Q])->(add_("$fresh_",L,R),subtract(F,[R],S)),T=[L|S];T=F);O=E,T=F),'check::outputs'(B,D,O,T,G,H).
-'check::$impl_flow_call'(A,B,C,D,E,F,G,H,I):-(add_("$call_",A,J),get_assoc(J,F,K);get_assoc(A,E,K))->(member(L,K),size_(L,M),size_(B,N),M=N->true;add_("Wrong arity for ",A,O),throw(fc_CompileError(O,C))),(member(P,K),'check::fits'(P,B,D,F,G)->'check::viable_outputs'(K,B,D,F,G,H,I);add_("No matching type/mode signature for ",A,Q),throw(fc_CompileError(Q,C)));get_assoc(A,F,R),dif(R,"Relation"),dif(R,"Any")->add_("Value is not callable: ",A,S),throw(fc_CompileError(S,C));get_assoc("$imports",D,T),(cosmos_get(T,"fields",U),get_assoc(A,U,V)),dif(V,"Relation"),dif(V,"Any")->add_("Exported field is not callable: ",A,W),throw(fc_CompileError(W,C));'check::imported_path'(A,D),get_assoc("$imports",D,X),\+ (cosmos_get(X,"fields",Y),get_assoc(A,Y,Z))->add_("Unknown imported member: ",A,A1),throw(fc_CompileError(A1,C));H=F,I=G.
-'check::$impl_flow_list'([],A,B,C,D,C,D):-true.
-'check::$impl_flow_list'([A|B],C,D,E,F,G,H):-'check::flow'(A,C,D,E,F,I,J),'check::flow_list'(B,C,D,I,J,G,H).
-'check::$impl_flow'(A,B,C,D,E,F,G):-(A=fc_RelationDecl(H,I,J,K,L);A=fc_ClosureExpr(M,J,K,N))->new(O),'check::parameter_env'(J,O,P),'check::entry_bound'(J,Q),'check::flow'(K,B,C,P,Q,R,S),F=D,G=E;(A=fc_AndGoal(T);is_list(A),A=T)->'check::flow_list'(T,B,C,D,E,F,G);A=fc_CallGoal(fc_VarExpr(U,V),W,X)->'check::flow_call'(U,W,X,B,C,D,E,F,G);A=fc_CallGoal(Y,W,X),Y=fc_FieldExpr(Z,A1,B1),'check::field_path'(Y,C1)->'check::flow_call'(C1,W,X,B,C,D,E,F,G);A=fc_TypedDecl(D1,U,E1,X)->'check::annotation_type'(D1,F1),set_(D,U,F1,G1),(E1=fc_None->F=G1,(add_("$fresh_",U,H1),I1=H1),subtract(E,[U,I1],J1),G=[I1|J1];'check::flow'(fc_UnifyGoal(fc_VarExpr(U,X),E1,X),B,C,G1,E,F,G));A=fc_UnifyGoal(fc_VarExpr(U,K1),E1,X)->'check::expression_type'(E1,B,D,F1),(get_assoc(U,D,L1)->'check::compatible'(F1,L1,B,X);true),(F1="Any"->G1=D;set_(D,U,F1,G1)),(E1=fc_VarExpr(M1,N1),(add_("$call_",M1,O1),get_assoc(O1,D,P1);get_assoc(M1,C,P1))->add_("$call_",U,Q1),set_(G1,Q1,P1,F);E1=fc_ClosureExpr(R1,J,S1,T1)->add_("$call_",U,U1),set_(G1,U1,[J],F);E1=fc_FieldExpr(fc_VarExpr(V1,W1),X1,Y1),add_(V1,".",Z1),add_(Z1,X1,A2),get_assoc(A2,C,P1)->add_("$call_",U,B2),set_(G1,B2,P1,F);F=G1),((E1=fc_LiteralExpr(C2,D2);E1=fc_DictExpr(E2,F2);E1=fc_ListExpr(G2,H2,I2);E1=fc_ClosureExpr(J2,K2,L2,M2);E1=fc_VarExpr(N2,O2),has_(E,N2))->(add_("$fresh_",U,P2),subtract(E,[P2],J1)),G=[U|J1];add_("$fresh_",U,Q2),subtract(E,[Q2],G)),'check::flow'(E1,B,C,D,E,R2,S2);A=fc_ControlGoal(T2,U2,V2,W2,X2)->'check::flow'(U2,B,C,D,E,Y2,Z2),'check::flow'(V2,B,C,Y2,Z2,A3,B3),'check::flow'(W2,B,C,D,E,C3,D3),'check::merge_facts'(A3,B3,C3,D3,F,G);A=fc_OrGoal(T)->'check::flow_alternatives'(T,B,C,D,E,F,G);compound(A)->cc_parts(A,E3,W),'check::flow_branches'(W,B,C,D,E),F=D,G=E;F=D,G=E.
-'check::$impl_flow_branches'([],A,B,C,D):-true.
-'check::$impl_flow_branches'([A|B],C,D,E,F):-'check::flow'(A,C,D,E,F,G,H),'check::flow_branches'(B,C,D,E,F).
-'check::$impl_merge_facts'(A,B,C,D,E,F):-assoc_to_list(A,G),new(H),'check::shared_facts'(G,C,H,E),intersection(B,D,I),sort(I,F).
-'check::$impl_shared_facts'([],A,B,B):-true.
-'check::$impl_shared_facts'([A|B],C,D,E):-cc_parts(A,F,[G,H]),(get_assoc(G,C,H)->set_(D,G,H,I);I=D),'check::shared_facts'(B,C,I,E).
-'check::$impl_flow_alternatives'([],A,B,C,D,C,D):-true.
-'check::$impl_flow_alternatives'([A],B,C,D,E,F,G):-'check::flow'(A,B,C,D,E,F,G).
-'check::$impl_flow_alternatives'([A,B|C],D,E,F,G,H,I):-'check::flow'(A,D,E,F,G,J,K),'check::flow_alternatives'([B|C],D,E,F,G,L,M),'check::merge_facts'(J,K,L,M,H,I).
-'check::$impl_viable_outputs'(A,B,C,D,E,F,G):-'check::matching_outputs'(A,B,C,D,E,H),H=[fc_Fact(I,J)|K],'check::merge_output_facts'(K,I,J,F,G).
-'check::$impl_matching_outputs'([],A,B,C,D,[]):-true.
-'check::$impl_matching_outputs'([A|B],C,D,E,F,G):-'check::matching_outputs'(B,C,D,E,F,H),('check::fits'(A,C,D,E,F)->'check::outputs'(A,C,E,F,I,J),G=[fc_Fact(I,J)|H];G=H).
-'check::$impl_merge_output_facts'([],A,B,A,B):-true.
-'check::$impl_merge_output_facts'([fc_Fact(A,B)|C],D,E,F,G):-'check::merge_facts'(D,E,A,B,H,I),'check::merge_output_facts'(C,H,I,F,G).
-'check::$impl_inferred_parameters'([],A,B,[]):-true.
-'check::$impl_inferred_parameters'([A|B],C,D,[E|F]):-(A=fc_VarExpr(G,H),get_assoc(G,C,I),dif(I,"Any")->(has_(D,G)->J=["$Produced",I];J=[I]),E=fc_TypedParam(J,G,H);E=A),'check::inferred_parameters'(B,C,D,F).
-'check::$impl_infer_round'([],A,B,C,C):-true.
-'check::$impl_infer_round'([A|B],C,D,E,F):-(A=fc_RelationDecl(G,H,I,J,K)->new(L),'check::parameter_env'(I,L,M),'check::entry_bound'(I,N),'check::flow'(J,C,D,M,N,O,P),(is_assoc(G),get_assoc("contracts",G,Q)->R=Q;'check::inferred_parameters'(I,O,P,S),R=[S]),(get_assoc(H,E,T)->append(T,R,U);U=R),set_(E,H,U,V);V=E),'check::infer_round'(B,C,D,V,F).
-'check::$impl_infer_fixed'(A,B,C,D,E):-'check::infer_round'(A,B,D,C,F),(F=D->E=F;'check::infer_fixed'(A,B,C,F,E)).
-'check::$impl_imported_schemas'([],A,A):-true.
-'check::$impl_imported_schemas'([A|B],C,D):-(cosmos_get(A,"schemas",E),assoc_to_list(E,F)),'check::schema_pairs'(F,C,G),'check::imported_schemas'(B,G,D).
-'check::$impl_schema_pairs'([],A,A):-true.
-'check::$impl_schema_pairs'([A|B],C,D):-cc_parts(A,E,[F,G]),(get_assoc(F,C,H),dif(H,G)->add_("Conflicting imported type: ",F,I),cosmos_get(G,"location",J),throw(fc_CompileError(I,J));set_(C,F,G,K)),'check::schema_pairs'(B,K,D).
-'check::$impl_imported_calls'([],A,B,B):-true.
-'check::$impl_imported_calls'([A|B],C,D,E):-(A=fc_CallGoal(fc_VarExpr("require",F),[fc_LiteralExpr(G,H),fc_VarExpr(I,J)],K),get_assoc(G,C,L)->(cosmos_get(L,"exports",M),assoc_to_list(M,N)),'check::import_members'(N,I,D,O);O=D),'check::imported_calls'(B,C,O,E).
-'check::$impl_import_members'([],A,B,B):-true.
-'check::$impl_import_members'([A|B],C,D,E):-cc_parts(A,F,[G,H]),(G="$call"->I=C;add_(C,".",J),add_(J,G,K),I=K),set_(D,I,H,L),'check::import_members'(B,C,L,E).
-'check::$impl_public_callable'(fc_VarExpr(A,B),C,D):-get_assoc(A,C,D).
-'check::$impl_public_callable'(fc_ClosureExpr(A,B,C,D),E,[B]):-true.
-'check::$impl_public_members'([],A,B,B):-true.
-'check::$impl_public_members'([fc_Entry(fc_LiteralExpr(A,B),C)|D],E,F,G):-('check::public_callable'(C,E,H)->set_(F,A,H,I);C=fc_DictExpr(J,K)->new(L),'check::public_members'(J,E,L,M),assoc_to_list(M,N),'check::import_members'(N,A,F,I);I=F),'check::public_members'(D,E,I,G).
-'check::$impl_public_exports'([],A,B,B):-true.
-'check::$impl_public_exports'([A|B],C,D,E):-(A=fc_ExportDecl(fc_DictExpr(F,G),H)->'check::public_members'(F,C,D,I);A=fc_ExportDecl(J,K),'check::public_callable'(J,C,L)->set_(D,"$call",L,I);I=D),'check::public_exports'(B,C,I,E).
-'check::$impl_interface'(A,B,C,D,E):-new(F),'check::export_bindings'(A,F,G),'check::expanded_exports'(A,G,H),'check::public_exports'(H,D,F,I),'check::flow'(A,C,D,F,[],J,K),assoc_to_keys(D,L),'check::callable_types'(L,J,M),'check::exported_fields'(H,C,M,F,N),del_assoc("$imports",C,O,P),new(Q),set_(Q,"format",1.0,R),set_(R,"module",B,S),set_(S,"schemas",P,T),set_(T,"exports",I,U),set_(U,"fields",N,V),E=V.
-'check::$impl_import_names'([],[]):-true.
-'check::$impl_import_names'([A|B],C):-'check::import_names'(B,D),(A=fc_CallGoal(fc_VarExpr("require",E),[fc_LiteralExpr(F,G),H],I)->C=[F|D];C=D).
-'check::$impl_imported_functors'(A,B):-new(C),assoc_to_values(A,D),'check::imported_schemas'(D,C,E),assoc_to_list(E,F),'check::schema_nodes'(F,B).
-'check::$impl_schema_nodes'([],[]):-true.
-'check::$impl_schema_nodes'([A|B],C):-cc_parts(A,D,[E,F]),'check::schema_nodes'(B,G),(get_assoc("kind",F,H)->C=G;cosmos_get(F,"parent",I),cosmos_get(F,"fields",J),cosmos_get(F,"location",K),C=[fc_FunctorDecl(E,[I|J],K)|G]).
-'check::$impl_string_operand'(A,B,C):-(A="Any";A="String";'check::subtype'(A,"Number",B))->true;add_("Expected String or Number, got ",A,D),throw(fc_CompileError(D,C)).
-'check::$impl_field_path'(fc_VarExpr(A,B),A):-true.
-'check::$impl_field_path'(fc_FieldExpr(A,B,C),D):-'check::field_path'(A,E),add_(E,".",F),add_(F,B,G),D=G.
-'check::$impl_imported_path'(A,B):-get_assoc("$imports",B,C),split_string(A,".","",[D|E]),cosmos_get(C,"modules",F),has_(F,D).
-'check::$impl_import_field_info'([],A,B,C,B,C):-true.
-'check::$impl_import_field_info'([A|B],C,D,E,F,G):-(A=fc_CallGoal(fc_VarExpr("require",H),[fc_LiteralExpr(I,J),fc_VarExpr(K,L)],M),get_assoc(I,C,N),get_assoc("fields",N,O)->assoc_to_list(O,P),'check::import_members'(P,K,D,Q),R=[K|E];Q=D,R=E),'check::import_field_info'(B,C,Q,R,F,G).
-'check::$impl_exported_fields'([],A,B,C,C):-true.
-'check::$impl_exported_fields'([A|B],C,D,E,F):-(A=fc_ExportDecl(G,H)->'check::export_value_fields'(G,"",C,D,E,I);I=E),'check::exported_fields'(B,C,D,I,F).
-'check::$impl_export_value_fields'(fc_DictExpr(A,B),C,D,E,F,G):-(C=""->H=F;set_(F,C,"Table",H)),'check::export_entries'(A,C,D,E,H,G).
-'check::$impl_export_value_fields'(A,B,C,D,E,F):- \+A=fc_DictExpr(G,H),'check::expression_type'(A,C,D,I),(B=""->J="$call";J=B),set_(E,J,I,F).
-'check::$impl_export_entries'([],A,B,C,D,D):-true.
-'check::$impl_export_entries'([fc_Entry(fc_LiteralExpr(A,B),C)|D],E,F,G,H,I):-(E=""->J=A;add_(E,".",K),add_(K,A,L),J=L),'check::export_value_fields'(C,J,F,G,H,M),'check::export_entries'(D,E,F,G,M,I).
-'check::$impl_callable_types'([],A,A):-true.
-'check::$impl_callable_types'([A|B],C,D):-set_(C,A,"Relation",E),'check::callable_types'(B,E,D).
-'check::$impl_export_bindings'([],A,A):-true.
-'check::$impl_export_bindings'([A|B],C,D):-((A=fc_UnifyGoal(fc_VarExpr(E,F),G,H);A=fc_TypedDecl(I,E,G,J))->set_(C,E,G,K);K=C),'check::export_bindings'(B,K,D).
-'check::$impl_expand_export'(A,B,C,D):-A=fc_VarExpr(E,F),\+has_(C,E),get_assoc(E,B,G)->'check::expand_export'(G,B,[E|C],D);A=fc_DictExpr(H,I)->'check::expand_entries'(H,B,C,J),D=fc_DictExpr(J,I);D=A.
-'check::$impl_expand_entries'([],A,B,[]):-true.
-'check::$impl_expand_entries'([fc_Entry(A,B)|C],D,E,[fc_Entry(A,F)|G]):-'check::expand_export'(B,D,E,F),'check::expand_entries'(C,D,E,G).
-'check::$impl_expanded_exports'([],A,[]):-true.
-'check::$impl_expanded_exports'([A|B],C,[D|E]):-(A=fc_ExportDecl(F,G)->'check::expand_export'(F,C,[],H),D=fc_ExportDecl(H,G);D=A),'check::expanded_exports'(B,C,E).
-'check::$impl_value_names'(A,B):-(A=fc_VarExpr(C,D);A=fc_TypedParam(E,C,F))->B=[C];A=fc_ClosureExpr(G,H,I,J)->B=[];A=fc_CallExpr(K,L,M)->'check::value_names'(L,B);is_list(A)->'check::value_name_list'(A,B);compound(A)->cc_parts(A,N,L),'check::value_name_list'(L,B);B=[].
-'check::$impl_value_name_list'([],[]):-true.
-'check::$impl_value_name_list'([A|B],C):-'check::value_names'(A,D),'check::value_name_list'(B,E),append(D,E,C).
-'check::$impl_binding_names'(A,B):-(A=fc_RelationDecl(C,D,E,F,G);A=fc_TypedDecl(H,D,I,J);A=fc_ClassDecl(D,K,L);A=fc_ProtocolDecl(D,M,N))->B=[D];A=fc_ClosureExpr(O,P,Q,R)->B=[];A=fc_UnifyGoal(S,T,U)->'check::value_names'([S,T],B);A=fc_CallGoal(V,W,X)->'check::value_names'(W,B);is_list(A)->'check::binding_list'(A,B);compound(A)->cc_parts(A,Y,W),'check::binding_list'(W,B);B=[].
-'check::$impl_binding_list'([],[]):-true.
-'check::$impl_binding_list'([A|B],C):-'check::binding_names'(A,D),'check::binding_list'(B,E),append(D,E,C).
-'check::$impl_validate_calls'(A,B,C):-(A=fc_RelationDecl(D,E,F,G,H);A=fc_ClosureExpr(I,F,G,J))->'check::value_names'(F,K),'check::binding_names'(G,L),append(B,K,M),append(M,L,N),'check::validate_calls'(G,N,C);(A=fc_CallGoal(fc_VarExpr(O,P),Q,R);A=fc_CallExpr(fc_VarExpr(O,S),Q,R))->((has_(B,O);has_(["require","print","write","writeln","throw","str","num","int","real"],O);sub_string(O,T,U,V,"::");get_assoc(O,C,W))->'check::validate_calls'(Q,B,C);add_("Cannot find relation ",O,X),throw(fc_CompileError(X,R)));is_list(A)->'check::validate_call_list'(A,B,C);compound(A)->cc_parts(A,Y,Q),'check::validate_call_list'(Q,B,C);true.
-'check::$impl_validate_call_list'([],A,B):-true.
-'check::$impl_validate_call_list'([A|B],C,D):-'check::validate_calls'(A,C,D),'check::validate_call_list'(B,C,D).
-check(A):-new(B),set_(B,"check",clos(upvals([]),'check::$value_check'),C),set_(C,"analyze",clos(upvals([]),'check::$value_analyze'),D),set_(D,"interface",clos(upvals([]),'check::$value_interface'),E),set_(E,"imports",clos(upvals([]),'check::$value_import_names'),F),set_(F,"imported_functors",clos(upvals([]),'check::$value_imported_functors'),A).
-'check::builtin'(A):-'check::$impl_builtin'(A).
-'check::$value_builtin'(A,upvals([])):-'check::builtin'(A).
-'check::declarations'(A,B,C):-'check::$impl_declarations'(A,B,C).
-'check::$value_declarations'(A,B,C,upvals([])):-'check::declarations'(A,B,C).
-'check::ancestry'(A,B,C,D):-'check::$impl_ancestry'(A,B,C,D).
-'check::$value_ancestry'(A,B,C,D,upvals([])):-'check::ancestry'(A,B,C,D).
-'check::field_types'(A,B,C):-'check::$impl_field_types'(A,B,C).
-'check::$value_field_types'(A,B,C,upvals([])):-'check::field_types'(A,B,C).
-'check::validate_specs'(A,B):-'check::$impl_validate_specs'(A,B).
-'check::$value_validate_specs'(A,B,upvals([])):-'check::validate_specs'(A,B).
-'check::subtype'(A,B,C):-'check::$impl_subtype'(A,B,C).
-'check::$value_subtype'(A,B,C,upvals([])):-'check::subtype'(A,B,C).
-'check::compatible'(A,B,C,D):-'check::$impl_compatible'(A,B,C,D).
-'check::$value_compatible'(A,B,C,D,upvals([])):-'check::compatible'(A,B,C,D).
-'check::parameter_env'(A,B,C):-'check::$impl_parameter_env'(A,B,C).
-'check::$value_parameter_env'(A,B,C,upvals([])):-'check::parameter_env'(A,B,C).
-'check::arguments'(A,B,C,D,E):-'check::$impl_arguments'(A,B,C,D,E).
-'check::$value_arguments'(A,B,C,D,E,upvals([])):-'check::arguments'(A,B,C,D,E).
-'check::expression_type'(A,B,C,D):-'check::$impl_expression_type'(A,B,C,D).
-'check::$value_expression_type'(A,B,C,D,upvals([])):-'check::expression_type'(A,B,C,D).
-'check::children'(A,B,C):-'check::$impl_children'(A,B,C).
-'check::$value_children'(A,B,C,upvals([])):-'check::children'(A,B,C).
-'check::walk_list'(A,B,C):-'check::$impl_walk_list'(A,B,C).
-'check::$value_walk_list'(A,B,C,upvals([])):-'check::walk_list'(A,B,C).
-'check::protocol_entry'(A,B,C,D):-'check::$impl_protocol_entry'(A,B,C,D).
-'check::$value_protocol_entry'(A,B,C,D,upvals([])):-'check::protocol_entry'(A,B,C,D).
-'check::protocol_shape'(A,B,C,D,E):-'check::$impl_protocol_shape'(A,B,C,D,E).
-'check::$value_protocol_shape'(A,B,C,D,E,upvals([])):-'check::protocol_shape'(A,B,C,D,E).
-'check::method_shape'(A,B,C):-'check::$impl_method_shape'(A,B,C).
-'check::$value_method_shape'(A,B,C,upvals([])):-'check::method_shape'(A,B,C).
-'check::parameter_spec'(A,B,C):-'check::$impl_parameter_spec'(A,B,C).
-'check::$value_parameter_spec'(A,B,C,upvals([])):-'check::parameter_spec'(A,B,C).
-'check::method_modes'(A,B,C,D):-'check::$impl_method_modes'(A,B,C,D).
-'check::$value_method_modes'(A,B,C,D,upvals([])):-'check::method_modes'(A,B,C,D).
-'check::compatible_parameters'(A,B,C,D):-'check::$impl_compatible_parameters'(A,B,C,D).
-'check::$value_compatible_parameters'(A,B,C,D,upvals([])):-'check::compatible_parameters'(A,B,C,D).
-'check::walk'(A,B,C):-'check::$impl_walk'(A,B,C).
-'check::$value_walk'(A,B,C,upvals([])):-'check::walk'(A,B,C).
-'check::check'(A,B):-'check::$impl_check'(A,B).
-'check::$value_check'(A,B,upvals([])):-'check::check'(A,B).
-'check::analyze'(A,B,C,D):-'check::$impl_analyze'(A,B,C,D).
-'check::$value_analyze'(A,B,C,D,upvals([])):-'check::analyze'(A,B,C,D).
-'check::callable_specs'(A,B,C):-'check::$impl_callable_specs'(A,B,C).
-'check::$value_callable_specs'(A,B,C,upvals([])):-'check::callable_specs'(A,B,C).
-'check::annotation_type'(A,B):-'check::$impl_annotation_type'(A,B).
-'check::$value_annotation_type'(A,B,upvals([])):-'check::annotation_type'(A,B).
-'check::entry_bound'(A,B):-'check::$impl_entry_bound'(A,B).
-'check::$value_entry_bound'(A,B,upvals([])):-'check::entry_bound'(A,B).
-'check::fits'(A,B,C,D,E):-'check::$impl_fits'(A,B,C,D,E).
-'check::$value_fits'(A,B,C,D,E,upvals([])):-'check::fits'(A,B,C,D,E).
-'check::outputs'(A,B,C,D,E,F):-'check::$impl_outputs'(A,B,C,D,E,F).
-'check::$value_outputs'(A,B,C,D,E,F,upvals([])):-'check::outputs'(A,B,C,D,E,F).
-'check::flow_call'(A,B,C,D,E,F,G,H,I):-'check::$impl_flow_call'(A,B,C,D,E,F,G,H,I).
-'check::$value_flow_call'(A,B,C,D,E,F,G,H,I,upvals([])):-'check::flow_call'(A,B,C,D,E,F,G,H,I).
-'check::flow_list'(A,B,C,D,E,F,G):-'check::$impl_flow_list'(A,B,C,D,E,F,G).
-'check::$value_flow_list'(A,B,C,D,E,F,G,upvals([])):-'check::flow_list'(A,B,C,D,E,F,G).
-'check::flow'(A,B,C,D,E,F,G):-'check::$impl_flow'(A,B,C,D,E,F,G).
-'check::$value_flow'(A,B,C,D,E,F,G,upvals([])):-'check::flow'(A,B,C,D,E,F,G).
-'check::flow_branches'(A,B,C,D,E):-'check::$impl_flow_branches'(A,B,C,D,E).
-'check::$value_flow_branches'(A,B,C,D,E,upvals([])):-'check::flow_branches'(A,B,C,D,E).
-'check::merge_facts'(A,B,C,D,E,F):-'check::$impl_merge_facts'(A,B,C,D,E,F).
-'check::$value_merge_facts'(A,B,C,D,E,F,upvals([])):-'check::merge_facts'(A,B,C,D,E,F).
-'check::shared_facts'(A,B,C,D):-'check::$impl_shared_facts'(A,B,C,D).
-'check::$value_shared_facts'(A,B,C,D,upvals([])):-'check::shared_facts'(A,B,C,D).
-'check::flow_alternatives'(A,B,C,D,E,F,G):-'check::$impl_flow_alternatives'(A,B,C,D,E,F,G).
-'check::$value_flow_alternatives'(A,B,C,D,E,F,G,upvals([])):-'check::flow_alternatives'(A,B,C,D,E,F,G).
-'check::viable_outputs'(A,B,C,D,E,F,G):-'check::$impl_viable_outputs'(A,B,C,D,E,F,G).
-'check::$value_viable_outputs'(A,B,C,D,E,F,G,upvals([])):-'check::viable_outputs'(A,B,C,D,E,F,G).
-'check::matching_outputs'(A,B,C,D,E,F):-'check::$impl_matching_outputs'(A,B,C,D,E,F).
-'check::$value_matching_outputs'(A,B,C,D,E,F,upvals([])):-'check::matching_outputs'(A,B,C,D,E,F).
-'check::merge_output_facts'(A,B,C,D,E):-'check::$impl_merge_output_facts'(A,B,C,D,E).
-'check::$value_merge_output_facts'(A,B,C,D,E,upvals([])):-'check::merge_output_facts'(A,B,C,D,E).
-'check::inferred_parameters'(A,B,C,D):-'check::$impl_inferred_parameters'(A,B,C,D).
-'check::$value_inferred_parameters'(A,B,C,D,upvals([])):-'check::inferred_parameters'(A,B,C,D).
-'check::infer_round'(A,B,C,D,E):-'check::$impl_infer_round'(A,B,C,D,E).
-'check::$value_infer_round'(A,B,C,D,E,upvals([])):-'check::infer_round'(A,B,C,D,E).
-'check::infer_fixed'(A,B,C,D,E):-'check::$impl_infer_fixed'(A,B,C,D,E).
-'check::$value_infer_fixed'(A,B,C,D,E,upvals([])):-'check::infer_fixed'(A,B,C,D,E).
-'check::imported_schemas'(A,B,C):-'check::$impl_imported_schemas'(A,B,C).
-'check::$value_imported_schemas'(A,B,C,upvals([])):-'check::imported_schemas'(A,B,C).
-'check::schema_pairs'(A,B,C):-'check::$impl_schema_pairs'(A,B,C).
-'check::$value_schema_pairs'(A,B,C,upvals([])):-'check::schema_pairs'(A,B,C).
-'check::imported_calls'(A,B,C,D):-'check::$impl_imported_calls'(A,B,C,D).
-'check::$value_imported_calls'(A,B,C,D,upvals([])):-'check::imported_calls'(A,B,C,D).
-'check::import_members'(A,B,C,D):-'check::$impl_import_members'(A,B,C,D).
-'check::$value_import_members'(A,B,C,D,upvals([])):-'check::import_members'(A,B,C,D).
-'check::public_callable'(A,B,C):-'check::$impl_public_callable'(A,B,C).
-'check::$value_public_callable'(A,B,C,upvals([])):-'check::public_callable'(A,B,C).
-'check::public_members'(A,B,C,D):-'check::$impl_public_members'(A,B,C,D).
-'check::$value_public_members'(A,B,C,D,upvals([])):-'check::public_members'(A,B,C,D).
-'check::public_exports'(A,B,C,D):-'check::$impl_public_exports'(A,B,C,D).
-'check::$value_public_exports'(A,B,C,D,upvals([])):-'check::public_exports'(A,B,C,D).
-'check::interface'(A,B,C,D,E):-'check::$impl_interface'(A,B,C,D,E).
-'check::$value_interface'(A,B,C,D,E,upvals([])):-'check::interface'(A,B,C,D,E).
-'check::import_names'(A,B):-'check::$impl_import_names'(A,B).
-'check::$value_import_names'(A,B,upvals([])):-'check::import_names'(A,B).
-'check::imported_functors'(A,B):-'check::$impl_imported_functors'(A,B).
-'check::$value_imported_functors'(A,B,upvals([])):-'check::imported_functors'(A,B).
-'check::schema_nodes'(A,B):-'check::$impl_schema_nodes'(A,B).
-'check::$value_schema_nodes'(A,B,upvals([])):-'check::schema_nodes'(A,B).
-'check::string_operand'(A,B,C):-'check::$impl_string_operand'(A,B,C).
-'check::$value_string_operand'(A,B,C,upvals([])):-'check::string_operand'(A,B,C).
-'check::field_path'(A,B):-'check::$impl_field_path'(A,B).
-'check::$value_field_path'(A,B,upvals([])):-'check::field_path'(A,B).
-'check::imported_path'(A,B):-'check::$impl_imported_path'(A,B).
-'check::$value_imported_path'(A,B,upvals([])):-'check::imported_path'(A,B).
-'check::import_field_info'(A,B,C,D,E,F):-'check::$impl_import_field_info'(A,B,C,D,E,F).
-'check::$value_import_field_info'(A,B,C,D,E,F,upvals([])):-'check::import_field_info'(A,B,C,D,E,F).
-'check::exported_fields'(A,B,C,D,E):-'check::$impl_exported_fields'(A,B,C,D,E).
-'check::$value_exported_fields'(A,B,C,D,E,upvals([])):-'check::exported_fields'(A,B,C,D,E).
-'check::export_value_fields'(A,B,C,D,E,F):-'check::$impl_export_value_fields'(A,B,C,D,E,F).
-'check::$value_export_value_fields'(A,B,C,D,E,F,upvals([])):-'check::export_value_fields'(A,B,C,D,E,F).
-'check::export_entries'(A,B,C,D,E,F):-'check::$impl_export_entries'(A,B,C,D,E,F).
-'check::$value_export_entries'(A,B,C,D,E,F,upvals([])):-'check::export_entries'(A,B,C,D,E,F).
-'check::callable_types'(A,B,C):-'check::$impl_callable_types'(A,B,C).
-'check::$value_callable_types'(A,B,C,upvals([])):-'check::callable_types'(A,B,C).
-'check::export_bindings'(A,B,C):-'check::$impl_export_bindings'(A,B,C).
-'check::$value_export_bindings'(A,B,C,upvals([])):-'check::export_bindings'(A,B,C).
-'check::expand_export'(A,B,C,D):-'check::$impl_expand_export'(A,B,C,D).
-'check::$value_expand_export'(A,B,C,D,upvals([])):-'check::expand_export'(A,B,C,D).
-'check::expand_entries'(A,B,C,D):-'check::$impl_expand_entries'(A,B,C,D).
-'check::$value_expand_entries'(A,B,C,D,upvals([])):-'check::expand_entries'(A,B,C,D).
-'check::expanded_exports'(A,B,C):-'check::$impl_expanded_exports'(A,B,C).
-'check::$value_expanded_exports'(A,B,C,upvals([])):-'check::expanded_exports'(A,B,C).
-'check::value_names'(A,B):-'check::$impl_value_names'(A,B).
-'check::$value_value_names'(A,B,upvals([])):-'check::value_names'(A,B).
-'check::value_name_list'(A,B):-'check::$impl_value_name_list'(A,B).
-'check::$value_value_name_list'(A,B,upvals([])):-'check::value_name_list'(A,B).
-'check::binding_names'(A,B):-'check::$impl_binding_names'(A,B).
-'check::$value_binding_names'(A,B,upvals([])):-'check::binding_names'(A,B).
-'check::binding_list'(A,B):-'check::$impl_binding_list'(A,B).
-'check::$value_binding_list'(A,B,upvals([])):-'check::binding_list'(A,B).
-'check::validate_calls'(A,B,C):-'check::$impl_validate_calls'(A,B,C).
-'check::$value_validate_calls'(A,B,C,upvals([])):-'check::validate_calls'(A,B,C).
-'check::validate_call_list'(A,B,C):-'check::$impl_validate_call_list'(A,B,C).
-'check::$value_validate_call_list'(A,B,C,upvals([])):-'check::validate_call_list'(A,B,C).
+cosmos_check__builtin(_name) :- has_(["Any"|["Functor"|["String"|["Number"|["Integer"|["Real"|["List"|["Table"|["Relation"|["Host"|[]]]]]]]]]]], _name).
+cosmos_check__declarations([], _schemas, _schemas) :- true.
+cosmos_check__declarations([_node|_nodes], _before, _after) :- (_node = fc_FunctorDecl(_name,_types,_loc) -> (_types = [] -> _parent = "Functor", _fields = [], _open = 1.0 ; _types = [_parent|_fields], (_types = ["Functor"|[]] -> _open = 1.0 ; _open = 0.0)), new(T1), set_(T1, "parent", _parent, T2), set_(T2, "fields", _fields, T3), set_(T3, "open", _open, T4), set_(T4, "location", _loc, T5), _spec = T5, (get_assoc(_name, _before, _old) -> (getnil(_old, "parent", T6), T6 = _parent, getnil(_old, "fields", T7), T7 = _fields, getnil(_old, "open", T8), T8 = _open -> _following = _before ; add_("Conflicting functor declaration: ", _name, T9), throw(fc_CompileError(T9,_loc))) ; set_(_before, _name, _spec, _following)) ; (_node = fc_ProtocolDecl(_name,_members,_loc) -> new(T10), set_(T10, "kind", "protocol", T11), set_(T11, "fields", _members, T12), set_(T12, "location", _loc, T13), _spec = T13, set_(_before, _name, _spec, _following) ; (_node = fc_ClassDecl(_name,fc_DictExpr(_entries,_),_loc) -> new(T14), set_(T14, "kind", "class", T15), set_(T15, "fields", _entries, T16), set_(T16, "location", _loc, T17), _spec = T17, set_(_before, _name, _spec, _following) ; (_node = fc_UnifyGoal(fc_VarExpr(_name,_),fc_DictExpr(_entries,_),_loc) -> new(T18), set_(T18, "kind", "constructor", T19), set_(T19, "fields", _entries, T20), set_(T20, "location", _loc, T21), _spec = T21, set_(_before, _name, _spec, _following) ; _following = _before)))), cosmos_check__declarations(_nodes, _following, _after).
+cosmos_check__ancestry(_name, _schemas, _seen, _loc) :- (_name = "Functor" -> true ; (has_(_seen, _name) -> add_("Cyclic functor subtype: ", _name, T22), throw(fc_CompileError(T22,_loc)) ; (get_assoc(_name, _schemas, _spec) -> getnil(_spec, "parent", T23), cosmos_check__ancestry(T23, _schemas, [_name|_seen], _loc) ; add_("Unknown functor subtype: ", _name, T24), throw(fc_CompileError(T24,_loc))))).
+cosmos_check__field_types([], _schemas, _loc) :- true.
+cosmos_check__field_types([_name|_names], _schemas, _loc) :- ((cosmos_check__builtin(_name) ; get_assoc(_name, _schemas, _)) -> true ; add_("Unknown field type: ", _name, T25), throw(fc_CompileError(T25,_loc))), cosmos_check__field_types(_names, _schemas, _loc).
+cosmos_check__validate_specs([], _schemas) :- true.
+cosmos_check__validate_specs([_name|_names], _schemas) :- get_assoc(_name, _schemas, _spec), (get_assoc("kind", _spec, _) -> true ; getnil(_spec, "location", T26), cosmos_check__ancestry(_name, _schemas, [], T26), getnil(_spec, "fields", T27), getnil(_spec, "location", T28), cosmos_check__field_types(T27, _schemas, T28)), cosmos_check__validate_specs(_names, _schemas).
+cosmos_check__subtype(_actual, _expected, _schemas) :- ((_expected = "Any" ; _actual = _expected) -> true ; (has_(["Integer"|["Real"|[]]], _actual), _expected = "Number" -> true ; (get_assoc(_actual, _schemas, _spec), \+(get_assoc("kind", _spec, _)) -> getnil(_spec, "parent", T29), cosmos_check__subtype(T29, _expected, _schemas) ; false))).
+cosmos_check__compatible(_actual, _expected, _schemas, _loc) :- ((_actual = "Any" ; cosmos_check__subtype(_actual, _expected, _schemas) ; cosmos_check__subtype(_expected, _actual, _schemas) ; get_assoc(_expected, _schemas, _spec), get_assoc("kind", _spec, "protocol")) -> true ; add_("Expected ", _expected, T30), add_(T30, ", got ", T31), add_(T31, _actual, T32), throw(fc_CompileError(T32,_loc))).
+cosmos_check__parameter_env([], _env, _env) :- true.
+cosmos_check__parameter_env([_node|_nodes], _before, _after) :- (_node = fc_TypedParam(_words,_name,_) -> subtract(_words, ["In"|["Out"|["InOut"|[]]]], _types), (_types = [] -> _typeName = "Any" ; (_types = ["Relation"|_] -> _typeName = "Relation" ; last(_types, _typeName))), set_(_before, _name, _typeName, _following) ; _following = _before), cosmos_check__parameter_env(_nodes, _following, _after).
+cosmos_check__arguments([], [], _schemas, _env, _loc) :- true.
+cosmos_check__arguments([_node|_nodes], [_expected|_types], _schemas, _env, _loc) :- cosmos_check__expression_type(_node, _schemas, _env, _actual), cosmos_check__compatible(_actual, _expected, _schemas, _loc), cosmos_check__arguments(_nodes, _types, _schemas, _env, _loc).
+cosmos_check__expression_type(_node, _schemas, _env, _typeName) :- (_node = fc_NewExpr(fc_VarExpr(_name,_),_args,_loc) -> (get_assoc(_name, _schemas, _spec), getnil(_spec, "fields", T33), member(fc_Entry(fc_LiteralExpr("new",_),_constructor), T33) -> (_constructor = fc_ClosureExpr(_,_params,_,_) -> (getnil(_spec, "kind", T34), T34 = "class" -> size_(_args, T35), add_(T35, 2.0, T36), _expected = T36 ; size_(_args, T37), add_(T37, 1.0, T38), _expected = T38), (size_(_params, T39), T39 = _expected -> true ; add_("Wrong constructor arity: ", _name, T40), throw(fc_CompileError(T40,_loc))) ; (_constructor = fc_LiteralExpr(_,_) -> add_("Constructor is not callable: ", _name, T41), throw(fc_CompileError(T41,_loc)) ; true)), cosmos_check__walk(_args, _schemas, _env), _typeName = _name ; add_("Cannot resolve constructor ", _name, T42), add_(T42, ".new", T43), throw(fc_CompileError(T43,_loc))) ; (_node = fc_LiteralExpr(_value,_) -> (string(_value) -> _typeName = "String" ; (number(_value) -> _typeName = "Number" ; _typeName = "Any")) ; (_node = fc_VarExpr(_name,_) -> (get_assoc(_name, _env, _known) -> _typeName = _known ; (get_assoc(_name, _schemas, _spec) -> (get_assoc("kind", _spec, _) -> _typeName = "Any" ; ((getnil(_spec, "open", T44), T44 = 1.0 ; getnil(_spec, "fields", T45), T45 = []) -> _typeName = _name ; add_("Functor needs arguments: ", _name, T46), getnil(_spec, "location", T47), throw(fc_CompileError(T46,T47)))) ; _typeName = "Any")) ; (_node = fc_CallExpr(fc_VarExpr(_name,_),_args,_loc), get_assoc(_name, _schemas, _spec), \+(get_assoc("kind", _spec, _)) -> (getnil(_spec, "open", T48), T48 = 1.0 -> cosmos_check__walk(_args, _schemas, _env) ; (size_(_args, T49), getnil(_spec, "fields", T50), size_(T50, T51), T49 = T51 -> true ; add_("Wrong functor arity: ", _name, T52), throw(fc_CompileError(T52,_loc))), getnil(_spec, "fields", T53), cosmos_check__arguments(_args, T53, _schemas, _env, _loc)), _typeName = _name ; (_node = fc_ListExpr(_items,_tail,_) -> cosmos_check__walk([_items|[_tail|[]]], _schemas, _env), _typeName = "List" ; (_node = fc_DictExpr(_entries,_) -> cosmos_check__walk(_entries, _schemas, _env), _typeName = "Table" ; (_node = fc_ClosureExpr(_,_,_,_) -> cosmos_check__walk(_node, _schemas, _env), _typeName = "Relation" ; cosmos_check__children(_node, _schemas, _env), _typeName = "Any"))))))).
+cosmos_check__children(_node, _schemas, _env) :- (is_list(_node) -> cosmos_check__walk_list(_node, _schemas, _env) ; (compound(_node) -> cc_parts(_node, _, _args), cosmos_check__walk_list(_args, _schemas, _env) ; true)).
+cosmos_check__walk_list([], _schemas, _env) :- true.
+cosmos_check__walk_list([_node|_nodes], _schemas, _env) :- cosmos_check__walk(_node, _schemas, _env), cosmos_check__walk_list(_nodes, _schemas, _env).
+cosmos_check__protocol_entry(_name, _entries, _loc, _value) :- (member(fc_Entry(fc_LiteralExpr(_name,_),_found), _entries) -> _value = _found ; add_("Missing protocol member: ", _name, T54), throw(fc_CompileError(T54,_loc))).
+cosmos_check__protocol_shape([], _entries, _schemas, _env, _loc) :- true.
+cosmos_check__protocol_shape([_member|_members], _entries, _schemas, _env, _loc) :- (_member = fc_TypedDecl(["Relation"|_types],_name,_,_) -> cosmos_check__protocol_entry(_name, _entries, _loc, _value), size_(_types, T55), cosmos_check__method_shape(_value, T55, _loc) ; (_member = fc_TypedDecl(_types,_name,_,_) -> cosmos_check__protocol_entry(_name, _entries, _loc, _value), last(_types, _expected), cosmos_check__expression_type(_value, _schemas, _env, _actual), cosmos_check__compatible(_actual, _expected, _schemas, _loc) ; (_member = fc_ClosureExpr(_annotation,_params,_,_) -> (is_assoc(_annotation) -> getnil(_annotation, "name", T56), _name = T56 ; _name = _annotation), cosmos_check__protocol_entry(_name, _entries, _loc, _value), size_(_params, T57), cosmos_check__method_shape(_value, T57, _loc), cosmos_check__method_modes(_value, _params, _schemas, _loc) ; true))), cosmos_check__protocol_shape(_members, _entries, _schemas, _env, _loc).
+cosmos_check__method_shape(_value, _arity, _loc) :- (_value = fc_ClosureExpr(_,_params,_,_) -> (size_(_params, T58), T58 = _arity -> true ; throw(fc_CompileError("Wrong protocol method arity",_loc))) ; (_value = fc_LiteralExpr(_,_) -> throw(fc_CompileError("Protocol method is not callable",_loc)) ; true)).
+cosmos_check__parameter_spec(_param, _mode, _typeName) :- (_param = fc_TypedParam(_words,_,_) -> cosmos_check__annotation_type(_words, _typeName), (_words = [_word|_], has_(["In"|["Out"|["InOut"|[]]]], _word) -> _mode = _word ; _mode = "Unspecified") ; _mode = "Unspecified", _typeName = "Any").
+cosmos_check__method_modes(_value, _expected, _schemas, _loc) :- (_value = fc_ClosureExpr(_,_actual,_,_) -> cosmos_check__compatible_parameters(_expected, _actual, _schemas, _loc) ; true).
+cosmos_check__compatible_parameters([], [], _schemas, _loc) :- true.
+cosmos_check__compatible_parameters([_expected|_es], [_actual|_as], _schemas, _loc) :- cosmos_check__parameter_spec(_expected, _em, _et), cosmos_check__parameter_spec(_actual, _am, _at), ((_em = "In", _am = "Out" ; _em = "Out", _am = "In" ; has_(["InOut"|["Unspecified"|[]]], _em), has_(["In"|["Out"|[]]], _am)) -> add_("Incompatible protocol method mode: ", _em, T59), add_(T59, " versus ", T60), add_(T60, _am, T61), throw(fc_CompileError(T61,_loc)) ; true), (_em = "Out" -> cosmos_check__compatible(_at, _et, _schemas, _loc) ; cosmos_check__compatible(_et, _at, _schemas, _loc)), cosmos_check__compatible_parameters(_es, _as, _schemas, _loc).
+cosmos_check__walk(_node, _schemas, _env) :- ((_node = fc_RelationDecl(_,_,_params,_body,_) ; _node = fc_ClosureExpr(_,_params,_body,_)) -> new(_empty), cosmos_check__parameter_env(_params, _empty, _locals), cosmos_check__walk(_params, _schemas, _locals), cosmos_check__walk(_body, _schemas, _locals) ; (_node = fc_TypedParam(_words,_,_loc) -> subtract(_words, ["In"|["Out"|["InOut"|[]]]], _types), cosmos_check__field_types(_types, _schemas, _loc) ; (_node = fc_TypedDecl(_words,_,_value,_loc) -> last(_words, _expected), cosmos_check__expression_type(_value, _schemas, _env, _actual), cosmos_check__compatible(_actual, _expected, _schemas, _loc), (_value = fc_DictExpr(_entries,_), get_assoc(_expected, _schemas, _spec), get_assoc("kind", _spec, "protocol") -> getnil(_spec, "fields", T62), cosmos_check__protocol_shape(T62, _entries, _schemas, _env, _loc) ; true) ; ((_node = fc_NewExpr(_,_,_) ; _node = fc_CallExpr(_,_,_) ; _node = fc_VarExpr(_,_)) -> cosmos_check__expression_type(_node, _schemas, _env, _) ; cosmos_check__children(_node, _schemas, _env))))).
+cosmos_check__check(_items, _schemas) :- new(_empty), cosmos_check__declarations(_items, _empty, _schemas), assoc_to_keys(_schemas, _names), cosmos_check__validate_specs(_names, _schemas), cosmos_check__walk(_items, _schemas, _empty), cosmos_check__callable_specs(_items, _empty, _callables), cosmos_check__walk(_callables, _schemas, _empty), cosmos_check__flow(_items, _schemas, _callables, _empty, [], _, _).
+cosmos_check__callable_specs([], _specs, _specs) :- true.
+cosmos_check__callable_specs([_node|_nodes], _before, _after) :- (_node = fc_RelationDecl(_annotation,_name,_params,_,_) -> (is_assoc(_annotation), get_assoc("contracts", _annotation, _contracts) -> _current = _contracts ; _current = [_params|[]]), (get_assoc(_name, _before, _old) -> append(_current, _old, _entries) ; _entries = _current), set_(_before, _name, _entries, _middle) ; _middle = _before), cosmos_check__callable_specs(_nodes, _middle, _after).
+cosmos_check__annotation_type(_words, _typeName) :- subtract(_words, ["In"|["Out"|["InOut"|[]]]], _types), (_types = [] -> _typeName = "Any" ; (_types = ["Relation"|_] -> _typeName = "Relation" ; last(_types, _typeName))).
+cosmos_check__entry_bound([], []) :- true.
+cosmos_check__entry_bound([_p|_ps], _bound) :- cosmos_check__entry_bound(_ps, _tail), (_p = fc_TypedParam(["In"|_],_name,_) -> _bound = [_name|_tail] ; (_p = fc_TypedParam(["Out"|_],_name,_) -> add_("$fresh_", _name, T63), _bound = [T63|_tail] ; _bound = _tail)).
+cosmos_check__fits([], [], _schemas, _env, _bound) :- true.
+cosmos_check__fits([_p|_ps], [_arg|_args], _schemas, _env, _bound) :- (_p = fc_TypedParam(_words,_,_) -> cosmos_check__annotation_type(_words, _expected), cosmos_check__expression_type(_arg, _schemas, _env, _actual), (_actual = "Any" ; cosmos_check__subtype(_actual, _expected, _schemas) ; cosmos_check__subtype(_expected, _actual, _schemas) ; get_assoc(_expected, _schemas, _spec), get_assoc("kind", _spec, "protocol")), (_words = ["Out"|_] -> _arg = fc_VarExpr(_name,_), \+(has_(_bound, _name)) ; (_words = ["In"|_], _arg = fc_VarExpr(_name,_) -> \+(add_("$fresh_", _name, T64), has_(_bound, T64)) ; true)) ; true), cosmos_check__fits(_ps, _args, _schemas, _env, _bound).
+cosmos_check__outputs([], [], _env, _bound, _env, _bound) :- true.
+cosmos_check__outputs([_p|_ps], [_arg|_args], _schemasBefore, _before, _schemasAfter, _after) :- (_p = fc_TypedParam(_words,_,_), _arg = fc_VarExpr(_name,_) -> cosmos_check__annotation_type(_words, _typeName), (_typeName = "Any" -> _middle = _schemasBefore ; set_(_schemasBefore, _name, _typeName, _middle)), ((_words = ["Out"|_] ; _words = ["In"|_]) -> add_("$fresh_", _name, T65), subtract(_before, [T65|[]], _clean), _bound = [_name|_clean] ; _bound = _before) ; _middle = _schemasBefore, _bound = _before), cosmos_check__outputs(_ps, _args, _middle, _bound, _schemasAfter, _after).
+cosmos_check__flow_call(_name, _args, _loc, _schemas, _callables, _env, _bound, _after, _known) :- ((add_("$call_", _name, T66), get_assoc(T66, _env, _options) ; get_assoc(_name, _callables, _options)) -> (member(_candidate, _options), size_(_candidate, T67), size_(_args, T68), T67 = T68 -> true ; add_("Wrong arity for ", _name, T69), throw(fc_CompileError(T69,_loc))), (member(_params, _options), cosmos_check__fits(_params, _args, _schemas, _env, _bound) -> (_options = [_params|[]] -> cosmos_check__outputs(_params, _args, _env, _bound, _after, _known) ; _after = _env, _known = _bound) ; add_("No matching type/mode signature for ", _name, T70), throw(fc_CompileError(T70,_loc))) ; _after = _env, _known = _bound).
+cosmos_check__flow_list([], _schemas, _callables, _env, _bound, _env, _bound) :- true.
+cosmos_check__flow_list([_x|_xs], _schemas, _callables, _env, _bound, _after, _known) :- cosmos_check__flow(_x, _schemas, _callables, _env, _bound, _middle, _partial), cosmos_check__flow_list(_xs, _schemas, _callables, _middle, _partial, _after, _known).
+cosmos_check__flow(_node, _schemas, _callables, _env, _bound, _after, _known) :- ((_node = fc_RelationDecl(_,_,_params,_body,_) ; _node = fc_ClosureExpr(_,_params,_body,_)) -> new(_empty), cosmos_check__parameter_env(_params, _empty, _locals), cosmos_check__entry_bound(_params, _inputs), cosmos_check__flow(_body, _schemas, _callables, _locals, _inputs, _, _), _after = _env, _known = _bound ; ((_node = fc_AndGoal(_nodes) ; is_list(_node), _node = _nodes) -> cosmos_check__flow_list(_nodes, _schemas, _callables, _env, _bound, _after, _known) ; (_node = fc_CallGoal(fc_VarExpr(_name,_),_args,_loc) -> cosmos_check__flow_call(_name, _args, _loc, _schemas, _callables, _env, _bound, _after, _known) ; (_node = fc_TypedDecl(_words,_name,_value,_loc) -> cosmos_check__annotation_type(_words, _typeName), set_(_env, _name, _typeName, _typed), (_value = fc_None -> _after = _typed, _known = _bound ; cosmos_check__flow(fc_UnifyGoal(fc_VarExpr(_name,_loc),_value,_loc), _schemas, _callables, _typed, _bound, _after, _known)) ; (_node = fc_UnifyGoal(fc_VarExpr(_name,_),_value,_loc) -> cosmos_check__expression_type(_value, _schemas, _env, _typeName), (get_assoc(_name, _env, _previous) -> cosmos_check__compatible(_typeName, _previous, _schemas, _loc) ; true), (_typeName = "Any" -> _typed = _env ; set_(_env, _name, _typeName, _typed)), (_value = fc_VarExpr(_source,_), (add_("$call_", _source, T71), get_assoc(T71, _env, _options) ; get_assoc(_source, _callables, _options)) -> add_("$call_", _name, T72), set_(_typed, T72, _options, _after) ; (_value = fc_ClosureExpr(_,_params,_,_) -> add_("$call_", _name, T73), set_(_typed, T73, [_params|[]], _after) ; _after = _typed)), ((_value = fc_LiteralExpr(_,_) ; _value = fc_DictExpr(_,_) ; _value = fc_ListExpr(_,_,_) ; _value = fc_ClosureExpr(_,_,_,_) ; _value = fc_VarExpr(_other,_), has_(_bound, _other)) -> add_("$fresh_", _name, T74), subtract(_bound, [T74|[]], _clean), _known = [_name|_clean] ; add_("$fresh_", _name, T75), subtract(_bound, [T75|[]], _known)), cosmos_check__flow(_value, _schemas, _callables, _env, _bound, _, _) ; (_node = fc_ControlGoal(_,_condition,_yes,_no,_) -> cosmos_check__flow(_condition, _schemas, _callables, _env, _bound, _test, _testBound), cosmos_check__flow(_yes, _schemas, _callables, _test, _testBound, _, _), cosmos_check__flow(_no, _schemas, _callables, _env, _bound, _, _), _after = _env, _known = _bound ; (_node = fc_OrGoal(_nodes) -> cosmos_check__flow_branches(_nodes, _schemas, _callables, _env, _bound), _after = _env, _known = _bound ; (compound(_node) -> cc_parts(_node, _, _args), cosmos_check__flow_branches(_args, _schemas, _callables, _env, _bound), _after = _env, _known = _bound ; _after = _env, _known = _bound)))))))).
+cosmos_check__flow_branches([], _schemas, _callables, _env, _bound) :- true.
+cosmos_check__flow_branches([_x|_xs], _schemas, _callables, _env, _bound) :- cosmos_check__flow(_x, _schemas, _callables, _env, _bound, _, _), cosmos_check__flow_branches(_xs, _schemas, _callables, _env, _bound).
+cosmos_check__value_builtin(V1, _upvals) :- cosmos_check__builtin(V1).
+cosmos_check__value_declarations(V1, V2, V3, _upvals) :- cosmos_check__declarations(V1, V2, V3).
+cosmos_check__value_declarations(V1, V2, V3, _upvals) :- cosmos_check__declarations(V1, V2, V3).
+cosmos_check__value_ancestry(V1, V2, V3, V4, _upvals) :- cosmos_check__ancestry(V1, V2, V3, V4).
+cosmos_check__value_field_types(V1, V2, V3, _upvals) :- cosmos_check__field_types(V1, V2, V3).
+cosmos_check__value_field_types(V1, V2, V3, _upvals) :- cosmos_check__field_types(V1, V2, V3).
+cosmos_check__value_validate_specs(V1, V2, _upvals) :- cosmos_check__validate_specs(V1, V2).
+cosmos_check__value_validate_specs(V1, V2, _upvals) :- cosmos_check__validate_specs(V1, V2).
+cosmos_check__value_subtype(V1, V2, V3, _upvals) :- cosmos_check__subtype(V1, V2, V3).
+cosmos_check__value_compatible(V1, V2, V3, V4, _upvals) :- cosmos_check__compatible(V1, V2, V3, V4).
+cosmos_check__value_parameter_env(V1, V2, V3, _upvals) :- cosmos_check__parameter_env(V1, V2, V3).
+cosmos_check__value_parameter_env(V1, V2, V3, _upvals) :- cosmos_check__parameter_env(V1, V2, V3).
+cosmos_check__value_arguments(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__arguments(V1, V2, V3, V4, V5).
+cosmos_check__value_arguments(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__arguments(V1, V2, V3, V4, V5).
+cosmos_check__value_expression_type(V1, V2, V3, V4, _upvals) :- cosmos_check__expression_type(V1, V2, V3, V4).
+cosmos_check__value_children(V1, V2, V3, _upvals) :- cosmos_check__children(V1, V2, V3).
+cosmos_check__value_walk_list(V1, V2, V3, _upvals) :- cosmos_check__walk_list(V1, V2, V3).
+cosmos_check__value_walk_list(V1, V2, V3, _upvals) :- cosmos_check__walk_list(V1, V2, V3).
+cosmos_check__value_protocol_entry(V1, V2, V3, V4, _upvals) :- cosmos_check__protocol_entry(V1, V2, V3, V4).
+cosmos_check__value_protocol_shape(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__protocol_shape(V1, V2, V3, V4, V5).
+cosmos_check__value_protocol_shape(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__protocol_shape(V1, V2, V3, V4, V5).
+cosmos_check__value_method_shape(V1, V2, V3, _upvals) :- cosmos_check__method_shape(V1, V2, V3).
+cosmos_check__value_parameter_spec(V1, V2, V3, _upvals) :- cosmos_check__parameter_spec(V1, V2, V3).
+cosmos_check__value_method_modes(V1, V2, V3, V4, _upvals) :- cosmos_check__method_modes(V1, V2, V3, V4).
+cosmos_check__value_compatible_parameters(V1, V2, V3, V4, _upvals) :- cosmos_check__compatible_parameters(V1, V2, V3, V4).
+cosmos_check__value_compatible_parameters(V1, V2, V3, V4, _upvals) :- cosmos_check__compatible_parameters(V1, V2, V3, V4).
+cosmos_check__value_walk(V1, V2, V3, _upvals) :- cosmos_check__walk(V1, V2, V3).
+cosmos_check__value_check(V1, V2, _upvals) :- cosmos_check__check(V1, V2).
+cosmos_check__value_callable_specs(V1, V2, V3, _upvals) :- cosmos_check__callable_specs(V1, V2, V3).
+cosmos_check__value_callable_specs(V1, V2, V3, _upvals) :- cosmos_check__callable_specs(V1, V2, V3).
+cosmos_check__value_annotation_type(V1, V2, _upvals) :- cosmos_check__annotation_type(V1, V2).
+cosmos_check__value_entry_bound(V1, V2, _upvals) :- cosmos_check__entry_bound(V1, V2).
+cosmos_check__value_entry_bound(V1, V2, _upvals) :- cosmos_check__entry_bound(V1, V2).
+cosmos_check__value_fits(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__fits(V1, V2, V3, V4, V5).
+cosmos_check__value_fits(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__fits(V1, V2, V3, V4, V5).
+cosmos_check__value_outputs(V1, V2, V3, V4, V5, V6, _upvals) :- cosmos_check__outputs(V1, V2, V3, V4, V5, V6).
+cosmos_check__value_outputs(V1, V2, V3, V4, V5, V6, _upvals) :- cosmos_check__outputs(V1, V2, V3, V4, V5, V6).
+cosmos_check__value_flow_call(V1, V2, V3, V4, V5, V6, V7, V8, V9, _upvals) :- cosmos_check__flow_call(V1, V2, V3, V4, V5, V6, V7, V8, V9).
+cosmos_check__value_flow_list(V1, V2, V3, V4, V5, V6, V7, _upvals) :- cosmos_check__flow_list(V1, V2, V3, V4, V5, V6, V7).
+cosmos_check__value_flow_list(V1, V2, V3, V4, V5, V6, V7, _upvals) :- cosmos_check__flow_list(V1, V2, V3, V4, V5, V6, V7).
+cosmos_check__value_flow(V1, V2, V3, V4, V5, V6, V7, _upvals) :- cosmos_check__flow(V1, V2, V3, V4, V5, V6, V7).
+cosmos_check__value_flow_branches(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__flow_branches(V1, V2, V3, V4, V5).
+cosmos_check__value_flow_branches(V1, V2, V3, V4, V5, _upvals) :- cosmos_check__flow_branches(V1, V2, V3, V4, V5).
+check(T77) :- new(T76), set_(T76, "check", clos(upvals, cosmos_check__value_check), T77).
