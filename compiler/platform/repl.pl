@@ -4,7 +4,7 @@
 :- initialization(main, main).
 
 version :- 
-	writeln("0.82").
+	writeln("0.842").
 
 main :-
     current_prolog_flag(argv, Arguments),
@@ -21,7 +21,7 @@ cosmos_main(['-d'|Arguments]) :- !,
 cosmos_main(['-v']) :- !,
     %writeln('Cosmos self-hosted compiler').
 	write('Cosmos self-hosted compiler'),
-	writeln(' 0.84').
+	write(' '),version.
 cosmos_main(['-h']) :- !, cosmos_help.
 cosmos_main(['--help']) :- !, cosmos_help.
 cosmos_main(['-q', Source|Arguments]) :- !,
