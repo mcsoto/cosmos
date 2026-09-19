@@ -1,3 +1,0 @@
-space=js::space
-space.canvas=js::canvas
-export(space)

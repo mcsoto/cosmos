@@ -1,5 +1,0 @@
-require('io',io)
-
-rel main(result)
-    io.writeln('loaded')
-    result=42

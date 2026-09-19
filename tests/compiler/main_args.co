@@ -1,5 +1,0 @@
-rel greet(name)
-    print(name)
-
-rel main(args)
-    greet(args[1])

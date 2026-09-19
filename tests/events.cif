@@ -1,1 +1,0 @@
-t("module","events_test",<,t("format",1.0,<,t("exports",t,-,t,t),t),t("schemas",t,-,t,t)).

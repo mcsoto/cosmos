@@ -2,6 +2,7 @@
 
 SWIPL ?= swipl
 COSMOS_EXE ?= cosmos.exe
+RM ?= rm
 
 all: compiler test
 
@@ -37,3 +38,8 @@ test: test-compiler
 
 test-compiler:
 	node --test tests/compiler/compiler.test.mjs
+
+clean:
+	$(RM) test/*.pl
+	$(RM) test/*.cif
+	$(RM) libs/*.pl
