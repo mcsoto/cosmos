@@ -41,3 +41,5 @@ Parse error at 27:2: Unexpected token (expected ID) //'new is a reserved token'
 Implemented: malformed bare `new` expressions report that `new` is a reserved
 keyword for `new Type(...)`, at the offending token. Quoted 'new' field keys
 and named constructor methods remain valid.
+
+- dependency on src/ and canvas/

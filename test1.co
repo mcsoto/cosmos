@@ -1,0 +1,11 @@
+
+rel p(!x)
+	!x+=1
+	!x=22
+print(p(1))
+
+for(x in [1,2,3])
+	print(x)
+
+for(c in '[1,2,3]')
+	print(c)
