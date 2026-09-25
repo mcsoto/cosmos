@@ -218,9 +218,9 @@ rel expression(node,c,env,value,goals)
         term('new',[initial],start)
         dictionary(entries,c,env,initial,value,rest)
         goals=[start|rest]
-    elseif(node=ClosureExpr(annotation,params,body,_))
+    elseif(node=ClosureExpr(annotation,params,body,loc))
         closure_info(annotation,_,kind,det)
-        annotated_closure(kind,det,params,body,c,env,value)
+        annotated_closure(kind,det,params,body,loc,c,env,value)
         goals=[]
     elseif(node=RawFunctorExpr(name,args,_))
         expressions(args,c,env,actual,goals)
@@ -278,8 +278,8 @@ rel retained([name|names],env,out)
     else
         out=tail
 rel closure(params,body,c,env,value)
-    annotated_closure('rel','nondet',params,body,c,env,value)
-rel annotated_closure(kind,det,params,body,c,env,value)
+    annotated_closure('rel','nondet',params,body,_,c,env,value)
+rel annotated_closure(kind,det,params,body,loc,c,env,value)
     c.analysis.variables(params,parameters)
     c.analysis.variables(body,direct)
     c.analysis.captures(direct,c.signatures,transitive)
@@ -304,7 +304,7 @@ rel annotated_closure(kind,det,params,body,c,env,value)
     parameter_contracts(params,specs)
     options=[{parameters=specs,determinism=det}]
     choose(required_contract(options))
-        term('cosmos_checked_call',[kind,name,options,args,c.schemas,bodyTerm],checkedBody)
+        term('cosmos_checked_call',[kind,name,options,args,c.schemas,bodyTerm,loc],checkedBody)
     elseif(kind!='rel')
         term('cosmos_callable',[kind,name,bodyTerm],checkedBody)
     else
@@ -483,9 +483,8 @@ rel control(kind,condition,yes,no,c,env,result)
         throw('Unsupported control form: '+kind)
 
 rel call_goal(fn,args,c,env,result)
-    raw_call_goal(fn,args,c,env,body)
-    trace_name(fn,name)
-    term('cosmos_trace_call',[name,args,body],result)
+	raw_call_goal(fn,args,c,env,body)
+    traced_call(fn,args,c,body,result)
 
 rel trace_name(fn,name)
     choose(fn=VarExpr(name,_))
@@ -495,6 +494,16 @@ rel trace_name(fn,name)
         name=prefix+'.'+key
     else
         name='<call>'
+
+// Trace wrappers are emitted only for a `-t` compilation.  Keeping this
+// decision in the emitter means ordinary generated programs have no tracing
+// predicates or wrapper overhead at all.
+rel traced_call(fn,args,c,body,result)
+    choose(c.trace=1)
+        trace_name(fn,name)
+        term('cosmos_trace_call',[name,args,body],result)
+    else
+        result=body
 
 rel raw_call_goal(fn,args,c,env,result)
     choose(fn=VarExpr(name,_))
@@ -543,9 +552,8 @@ rel value_call(fn,args,c,env,value,result)
         term('cosmos_method_value',[object,key,args,value],g)
         pl::append(pre,[g],all)
         sequence(all,body)
-        trace_name(fn,name)
         pl::append(args,[value],actual)
-        term('cosmos_trace_call',[name,actual,body],result)
+        traced_call(fn,actual,c,body,result)
     else
         pl::append(args,[value],actual)
         call_goal(fn,actual,c,env,result)
@@ -689,7 +697,7 @@ rel emit_relation(RelationDecl(annotation,name,params,body,_),c,clause)
         qualify(c,'$impl_'+name,wrapperCallArgs,implementation)
         contract_options(c.relations,name,options)
         choose(required_contract(options))
-            term('cosmos_checked_call',[kind,name,options,wrapperParameters,c.schemas,implementation],publicBody)
+            term('cosmos_checked_call',[kind,name,options,wrapperParameters,c.schemas,implementation,E],publicBody)
         elseif(kind!='rel')
             term('cosmos_callable',[kind,name,implementation],publicBody)
         else
@@ -720,9 +728,10 @@ rel generate(program,module,analysis,text)
     pl::cc_cell(0,counter)
     pl::cc_cell([],helpers)
     pl::cc_cell([],wrappers)
+    pl::cc_trace_requested(trace)
     c={module=module,signatures=program.signatures,functors=program.functors,
        analysis=analysis,counter=counter,helpers=helpers,wrappers=wrappers,locals=[],mode='rel',
-       schemas=program.schemas,relations=program.relations}
+       schemas=program.schemas,relations=program.relations,trace=trace}
     emit_relations(program.relations,c,relations)
     environment(program.globals,env)
     top_level(program.top,c,env,bodyGoals,exports)
@@ -732,8 +741,11 @@ rel generate(program,module,analysis,text)
         pl::last(exports,output)
     sequence(bodyGoals,body)
     term(module,[output],entryHead)
-    term('cosmos_trace_call',['::main',[],body],traced)
-    term(':-',[entryHead,traced],entry)
+    choose(trace=1)
+        term('cosmos_trace_call',['::main',[],body],traced)
+        term(':-',[entryHead,traced],entry)
+    else
+        term(':-',[entryHead,body],entry)
     pl::cc_cell_get(helpers,reversed)
     pl::reverse(reversed,generated)
     join([relations,[entry],generated],clauses)

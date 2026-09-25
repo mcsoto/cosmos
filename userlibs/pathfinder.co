@@ -1,0 +1,45 @@
+// Grid path primitives. Coordinates are one-based and the returned path
+// includes both endpoints. This deterministic base route is useful for UI and
+// Space examples; hosts may replace `walkable` with an A* policy later.
+
+rel horizontal(x,goal,y,path)
+    if(x=goal)
+        path=[{x=x and y=y}]
+    elseif(x<goal)
+        horizontal(x+1,goal,y,tail)
+        path=[{x=x and y=y}|tail]
+    else
+        horizontal(x-1,goal,y,tail)
+        path=[{x=x and y=y}|tail]
+
+rel vertical(x,y,goal,path)
+    if(y=goal)
+        path=[{x=x and y=y}]
+    elseif(y<goal)
+        vertical(x,y+1,goal,tail)
+        path=[{x=x and y=y}|tail]
+    else
+        vertical(x,y-1,goal,tail)
+        path=[{x=x and y=y}|tail]
+
+rel find(start_x,start_y,goal_x,goal_y,path,cost)
+    horizontal(start_x,goal_x,start_y,horizontal_path)
+    vertical(goal_x,start_y,goal_y,vertical_path)
+    path=horizontal_path+vertical_path
+    dx=goal_x-start_x
+    dy=goal_y-start_y
+    if(dx<0)
+        dx=-dx
+    if(dy<0)
+        dy=-dy
+    cost=dx+dy
+
+rel point_at(path,index,point)
+    pl::int(index,host_index)
+    pl::nth0(host_index,path,point)
+
+t={
+    'find'=find
+    'pointAt'=point_at
+}
+export(t)

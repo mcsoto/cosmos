@@ -1,0 +1,35 @@
+// Declarative UI primitives for Cosmos canvas hosts.
+// A host renders the command tables returned by panel/label/button/rect.
+
+rel contains(x,y,w,h,mx,my,inside)
+    if(mx>=x and mx<=x+w and my>=y and my<=y+h)
+        inside=1
+    else
+        inside=0
+
+rel panel(x,y,width,height,color,command)
+    command={kind='panel' and x=x and y=y and width=width and height=height and color=color}
+
+rel rect(x,y,width,height,color,command)
+    command={kind='rect' and x=x and y=y and width=width and height=height and color=color}
+
+rel label(text,x,y,color,command)
+    command={kind='label' and text=text and x=x and y=y and color=color}
+
+rel button(id,text,x,y,width,height,mx,my,command,clicked)
+    contains(x,y,width,height,mx,my,clicked)
+    command={kind='button' and id=id and text=text and x=x and y=y and width=width and height=height and hovered=clicked}
+
+rel row(left,top,gap,width,index,x,y)
+    x=left+index*(width+gap)
+    y=top
+
+t={
+    'contains'=contains
+    'panel'=panel
+    'rect'=rect
+    'label'=label
+    'button'=button
+    'row'=row
+}
+export(t)

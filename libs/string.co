@@ -8,15 +8,29 @@ rel size(String s, n)
 	pl::s_size(s,n)
 
 rel slice(String S1,I,J,String S2)
-	pl::s_slice2(S1,I,J,S2)//todo check this
-
-rel findIndex(String s1, String s2, i, pos)
-	//if(get(s1, i, s2))
-	when(slice(s1, i, i+size(s2), s2))
+	pl::s_slice(S1,I,J,S2)
+/*
+	find index, starts from i=0
+	
+	s[i : i+#s2] and i=pos
+	;
+	i<#s 
+	i+1
+	
+	slice
+	delay s delay-and (i=0 j) s2
+	
+*/
+//delay s1[_] = s2
+//s1[i,0+#s2]
+//#s2
+rel findIndex(String s, String s2, i, pos)
+	case
+		slice(s, i, i+size(s2), s2)
 		i=pos
-	else
-		i<size(s1)
-		findIndex(s1, s2, i+1, pos)
+	case
+		i<size(s)
+		findIndex(s, s2, i+1, pos)
 
 rel splitIndex(String s, String sep, i, Functor l)
 	when(findIndex(s,sep,i,pos))
@@ -36,21 +50,11 @@ rel concat(String s1, String s2, String s3)
 	s3=s1+s2
 
 rel last(String s, String c)
-	size(s,n)
-	get(s, n-1, c)
-	//get(s, size(s)-1, c)
+	get(s, size(s)-1, c)
 	
 rel at(s,x,c)
 	get(s,x,c)
 	
-/* 
-t= {
-	'get'=get
-	'size'=size
-	'at'=get
-	'lessOrEqual'=lessOrEqual
-}
-*/
 t= {
 	rel first(String S1,String S2)
 		pl::s_at(S1, 0, S2)
@@ -81,30 +85,30 @@ t= {
 	rel lower(String s1, String s2)
 		pl::string_lower(s1, s2)
 
-			/*
+			
 	rel eachIndex(String s, Relation Any Any p, i, String s2)
 		if(get(s, i, c))
 			p(i, c, c2)
-			eachIndex(s, p, i+1, String tail2)
+			this.eachIndex(s, p, i+1, tail2)
 			concat(c2, tail2, s2)
 		else
 			i=size(s)
 			s2=''
 
 	rel each(String s, Relation Any Any p, String s2)
-		eachIndex(s, p, 0, s2)
+		this.eachIndex(s, p, 0, s2)
 
 	rel mapIndex(String s, Relation Any Any p, i, String s2)
 		if(get(s, i, c))
 			p(c, c2)
-			mapIndex(s, p, i+1, String tail2)
+			this.mapIndex(s, p, i+1, tail2)
 			concat(c2, tail2, s2)
 		else
 			i=size(s)
 			s2=''
 
 	rel map(String s, Relation Any Any p, String s2)
-		mapIndex(s, p, 0, s2)
+		this.mapIndex(s, p, 0, s2)
 		
 	rel everyIndex(String s, Relation Any p, i)
 		if(i=size(s))
@@ -112,11 +116,10 @@ t= {
 		else
 			get(s, i, c)
 			p(c)
-			everyIndex(s, p, i+1)
+			this.everyIndex(s, p, i+1)
 		
 	rel every(String s, Relation Any p)
-		everyIndex(s, p, 0)
-
+		this.everyIndex(s, p, 0)
 		
 	rel replace(String s, String word1, String word2, String s2)
 		pl::replace_word(word1,word2,s,s2)
@@ -133,16 +136,16 @@ t= {
 	//rel _toList(String s, i, l2) l2=[];//todo repeated rel
 	rel _toList(String s, i, l2)
 		if(get(s, i, c))
-			_toList(s, i+1, tail)
-			pl::append([c],tail,l2)
+			this._toList(s, i+1, tail)
+			pl::append([c],tail,l2)//todo
 		else
 			i=size(s)
 			l2=[]
 		
 	//e.g. 'abc' ==> ['a','b','c']
 	rel toList(String s, l)
-		_toList(s, 0, l)
-		*/
+		this._toList(s, 0, l)
+	/*	*/
 	rel split(String s, String sep, l)
 		splitIndex(s, sep, 0, l)
 		

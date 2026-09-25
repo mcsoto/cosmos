@@ -9,3 +9,56 @@ for(x in [1,2,3])
 
 for(c in '[1,2,3]')
 	print(c)
+/* */
+
+find=string.find
+
+rel said(msg,word)
+	find(msg,word,_)
+	
+rel saidAt(msg,word,i)
+	find(msg,word,i)
+
+rel say(s,l)
+	case
+		l=[word,x]
+		find(s,word,i)
+		string.slice(s,i+1,#s,x)
+		print(x)
+	case
+		l=[word]
+		find(s,word,_)
+
+init loop=1
+while(loop=1)
+	io.write('> ')
+	s = io.read()
+	if (s='random')
+		for(x in math.range(1,20))
+			print(x+'='+math.random(1,10))
+	elseif(string.find(s,s2,i) and (s2 in ['+', '-', '=']))//
+		print('maths')
+		a=string.slice(s,0,i)
+		b=string.slice(s,i+1,#s)
+		print(a)
+		print(b)
+		//a=s.slice(0,i)
+		//a = s[0:i]+'+'+b
+		//b=s[i+#s]
+	elseif(say(s,['say ',x]))
+		true
+	elseif(said(s,'random'))
+		list.choice([1,2,3],x)
+		print(x)
+	else
+		next loop=0
+		//print(''+s)
+
+//a=s.slice(0,i) todo
+
+if(true)
+	//delay s1 s2 0
+	string.find('a-',s2,i)
+	print('>'+i)
+	s2='-'
+	print('>'+i)

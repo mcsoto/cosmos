@@ -1,6 +1,11 @@
 % Runtime operations used by generated programs. No parsing/lowering policy.
 % Embeddings implement cosmos_host_op/3; native compilation needs no host.
 :- multifile cosmos_host_op/3.
+% Emitter configuration, shared by the native driver and the browser bundle.
+% This is consulted only while compiling; generated application code never
+% calls it.
+cc_trace_requested(1.0) :- nb_current(cosmos_trace_requested,true), !.
+cc_trace_requested(0.0).
 % Trace source-level calls, never the compiler's generated helper predicates.
 % Backtrackable depth restores nesting on success, redo, failure and exceptions.
 :- meta_predicate cosmos_trace_call(+,?,0).
@@ -75,19 +80,84 @@ cosmos_receiver(Name,V) :- (var(V)->default_lib(Name,V);true).
 cosmos_object_create(Prototype,Fields,prototype_object(Prototype,Fields),_) :-
     (is_assoc(Fields)->true;throw(error(type_error(table,Fields),_))).
 
-:- meta_predicate cosmos_assert(0,+),cosmos_callable(+,+,0),cosmos_checked_call(+,+,+,+,+,0).
+:- meta_predicate cosmos_assert(0,+),cosmos_callable(+,+,0),cosmos_checked_call(+,+,+,+,+,0),cosmos_checked_call(+,+,+,+,+,0,+).
 :- meta_predicate cosmos_declared_call(+,+,?,0).
 cosmos_assert(Goal,Message) :- (once(Goal)->true;throw(error(cosmos_assertion(Message),_))).
 cosmos_callable("rel",_,Goal) :- !,call(Goal).
 cosmos_callable("bool",_,Goal) :- !,once(Goal).
 cosmos_callable(_,Name,Goal) :- (once(Goal)->true;throw(error(cosmos_function_failed(Name),_))).
 cosmos_checked_call(Kind,Name,Options,Args,Schemas,Goal) :-
+    cosmos_checked_call(Kind,Name,Options,Args,Schemas,Goal,none).
+cosmos_checked_call(Kind,Name,Options,Args,Schemas,Goal,Loc) :-
+    nb_setval(cosmos_contract_location,Loc),
     (member(Option,Options),get_assoc("parameters",Option,Spec),maplist(cosmos_input(Schemas),Spec,Args)->true
-    ;throw(error(cosmos_input_contract(Name),_))),
+    ;cosmos_contract_message(Kind,Name,Spec,Args,Loc,Message),throw(error(cosmos_contract(Message),_))),
     get_assoc("determinism",Option,Determinism),
     cosmos_declared_call(Determinism,Name,Args,cosmos_callable(Kind,Name,Goal)),
     (maplist(cosmos_output(Schemas),Spec,Args)->true
-    ;throw(error(cosmos_output_contract(Name),_))).
+    ;cosmos_contract_message(Kind,Name,Spec,Args,Loc,Message),throw(error(cosmos_contract(Message),_))).
+
+cosmos_contract_message(Kind,Name,Spec,Args,Loc,Message) :-
+    cosmos_contract_kind(Kind,KindName),
+    cosmos_contract_signature(Spec,Expected),
+    cosmos_contract_actual_signature(Args,Actual),
+    cosmos_contract_location(Loc,Prefix),
+    format(string(Message),'~s calling "~s" of type ~s ~s as ~s ~s',[Prefix,Name,KindName,Expected,KindName,Actual]).
+
+cosmos_contract_location(none,"") :- !.
+cosmos_contract_location(fc_Loc(Line,Column),Prefix) :- !,
+    format(string(Prefix),'line ~g:~g: ',[Line,Column]).
+cosmos_contract_location(_,"").
+
+cosmos_contract_kind("rel","Relation") :- !.
+cosmos_contract_kind("function","Function") :- !.
+cosmos_contract_kind("bool","Bool") :- !.
+cosmos_contract_kind(Kind,Kind).
+
+cosmos_contract_signature([],"") :- !.
+cosmos_contract_signature([Spec|Specs],Text) :-
+    get_assoc("mode",Spec,Mode),get_assoc("type",Spec,Type),
+    cosmos_contract_piece(Mode,Type,Piece),
+    cosmos_contract_signature(Specs,Tail),
+    cosmos_contract_join(Piece,Tail,Text).
+
+cosmos_contract_piece(Mode,_Type,Mode) :- Mode \= "Unspecified", !.
+cosmos_contract_piece(_Mode,Type,Type).
+
+cosmos_contract_actual_signature([],"") :- !.
+cosmos_contract_actual_signature([Value|Values],Text) :-
+    cosmos_contract_actual_piece(Value,Piece),
+    cosmos_contract_actual_signature(Values,Tail),
+    cosmos_contract_join(Piece,Tail,Text).
+
+cosmos_contract_actual_piece(Value,"Out") :- var(Value), !.
+cosmos_contract_actual_piece(Value,"String") :- string(Value), !.
+cosmos_contract_actual_piece(Value,"Number") :- number(Value), !.
+cosmos_contract_actual_piece(Value,"Table") :- is_assoc(Value), !.
+cosmos_contract_actual_piece(Value,"List") :- is_list(Value), !.
+cosmos_contract_actual_piece(Value,"Relation") :- Value=clos(_,_), !.
+cosmos_contract_actual_piece(_Value,"In").
+
+cosmos_contract_join("",Tail,Tail) :- !.
+cosmos_contract_join(Piece,"",Piece) :- !.
+cosmos_contract_join(Piece,Tail,Text) :- format(string(Text),'~s ~s',[Piece,Tail]).
+
+:- multifile prolog:message//1.
+prolog:message(error(cosmos_contract(Message),_)) --> [Message].
+prolog:message(error(cosmos_function_failed(Name),_)) -->
+    [ 'function "',Name,'" failed' ].
+prolog:message(error(cosmos_type_error(Expected,Value),_)) -->
+    {cosmos_contract_value_kind(Value,Actual),(nb_current(cosmos_contract_location,Loc)->true;Loc=none),cosmos_contract_location(Loc,Prefix),format(string(Message),'~stype error: expected ~s, got ~s',[Prefix,Expected,Actual])},
+    [Message].
+
+cosmos_contract_value_kind(Value,"Out") :- var(Value), !.
+cosmos_contract_value_kind(Value,"String") :- string(Value), !.
+cosmos_contract_value_kind(Value,"Number") :- number(Value), !.
+cosmos_contract_value_kind(Value,"Table") :- is_assoc(Value), !.
+cosmos_contract_value_kind(Value,"List") :- is_list(Value), !.
+cosmos_contract_value_kind(Value,"List") :- Value=[_|_], !.
+cosmos_contract_value_kind(Value,"Relation") :- Value=clos(_,_), !.
+cosmos_contract_value_kind(_Value,"Functor").
 % Debug instrumentation may explore a second solution. Keep it opt-in for
 % effectful relations; ordinary execution never probes extra alternatives.
 cosmos_declared_call(Det,Name,Args,Goal) :-
@@ -121,7 +191,10 @@ cosmos_is(V,"Number",_) :- !,number(V).
 cosmos_is(V,"String",_) :- !,string(V).
 cosmos_is(V,"Integer",_) :- !,integer(V).
 cosmos_is(V,"Real",_) :- !,float(V).
-cosmos_is(V,"List",_) :- !,is_list(V).
+% Cosmos lists may be proper lists or open-tail lists while a relation is
+% being assembled.  Both are List values; is_list/1 only recognizes the
+% former.
+cosmos_is(V,"List",_) :- !,(is_list(V);V=[_|_]).
 cosmos_is(V,"Table",_) :- !,is_assoc(V).
 cosmos_is(V,"Relation",_) :- !,nonvar(V),V=clos(_,_).
 cosmos_is(V,"Host",_) :- !,nonvar(V),V=host(_).

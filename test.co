@@ -1,0 +1,21 @@
+protocol(Positioned,{
+    Relation Any Number Number Any move
+})
+
+class(Point,{
+    x=0
+    y=0
+	rel new(env, x,y, o)
+		//env1.x = env.x : x
+		o = env
+    rel move(this, dx, dy, result)
+        result={x=dx and y=dy}
+})
+//p=new Point(1,1)
+//p is Positioned
+print(p)
+
+t={x=1}
+print(t)
+!t = t.x:2
+print(t1)

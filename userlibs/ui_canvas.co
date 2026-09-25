@@ -1,0 +1,42 @@
+// Canvas renderer for the declarative command tables made by ui.co.
+//
+// ui.panel/ui.rect/ui.label/ui.button create data; ui_canvas.draw or drawAll
+// consumes that data through the Space canvas API.  The adapter contains no
+// layout policy, so applications can compose their own command lists.
+
+require('ui', ui)
+require('space', space)
+
+rel draw(command)
+    if(command.kind='panel')
+        space.canvas.rect(command.x,command.y,command.width,command.height,command.color)
+    elseif(command.kind='rect')
+        space.canvas.rect(command.x,command.y,command.width,command.height,command.color)
+    elseif(command.kind='label')
+        space.canvas.label(command.text,command.x,command.y,command.color)
+    elseif(command.kind='button')
+        draw_button(command)
+    else
+        true
+
+rel draw_button(command)
+    if(command.hovered=1)
+        color='#3a675b'
+    else
+        color='#263f4a'
+    space.canvas.rect(command.x,command.y,command.width,command.height,color)
+    space.canvas.label(command.text,command.x+10,command.y+8,'#e6edf7')
+
+rel draw_all(commands)
+    if(commands=[])
+        true
+    else
+        commands=[command|tail]
+        draw(command)
+        draw_all(tail)
+
+t={
+    'draw'=draw
+    'drawAll'=draw_all
+}
+export(t)

@@ -50,6 +50,4 @@ const browserAssets = Object.fromEntries(browserFiles.map(file => {
   const key = file.replace(/^compiler\//, '');
   return [key, readFileSync(join(root, file)).toString('base64')];
 }));
-writeFileSync(join(root, 'canvas/cosmos-swipl-assets.js'),
-  `window.CosmosSwiplAssets = Object.freeze(${JSON.stringify(browserAssets, null, 2)});\n`);
-console.log(`Generated browser SWI assets from ${browserFiles.length} runtime/compiler files.`);
+//writeFileSync(join(root, 'canvas/cosmos-swipl-assets.js'), `window.CosmosSwiplAssets = Object.freeze(${JSON.stringify(browserAssets, null, 2)});\n`); console.log(`Generated browser SWI assets from ${browserFiles.length} runtime/compiler files.`);
