@@ -15,7 +15,7 @@ compiler_load(Stage) :-
 compiler_load_runtime :- compiler_platform_runtime_loaded, !.
 compiler_load_runtime :-
     compiler_platform(Here),
-    directory_file_path(Here,'../../src/swi.pl',Runtime),consult(Runtime),
+    directory_file_path(Here,'../swi.pl',Runtime),consult(Runtime),
     directory_file_path(Here,'terms.pl',Terms),consult(Terms),
     directory_file_path(Here,'runtime.pl',Operations),consult(Operations),
     directory_file_path(Here,'codec.pl',Codec),consult(Codec),
@@ -48,7 +48,7 @@ compiler_compile_file(Stage,Input,Output,Module) :-
 compiler_add_main_entry(Output, Module) :-
     atom_concat(Module, '::main', Predicate),
     compiler_platform(PlatformDirectory),
-    directory_file_path(PlatformDirectory, '../../src/swi.pl', Runtime),
+    directory_file_path(PlatformDirectory, '../swi.pl', Runtime),
     directory_file_path(PlatformDirectory, 'runtime.pl', Operations),
     setup_call_cleanup(
         open(Output, append, Stream, [encoding(utf8), newline(posix)]),

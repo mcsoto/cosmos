@@ -105,7 +105,7 @@ cannot yet dereference Canvas or DOM objects.
 provides fresh variables and cells. `driver.pl` handles files and diagnostics;
 `runtime.pl` provides field/call/host dispatch used by generated programs. These
 files contain no replacement parser or hand-written Prolog compiler. The core
-language runtime and precompiled libraries remain `src/swi.pl` and `libs/*.pl`.
+language runtime and precompiled libraries remain `compiler/swi.pl` and `libs/*.pl`.
 Compile application dependencies separately into `.pl`; automatic recursive
 compilation of imported `.co` files is not implemented.
 

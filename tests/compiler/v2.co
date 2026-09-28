@@ -45,9 +45,9 @@ rel exact(Out Number x) det
     x=1
 rel tooMany(Out Number x) det
     x=1 or x=2
-rel badProtocol()
+rel badProtocol(Number value)
     Positive object={size=3,rel accept(x) true}
-    object.accept(1)
+    object.accept(value)
 rel badType()
     node=Var(x)
     x=7

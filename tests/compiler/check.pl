@@ -2,7 +2,7 @@
 main :- catch((run -> writeln('Compiler semantics passed') ; throw(test_failed)),E,
               (print_message(error,E),halt(1))).
 run :-
- consult('src/swi.pl'),consult('compiler/platform/runtime.pl'),
+ consult('compiler/swi.pl'),consult('compiler/platform/runtime.pl'),
  consult('tests/compiler/semantics.pl'),semantics(Api),
  get_(Api,"run",Run),once(call_cl(Run,[])),
  get_(Api,"alternatives",Alternatives),findall(X,call_cl(Alternatives,[X]),[1.0,2.0]),

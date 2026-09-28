@@ -32,6 +32,15 @@
 'parser::$impl_is_token'(A,B):-A=[fc_Token(C,D,E,F)|G],(C=B;C="ID",D=B).
 'parser::$impl_next_is_token'([A|B],C):-'parser::is_token'(B,C).
 'parser::$impl_eat'(A,B,C,D):-A=[E|F],'parser::is_token'(A,B)->D=E,C=F;throw(fc_ParseError("Unexpected token",B,A)).
+'parser::$impl_split_range'(A,B,C):-'parser::range_split'(A,0.0,[],B,C).
+'parser::$impl_range_split'([fc_Token("]",A,B,C)|D],E,F,"none","none"):-E=0.0.
+'parser::$impl_range_split'([fc_Token(":",A,B,C)|D],0.0,E,E,D):-true.
+'parser::$impl_range_split'([fc_Token("(",A,B,C)|D],E,F,G,H):-add_(E,1.0,I),'parser::range_split'(D,I,F,G,H).
+'parser::$impl_range_split'([fc_Token("[",A,B,C)|D],E,F,G,H):-add_(E,1.0,I),'parser::range_split'(D,I,F,G,H).
+'parser::$impl_range_split'([fc_Token(")",A,B,C)|D],E,F,G,H):-r_sub(E,1.0,I),'parser::range_split'(D,I,F,G,H).
+'parser::$impl_range_split'([fc_Token("]",A,B,C)|D],E,F,G,H):-r_sub(E,1.0,I),'parser::range_split'(D,I,F,G,H).
+'parser::$impl_range_split'([A|B],C,D,E,F):-append(D,[A],G),'parser::range_split'(B,C,G,E,F).
+'parser::$impl_range_split'([],A,B,"none","none"):-true.
 'parser::$impl_skip_newlines'(A,B):-'parser::is_token'(A,"NEWLINE")->'parser::eat'(A,"NEWLINE",C,D),'parser::skip_newlines'(C,B);B=A.
 'parser::$impl_optional_token'(A,B,C):-'parser::is_token'(A,B)->'parser::eat'(A,B,C,D);C=A.
 'parser::$impl_make_and'([],A):-A=fc_TrueGoal.
@@ -92,6 +101,7 @@
 'parser::$impl_expression_loc'(fc_NewExpr(A,B,C),C):-true.
 'parser::$impl_expression_loc'(fc_FieldExpr(A,B,C),C):-true.
 'parser::$impl_expression_loc'(fc_IndexExpr(A,B,C),C):-true.
+'parser::$impl_expression_loc'(fc_SliceExpr(A,B,C,D),D):-true.
 'parser::$impl_expression_loc'(fc_SetFieldExpr(A,B,C),C):-true.
 'parser::$impl_expression_loc'(fc_ListExpr(A,B,C),C):-true.
 'parser::$impl_expression_loc'(fc_DictExpr(A,B),B):-true.
@@ -103,7 +113,7 @@
 'parser::$impl_parse_multiplicative_tail'(A,B,C,D):-('parser::is_token'(A,"*");'parser::is_token'(A,"/");'parser::is_token'(A,"%"))->'parser::token_value'(A,E),'parser::eat'(A,E,F,G),'parser::parse_prefix_expression'(F,H,I),'parser::expression_loc'(B,J),K=fc_BinaryExpr(E,B,H,J),'parser::parse_multiplicative_tail'(I,K,C,D);C=B,D=A.
 'parser::$impl_parse_prefix_expression'(A,B,C):-'parser::is_token'(A,"new")->'parser::token_loc'(A,D),'parser::eat'(A,"new",E,F),('parser::token_type'(E,"ID"),'parser::next_is_token'(E,"(")->true;throw(fc_ParseError("new is a reserved keyword; use new Type(...) for construction",A))),'parser::eat'(E,"ID",G,fc_Token(H,I,J,K)),'parser::eat'(G,"(",L,M),'parser::parse_arguments'(L,N,O),'parser::eat'(O,")",C,P),B=fc_NewExpr(fc_VarExpr(I,D),N,D);'parser::is_token'(A,"!")->'parser::token_loc'(A,D),'parser::eat'(A,"!",E,Q),'parser::parse_prefix_expression'(E,R,C),B=fc_StateExpr(R,D);'parser::is_token'(A,"+")->'parser::eat'(A,"+",E,S),'parser::parse_prefix_expression'(E,B,C);'parser::is_token'(A,"-")->'parser::token_loc'(A,D),'parser::eat'(A,"-",E,T),'parser::parse_prefix_expression'(E,R,C),B=fc_UnaryExpr("-",R,D);'parser::is_token'(A,"#")->'parser::token_loc'(A,D),'parser::eat'(A,"#",E,U),'parser::parse_prefix_expression'(E,R,C),B=fc_SizeExpr(R,D);'parser::is_token'(A,"next"),\+'parser::next_is_token'(A,"(")->'parser::token_loc'(A,D),'parser::eat'(A,"next",E,V),'parser::parse_primary'(E,R,G),'parser::parse_postfix_tail'(G,fc_NextExpr(R,D),B,C);'parser::parse_postfix'(A,B,C).
 'parser::$impl_parse_postfix'(A,B,C):-'parser::parse_primary'(A,D,E),'parser::parse_postfix_tail'(E,D,B,C).
-'parser::$impl_parse_postfix_tail'(A,B,C,D):-'parser::is_token'(A,"(")->'parser::eat'(A,"(",E,F),'parser::parse_arguments'(E,G,H),'parser::eat'(H,")",I,J),'parser::expression_loc'(B,K),L=fc_CallExpr(B,G,K),'parser::parse_postfix_tail'(I,L,C,D);'parser::is_token'(A,".")->'parser::eat'(A,".",E,M),'parser::eat'(E,"ID",H,fc_Token(N,O,P,Q)),L=fc_FieldExpr(B,O,fc_Loc(P,Q)),'parser::parse_postfix_tail'(H,L,C,D);'parser::is_token'(A,"[")->'parser::token_loc'(A,K),'parser::eat'(A,"[",E,R),'parser::parse_term'(E,S,H),'parser::eat'(H,"]",I,T),L=fc_IndexExpr(B,S,K),'parser::parse_postfix_tail'(I,L,C,D);'parser::is_token'(A,":")->'parser::token_loc'(A,K),'parser::eat'(A,":",E,U),'parser::parse_term'(E,V,H),L=fc_SetFieldExpr(B,V,K),'parser::parse_postfix_tail'(H,L,C,D);C=B,D=A.
+'parser::$impl_parse_postfix_tail'(A,B,C,D):-'parser::is_token'(A,"(")->'parser::eat'(A,"(",E,F),'parser::parse_arguments'(E,G,H),'parser::eat'(H,")",I,J),'parser::expression_loc'(B,K),L=fc_CallExpr(B,G,K),'parser::parse_postfix_tail'(I,L,C,D);'parser::is_token'(A,".")->'parser::eat'(A,".",E,M),'parser::eat'(E,"ID",H,fc_Token(N,O,P,Q)),L=fc_FieldExpr(B,O,fc_Loc(P,Q)),'parser::parse_postfix_tail'(H,L,C,D);'parser::is_token'(A,"[")->'parser::token_loc'(A,K),'parser::eat'(A,"[",E,R),'parser::split_range'(E,S,T),(S="none"->'parser::parse_term'(E,U,H),L=fc_IndexExpr(B,U,K);'parser::parse_term'(S,V,W),'parser::parse_term'(T,X,H),L=fc_SliceExpr(B,V,X,K)),'parser::eat'(H,"]",I,Y),'parser::parse_postfix_tail'(I,L,C,D);'parser::is_token'(A,":")->'parser::token_loc'(A,K),'parser::eat'(A,":",E,Z),'parser::parse_term'(E,A1,H),L=fc_SetFieldExpr(B,A1,K),'parser::parse_postfix_tail'(H,L,C,D);C=B,D=A.
 'parser::$impl_parse_arguments'(A,B,C):-'parser::is_token'(A,")")->B=[],C=A;'parser::parse_term'(A,D,E),('parser::is_token'(E,",")->'parser::eat'(E,",",F,G),'parser::parse_arguments'(F,H,C),B=[D|H];B=[D],C=E).
 'parser::$impl_parse_primary'(A,B,C):-'parser::is_token'(A,":")->'parser::eat'(A,":",D,fc_Token(E,F,G,H)),'parser::eat'(D,"ID",I,fc_Token(J,K,L,M)),('parser::is_token'(I,"(")->'parser::eat'(I,"(",N,O),'parser::parse_arguments'(N,P,Q),'parser::eat'(Q,")",C,R);P=[],C=I),B=fc_RawFunctorExpr(K,P,fc_Loc(G,H));'parser::token_type'(A,"NUMBER")->'parser::eat'(A,"NUMBER",C,fc_Token(S,T,G,H)),(num(T,U),V=U),B=fc_LiteralExpr(V,fc_Loc(G,H));'parser::token_type'(A,"STRING")->'parser::eat'(A,"STRING",C,fc_Token(W,V,G,H)),B=fc_LiteralExpr(V,fc_Loc(G,H));'parser::starts_relation'(A)->'parser::parse_closure'(A,B,C);'parser::token_type'(A,"ID")->'parser::eat'(A,"ID",D,fc_Token(X,K,G,H)),('parser::is_token'(D,"::")->'parser::eat'(D,"::",I,Y),'parser::eat'(I,"ID",C,fc_Token(Z,A1,B1,C1)),add_(K,"::",D1),add_(D1,A1,E1),B=fc_VarExpr(E1,fc_Loc(G,H));B=fc_VarExpr(K,fc_Loc(G,H)),C=D);'parser::is_token'(A,"(")->'parser::eat'(A,"(",D,F1),'parser::parse_term'(D,B,I),'parser::eat'(I,")",C,G1);'parser::is_token'(A,"[")->'parser::parse_list'(A,B,C);'parser::is_token'(A,"{")->'parser::parse_dictionary'(A,B,C);throw(fc_ParseError("Expected term",A)).
 'parser::$impl_parse_list'(A,B,C):-'parser::token_loc'(A,D),'parser::eat'(A,"[",E,F),('parser::is_token'(E,"]")->G=[],H=fc_None,I=E;'parser::parse_list_items'(E,G,H,I)),'parser::eat'(I,"]",C,J),B=fc_ListExpr(G,H,D).
@@ -189,6 +199,10 @@ parser(A):-new(B),set_(B,"lex",clos(upvals([]),'parser::$value_lex'),C),set_(C,"
 'parser::$value_next_is_token'(A,B,upvals([])):-'parser::next_is_token'(A,B).
 'parser::eat'(A,B,C,D):-'parser::$impl_eat'(A,B,C,D).
 'parser::$value_eat'(A,B,C,D,upvals([])):-'parser::eat'(A,B,C,D).
+'parser::split_range'(A,B,C):-'parser::$impl_split_range'(A,B,C).
+'parser::$value_split_range'(A,B,C,upvals([])):-'parser::split_range'(A,B,C).
+'parser::range_split'(A,B,C,D,E):-'parser::$impl_range_split'(A,B,C,D,E).
+'parser::$value_range_split'(A,B,C,D,E,upvals([])):-'parser::range_split'(A,B,C,D,E).
 'parser::skip_newlines'(A,B):-'parser::$impl_skip_newlines'(A,B).
 'parser::$value_skip_newlines'(A,B,upvals([])):-'parser::skip_newlines'(A,B).
 'parser::optional_token'(A,B,C):-'parser::$impl_optional_token'(A,B,C).

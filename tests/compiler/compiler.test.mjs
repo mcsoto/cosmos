@@ -44,6 +44,32 @@ test('colon constructs undeclared functors instead of relation calls', () => {
   assert.equal(run.status, 0, run.stderr);
   assert.equal(run.stdout.trim(), '[fc_F(1.0,2.0),fc_Empty]');
 });
+test('a bracket range lowers to the host slice operation for strings and lists', () => {
+  const source = `rel sliced()
+    s='hello world'
+    l=[10,20,30,40,50]
+    f=0
+    t=2
+    results=[s[0:5],s[6:#s],s[0:3]+'|'+s[3:5],l[1:3],s[3-1:5],s[0:#s],s[f:t]]
+    for(result in results)
+        print(result)
+export({sliced=sliced})`;
+  const result = compile(source, 'slice');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(readFileSync(result.output, 'utf8'), /slice_\(/);
+  const file = result.output.replaceAll('\\', '/').replaceAll("'", "''");
+  const run = spawnSync(swi, ['-q', '-s', join(root, 'compiler/platform/driver.pl'), '-g',
+    `compiler_load_runtime,consult('${file}'),slice(A),get_(A,"sliced",S),call_cl(S,[]),halt`],
+    { cwd: temporary, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.error?.message || run.stderr);
+  assert.equal(run.stdout.replaceAll('\r', '').trim(),
+    'hello\nworld\nhel|lo\n[20.0,30.0]\nllo\nhello world\nhe');
+  // A range is only a range at the top level of the brackets: an index keeps
+  // working, and a slice is a value like any other expression.
+  const nested = compile("rel n()\n    s='abc'\n    x=s[1]\n    y=[s[0:2]]\n    z={k=s[0:1]}\nexport([x,y,z])", 'slice_nested');
+  assert.equal(nested.status, 0, nested.stderr);
+});
+
 test('removed host namespaces cannot fall back to another compiler runtime', () => {
   const result = compile('host=lua::math\nexport(host)', 'removed_host');
   assert.notEqual(result.status, 0);
@@ -228,7 +254,8 @@ o.p(1)
 reader={rel read(Out Number result) result=3}
 reader is Readable
 reader is NumberReader
-checked.p(1)
+input=1
+checked.p(input)
 export('interfaces passed')`;
   const compiled=compile(source,'protocol_interface');
   assert.equal(compiled.status,0,compiled.stderr);
@@ -246,6 +273,36 @@ export('interfaces passed')`;
     {cwd:root,encoding:'utf8',timeout:15000});
   assert.notEqual(debugCli.status,0);
   assert.match(debugCli.stderr,/cosmos_protocol_behavior/);
+});
+test('a protocol body is proven at compile time and deferred whenever an operand is unknown', () => {
+  const protocol=`protocol(Positive,{
+    Number size
+    rel accept(In Number x)
+        x>2
+})
+`;
+  const declared=value=>`${protocol}Positive object={size=3,rel accept(x) true}\nobject.accept(${value})\n`;
+  // A literal that cannot satisfy the body is rejected before any code exists.
+  for (const [value,pattern] of [
+    ['1',/Compile error at 7:8: Protocol contract violation: accept requires 1\.0 > 2\.0/],
+    ['2',/Protocol contract violation: accept requires 2\.0 > 2\.0/],
+    ['0',/Protocol contract violation: accept requires 0\.0 > 2\.0/],
+  ]) {
+    const result=compile(declared(value),'static_contract');
+    assert.notEqual(result.status,0,value);
+    assert.match(result.stderr,pattern);
+  }
+  // Everything the static evaluator cannot decide is left to the runtime check:
+  // a satisfying literal, a variable, a computed value, a negated literal and a
+  // non-numeric field are all unproven rather than rejected.
+  for (const value of ['5','3','value','1+2','-1','size']) {
+    const result=compile(declared(value),'static_contract');
+    assert.equal(result.status,0,`${value}: ${result.stderr}`);
+  }
+  // A protocol method reached through a plain name is not resolved either.
+  const plain=compile(`${protocol}Positive object={size=3,rel accept(x) true}\nmethod=object.accept\nmethod(1)`,
+    'static_contract_alias');
+  assert.equal(plain.status,0,plain.stderr);
 });
 test('trace flag works before and after the file, with nested calls and ordinary output', () => {
   const source='rel q(x) x=1\nrel p(x)\n    q(x)\n    print(x)\np(value)';
@@ -271,7 +328,9 @@ test('trace flag works before and after the file, with nested calls and ordinary
   assert.match(native.stdout,/\|string\.size\("abc",#var\d+\)/);
   assert.match(native.stdout,/\|pl::string\("abc"\)/);
   assert.match(native.stdout,/\|print\(3\)/);
-  const violation='Protocol(P,{rel p(Number x) x>2})\nP o={rel p(Number x) true}\no.p(1)';
+  // The operand is a variable, so the contract is deferred to the runtime
+  // check and still surfaces as cosmos_protocol_behavior.
+  const violation='Protocol(P,{rel p(Number x) x>2})\nP o={rel p(Number x) true}\nn=1\no.p(n)';
   const debug=spawnSync(swi,['-q','-s',repl,'--','-q',violation,'-t'],{cwd:temporary,encoding:'utf8',timeout:15000});
   assert.notEqual(debug.status,0);
   assert.match(debug.stderr,/cosmos_protocol_behavior/);
@@ -432,11 +491,21 @@ test('the identical generated compiler runs in the shipped SWI WASM engine', asy
   const require = createRequire(import.meta.url);
   const SWIPL = require(join(root, 'canvas/prolog-wasm/swipl-bundle.js'));
   const engine = await SWIPL({ arguments: ['-q'], print() {}, printErr() {} });
-  for (const dir of ['/src', '/libs', '/compiler', '/compiler/generated', '/compiler/platform']) engine.FS.mkdir(dir);
-  const files = ['src/swi.pl', 'src/reif.pl', 'compiler/platform/terms.pl', 'compiler/platform/runtime.pl', 'compiler/platform/codec.pl',
-    ...['parser', 'normalize', 'resolve', 'check', 'emit_prolog', 'compiler'].map(name => `compiler/generated/${name}.pl`),
-    ...['string', 'list', 'table', 'math', 'logic'].map(name => `libs/${name}.pl`)];
-  for (const file of files) engine.FS.writeFile(`/${file}`, readFileSync(join(root, file), 'utf8'));
+  for (const dir of ['/src', '/libs', '/compiler/generated', '/compiler/platform']) engine.FS.mkdir(dir);
+  // The runtime lives in compiler/ on disk but is mounted at /src in the WASM
+  // filesystem, so the virtual layout is declared explicitly instead of being
+  // derived from the repository path.
+  const files = {
+    '/src/swi.pl': 'compiler/swi.pl',
+    '/src/reif.pl': 'compiler/reif.pl',
+    '/compiler/platform/terms.pl': 'compiler/platform/terms.pl',
+    '/compiler/platform/runtime.pl': 'compiler/platform/runtime.pl',
+    '/compiler/platform/codec.pl': 'compiler/platform/codec.pl',
+    ...Object.fromEntries(['parser', 'normalize', 'resolve', 'check', 'emit_prolog', 'compiler']
+      .map(name => [`/compiler/generated/${name}.pl`, `compiler/generated/${name}.pl`])),
+    ...Object.fromEntries(['string', 'list', 'table', 'math', 'logic'].map(name => [`/libs/${name}.pl`, `libs/${name}.pl`]))
+  };
+  for (const [target, file] of Object.entries(files)) engine.FS.writeFile(target, readFileSync(join(root, file), 'utf8'));
   const query = goal => {
     const answer = engine.prolog.query(goal).once();
     assert.equal(answer.error, undefined, answer.message);

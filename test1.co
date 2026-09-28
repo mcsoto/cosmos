@@ -62,3 +62,8 @@ if(true)
 	print('>'+i)
 	s2='-'
 	print('>'+i)
+	print(''+#s3)
+	list.choice([1,2,3],x)
+
+//a=string.slice(s,0,i)
+//a=s[0:i]

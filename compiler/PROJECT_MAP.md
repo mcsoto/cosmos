@@ -32,7 +32,7 @@ flowchart TD
     Check --> Interface[check.co: exported interface]
     Interface --> CIF[Data-only .cif sidecar]
     PL --> SWI[SWI-Prolog execution]
-    Runtime[src/swi.pl + reif.pl + platform/runtime.pl] --> SWI
+    Runtime[compiler/swi.pl + reif.pl + platform/runtime.pl] --> SWI
 ```
 
 The actual orchestration order is **parse → normalize → check → resolve → emit**. Checking also calls the resolver for built-in functor names. The emitter receives the resolver API for scope/capture work, so the dependencies are not strictly linear.
@@ -64,8 +64,8 @@ Paths in this table are relative to `compiler/`. These are the primary files to 
 | `compiler/platform/runtime.pl` | Operations used by emitted code: object access, contracts, callable execution, tracing and generic host boundary. Host implementation is outside this review. |
 | `compiler/platform/codec.pl` | Tagged values and query outcomes; retains shared variable identities, distinguishes strings from lists. |
 | `compiler/platform/swi-result.mjs` | JavaScript decoding of those tagged results. |
-| `src/swi.pl` | Base language operations, arithmetic/iteration, closures, module loading and cached standard libraries. |
-| `src/reif.pl` | Reification support loaded by `swi.pl`. |
+| `compiler/swi.pl` | Base language operations, arithmetic/iteration, closures, module loading and cached standard libraries. |
+| `compiler/reif.pl` | Reification support loaded by `swi.pl` through `ensure_loaded(reif)`. SWI resolves that against its own library first and only falls back to this bundled copy, so an engine that already ships `reif` ignores it. |
 | `libs/`, `userlibs/` | Runtime library search roots. Individual libraries were not exhaustively reviewed. |
 
 Generated programs use predicate names prefixed with the module identifier, rather than isolated SWI modules. Their exported entry is a predicate named after that identifier with one output argument. This makes namespace ownership and session cleanup important.
@@ -91,11 +91,11 @@ flowchart LR
 
 `compiler/build.mjs` invokes a fresh SWI process for each of six modules at each stage, compares stage 2 and generated `.pl` files, then records SHA-256 hashes. The comparison does not include `.cif` files. The manifest covers 23 source/seed/generated/runtime files, not every platform adapter or interface.
 
-The build also unconditionally writes a browser asset bundle. That is an external build dependency, not a reviewed browser component. The full build was not run during this review to avoid changing excluded Canvas assets.
+The build no longer writes anything outside `compiler/`. Browser asset bundles are packaging for the Canvas/editor front ends and are produced by a separate, explicitly invoked step, so they are not an external dependency of the compiler build.
 
 | Repository area | How to treat it |
 |---|---|
-| `compiler/src`, `compiler/platform`, root `src/swi.pl` and `src/reif.pl` | Active implementation. |
+| `compiler/src`, `compiler/platform`, `compiler/swi.pl` and `compiler/reif.pl` | Active implementation. |
 | `compiler/seed`, `compiler/generated` | Bootstrap input and runnable generated artifacts. |
 | `tests/compiler` | Current compiler regression suite and executable-guide checks. |
 | `compiler/GUIDE.md` | Current user-facing language guide. |
@@ -143,7 +143,7 @@ These are code-inspection observations; failure injection was not performed.
 | State or temporal-loop semantics | `normalize.co`, then emitter and runtime operations |
 | Types, modes, protocols, imported API checks | `check.co` and `.cif` handling in `driver.pl` |
 | Closure captures or multi-clause scope | `resolve.co`, then `emit_prolog.co` |
-| Generated execution behavior | `emit_prolog.co`, `platform/runtime.pl`, `src/swi.pl` |
+| Generated execution behavior | `emit_prolog.co`, `platform/runtime.pl`, `compiler/swi.pl` |
 | CLI, executable launch or file lookup | `cli.pl`, `repl.pl`, `driver.pl`, root launchers |
 | Query values or session lifetime | `session.pl`, `terms.pl`, `codec.pl`, `swi-result.mjs` |
 | Bootstrap reproducibility | `build.mjs`, `platform/build.pl`, seed and manifest |

@@ -1,0 +1,4 @@
+// Space host facade. The embedding supplies the actual Canvas2D object.
+space=js::space
+space.canvas=js::canvas
+export(space)

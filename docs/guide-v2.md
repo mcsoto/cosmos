@@ -7,7 +7,7 @@ The feature ratings below describe the self-hosted SWI-Prolog compiler.
 
 This companion to the [full guide](guide.md) and [introductory guide](guide-simple.md) covers the newer features those guides do not explain. It describes the intended language behavior, including contracts that the compiler does not yet enforce completely.
 
-Support notes refer to the active `compiler/` tree and `src/swi.pl` runtime. Browser and packaged copies use the same generated SWI compiler. **Supported** means the described basic behavior is implemented; **partial** means important parts of the contract remain incomplete; **unsupported** means the described behavior is a design target. Accepting a declaration does not necessarily mean its full contract is checked.
+Support notes refer to the active `compiler/` tree and the `compiler/swi.pl` runtime. Browser and packaged copies use the same generated SWI compiler. **Supported** means the described basic behavior is implemented; **partial** means important parts of the contract remain incomplete; **unsupported** means the described behavior is a design target. Accepting a declaration does not necessarily mean its full contract is checked.
 
 ## Support at a glance
 

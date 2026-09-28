@@ -30,7 +30,7 @@ for (const name of modules) for (const [directory, extension] of [['src', 'co'],
   const file = `compiler/${directory}/${name}.${extension}`;
   hashes[file] = createHash('sha256').update(readFileSync(join(root, file))).digest('hex');
 }
-for (const file of ['src/swi.pl','src/reif.pl','compiler/platform/runtime.pl','compiler/platform/terms.pl','compiler/platform/codec.pl']) {
+for (const file of ['compiler/swi.pl','compiler/reif.pl','compiler/platform/runtime.pl','compiler/platform/terms.pl','compiler/platform/codec.pl']) {
   hashes[file] = createHash('sha256').update(readFileSync(join(root,file))).digest('hex');
 }
 writeFileSync(join(root, 'compiler/generated/manifest.json'), JSON.stringify({
@@ -38,16 +38,7 @@ writeFileSync(join(root, 'compiler/generated/manifest.json'), JSON.stringify({
   verification: 'stage2 and generated are byte-identical', sha256: hashes,
 }, null, 2) + '\n');
 
-// The browser session runs these exact files from SWI-WASM.  Generate the
-// bundle as part of the normal compiler build so it cannot silently drift.
-const browserFiles = [
-  'src/swi.pl', 'src/reif.pl',
-  'compiler/platform/driver.pl', 'compiler/platform/runtime.pl', 'compiler/platform/terms.pl',
-  'compiler/platform/codec.pl', 'compiler/platform/session.pl',
-  ...modules.map(name => `compiler/generated/${name}.pl`)
-];
-const browserAssets = Object.fromEntries(browserFiles.map(file => {
-  const key = file.replace(/^compiler\//, '');
-  return [key, readFileSync(join(root, file)).toString('base64')];
-}));
-//writeFileSync(join(root, 'canvas/cosmos-swipl-assets.js'), `window.CosmosSwiplAssets = Object.freeze(${JSON.stringify(browserAssets, null, 2)});\n`); console.log(`Generated browser SWI assets from ${browserFiles.length} runtime/compiler files.`);
+// Browser and Electron front ends need these same artifacts as base64 bundles,
+// but that packaging belongs to the Canvas/editor side of the project rather
+// than to the compiler. This build therefore never writes outside compiler/;
+// produce any browser bundle from a separate, explicitly invoked step.

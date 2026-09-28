@@ -13,6 +13,6 @@ main :- compiler_load_runtime,consult('tests/compiler/v2.pl'),v2(Api),
  once(call_cl(Valid,[])),
  get_(Api,"exact",Exact),once(call_cl(Exact,[One])),One=1.0,
  get_(Api,"tooMany",Many),raises(call_cl(Many,[_]),error(cosmos_determinism("tooMany","det",2),_)),
- get_(Api,"badProtocol",BadProtocol),raises(call_cl(BadProtocol,[]),error(cosmos_protocol_behavior("Positive","accept"),_)),
+ get_(Api,"badProtocol",BadProtocol),raises(call_cl(BadProtocol,[1.0]),error(cosmos_protocol_behavior("Positive","accept"),_)),
  get_(Api,"badType",BadType),raises(call_cl(BadType,[]),error(cosmos_type_error("String",7.0),_)),
  writeln('V2 passed').

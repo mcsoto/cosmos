@@ -26,6 +26,8 @@ functor(ExportDecl,Functor)
 functor(FieldExpr,Functor)
 functor(TrueGoal,Functor)
 functor(IsGoal,Functor)
+functor(CompareGoal,Functor)
+functor(SliceExpr,Functor)
 functor(BinaryExpr,Functor)
 functor(UnaryExpr,Functor)
 functor(SizeExpr,Functor)
@@ -157,6 +159,15 @@ rel expression_type(node,schemas,env,typeName)
     elseif(node=SizeExpr(child,_))
         walk(child,schemas,env)
         typeName='Real'
+    elseif(node=SliceExpr(subject,_,_,_))
+        expression_type(subject,schemas,env,subjectType)
+        choose(subjectType='String')
+            typeName='String'
+        elseif(subjectType='List')
+            typeName='List'
+        else
+            walk(node,schemas,env)
+            typeName='Any'
     elseif(node=FieldExpr(owner,key,loc) and known_table(owner,schemas,env,entries) and unsafeNot(field_path(node,path) and imported_path(path,schemas)))
         choose(pl::member(Entry(LiteralExpr(key,_),value),entries))
             expression_type(value,schemas,env,typeName)
@@ -263,10 +274,7 @@ rel protocol_shape([member|members],entries,schemas,env,loc)
         expression_type(value,schemas,env,actual)
         compatible(actual,expected,schemas,loc)
     elseif(member=ClosureExpr(annotation,params,_,_))
-        choose(pl::is_assoc(annotation))
-            name=annotation.name
-        else
-            name=annotation
+        member_name(annotation,name)
         protocol_entry(name,entries,loc,value)
         method_shape(value,#params,loc)
         method_modes(value,params,schemas,loc)
@@ -430,6 +438,9 @@ rel outputs([p|ps],[arg|args],schemasBefore,before,schemasAfter,after)
         bound=before
     outputs(ps,args,middle,bound,schemasAfter,after)
 rel flow_call(name,args,loc,schemas,callables,env,bound,after,known)
+    // A method call reaches this relation under its field path, so the
+    // protocol contract is checked before the callable lookup below.
+    check_protocol_contract(name,args,loc,schemas,env)
     choose(pl::get_assoc('$call_'+name,env,options) or pl::get_assoc(name,callables,options))
         choose(pl::member(candidate,options) and #candidate=#args)
             true
@@ -482,7 +493,12 @@ rel flow(node,schemas,callables,env,bound,after,known)
         flow_call(path,args,loc,schemas,callables,env,bound,after,known)
     elseif(node=TypedDecl(words,name,value,loc))
         annotation_type(words,typeName)
-        pl::set_(env,name,typeName,typed)
+        pl::set_(env,name,typeName,declared)
+        declared_protocol(typeName,schemas,protocol)
+        choose(protocol='none')
+            typed=declared
+        else
+            pl::set_(declared,'$protocol_'+name,protocol,typed)
         choose(value=None)
             after=typed
             fresh='$fresh_'+name
@@ -852,4 +868,131 @@ rel validate_call_list([],known,schemas) true
 rel validate_call_list([x|xs],known,schemas)
     validate_calls(x,known,schemas)
     validate_call_list(xs,known,schemas)
+
+// ============================================================================
+// COMPILE-TIME PROTOCOL CONTRACT EVALUATION
+// ============================================================================
+// A protocol method body constrains every conforming value. The runtime
+// already enforces it through cosmos_protocol_behavior/2, but only when
+// cosmos_debug_contracts is set, and only after the program is running. When
+// both operands of a comparison are already known here, the call is decided
+// now and a constraint that cannot hold never reaches code generation.
+//
+// Evaluation is deliberately conservative and only ever rejects a call it can
+// prove false. A variable operand, an unevaluated expression, a different
+// operator, or a method this protocol does not declare all defer to the
+// existing runtime check.
+
+rel check_protocol_contract(name,args,loc,schemas,env)
+    choose(protocol_call(name,schemas,env,members,method))
+        find_method_body(members,method,params,body)
+        choose(params='none')
+            true
+        elseif(#params=#args)
+            pl::new(empty)
+            build_ct_env(params,args,empty,ct_env)
+            evaluate_constraint(body,ct_env,method,loc)
+        else
+            true
+    else
+        true
+
+// Records a protocol-typed binding so a later method call on it can be matched
+// against the declared contract. The key is separate from the plain type
+// because the UnifyGoal branch below narrows an annotated binding to its
+// structural type, which would otherwise lose the protocol.
+rel declared_protocol(typeName,schemas,protocol)
+    choose(pl::get_assoc(typeName,schemas,spec) and pl::get_assoc('kind',spec,'protocol'))
+        protocol=typeName
+    else
+        protocol='none'
+
+// Identifies a method call on a protocol-typed receiver and fails for anything
+// else. A plain name, a plain table, a closure or a value that was only
+// conformed with `is` has no recorded protocol, so there is no contract to
+// prove and the call defers to the runtime. This belongs in the condition
+// above because a failed guard must reach the else branch rather than fail the
+// enclosing goal.
+rel protocol_call(name,schemas,env,members,method)
+    pl::split_string(name,'.','',[owner,method])
+    pl::get_assoc('$protocol_'+owner,env,typeName)
+    pl::get_assoc(typeName,schemas,spec)
+    pl::get_assoc('kind',spec,'protocol')
+    pl::get_assoc('fields',spec,members)
+
+// A protocol member is either a field declaration or a method closure. Only a
+// closure carries a body, so 'none' means this protocol declares no such
+// method and nothing at all can be proven about the call.
+rel find_method_body(members,method,params,body)
+    choose(pl::member(ClosureExpr(annotation,params,body,_),members) and
+        member_name(annotation,method))
+        true
+    else
+        params='none'
+        body='none'
+
+// Method declarations are named either directly or by an annotation record,
+// depending on how the protocol was written.
+rel member_name(annotation,name)
+    choose(pl::is_assoc(annotation))
+        pl::get_assoc('name',annotation,name)
+    else
+        name=annotation
+
+// Binds protocol parameter names to call-site literals. An argument that is
+// not a literal number stays unbound, which is what makes every comparison
+// using it defer to the runtime.
+rel build_ct_env([],[],before,before) true
+rel build_ct_env([param|params],[arg|args],before,after)
+    choose(parameter_name(param,name) and arg=LiteralExpr(value,_) and pl::number(value))
+        pl::set_(before,name,value,middle)
+    else
+        middle=before
+    build_ct_env(params,args,middle,after)
+rel parameter_name(TypedParam(_,name,_),name) true
+rel parameter_name(VarExpr(name,_),name) true
+
+rel evaluate_constraint(AndGoal(goals),ct_env,method,loc)
+    evaluate_goals(goals,ct_env,method,loc)
+rel evaluate_constraint(body,ct_env,method,loc)
+    choose(pl::is_list(body))
+        evaluate_goals(body,ct_env,method,loc)
+    else
+        evaluate_goal(body,ct_env,method,loc)
+rel evaluate_goals([],ct_env,method,loc) true
+rel evaluate_goals([goal|goals],ct_env,method,loc)
+    evaluate_goal(goal,ct_env,method,loc)
+    evaluate_goals(goals,ct_env,method,loc)
+
+rel evaluate_goal(goal,ct_env,method,loc)
+    choose(goal=CompareGoal(op,left,right,_) and static_operand(left,ct_env,lhs) and
+        static_operand(right,ct_env,rhs))
+        comparison(op,lhs,rhs,verdict)
+        choose(verdict='fails')
+            throw(CompileError('Protocol contract violation: '+method+' requires '+lhs+' > '+rhs,loc))
+        else
+            true
+    else
+        true
+
+// An operand is only known when the protocol body and the call site agree on a
+// literal number. Anything else - a variable, a nested expression, a non-numeric
+// literal - leaves the comparison unevaluated.
+rel static_operand(node,ct_env,value)
+    choose(node=LiteralExpr(literal,_) and pl::number(literal))
+        value=literal
+    elseif(node=VarExpr(name,_))
+        pl::get_assoc(name,ct_env,value)
+        pl::number(value)
+
+// '>' is the only operator proven here, so it is the only one that can report a
+// failure. Every other operator is unknown and therefore deferred.
+rel comparison('>',lhs,rhs,verdict)
+    choose(lhs>rhs)
+        verdict='holds'
+    else
+        verdict='fails'
+rel comparison(op,lhs,rhs,'unknown')
+    unsafeNot(op='>')
+
 export({check=check,analyze=analyze,interface=interface,imports=import_names,imported_functors=imported_functors})

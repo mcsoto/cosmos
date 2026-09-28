@@ -7,7 +7,7 @@ run :-
     (Args=[File,Module] -> true
     ; Args=[File] -> compiler_file_module(File,Module)
     ; format(user_error,'Usage: swipl -q -s compiler/platform/run.pl -- program.pl [module]~n',[]),halt(2)),
-    compiler_platform(Here),directory_file_path(Here,'../../src/swi.pl',Runtime),consult(Runtime),
+    compiler_platform(Here),directory_file_path(Here,'../swi.pl',Runtime),consult(Runtime),
     directory_file_path(Here,'runtime.pl',Operations),consult(Operations),
     absolute_file_name(File,Absolute),file_directory_name(Absolute,Directory),
     directory_file_path(Directory,'?',Local),nb_getval(path,Previous),

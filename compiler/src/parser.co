@@ -42,6 +42,7 @@ functor(SizeExpr, Functor)
 functor(NextExpr, Functor)
 functor(FieldExpr, Functor)
 functor(IndexExpr, Functor)
+functor(SliceExpr, Functor)
 functor(SetFieldExpr, Functor)
 functor(ListExpr, Functor)
 functor(DictExpr, Functor)
@@ -319,6 +320,36 @@ rel eat(tokens, expected, rest, token)
         rest = tail
     else
         throw(ParseError('Unexpected token', expected, tokens))
+
+// Splits a bracket body on its first top-level ':'. The colon is located here
+// instead of being left to the expression grammar, which would bind it to the
+// nearest primary and bury the range inside a larger expression: in
+// `s[i+1:#s]` the grammar yields `i + (1:s)`, not a range.
+//
+// The walk is bounded by this bracket's own closing ']' and counts brackets
+// inside the body, so only a top-level colon counts and a colon belonging to a
+// later statement is never reached. Running out of body, or reaching the
+// closing bracket, reports 'none' rather than failing, which keeps the caller
+// total.
+rel split_range(tokens, from, to)
+    range_split(tokens, 0, [], from, to)
+rel range_split([Token(']',_,_,_)|_], depth, _, 'none', 'none')
+    depth = 0
+rel range_split([Token(':',_,_,_)|rest], 0, acc, acc, rest)
+    true
+rel range_split([Token('(',_,_,_)|tail], depth, acc, from, to)
+    range_split(tail, depth+1, acc, from, to)
+rel range_split([Token('[',_,_,_)|tail], depth, acc, from, to)
+    range_split(tail, depth+1, acc, from, to)
+rel range_split([Token(')',_,_,_)|tail], depth, acc, from, to)
+    range_split(tail, depth-1, acc, from, to)
+rel range_split([Token(']',_,_,_)|tail], depth, acc, from, to)
+    range_split(tail, depth-1, acc, from, to)
+rel range_split([head|tail], depth, acc, from, to)
+    pl::append(acc, [head], longer)
+    range_split(tail, depth, longer, from, to)
+rel range_split([], _, _, 'none', 'none')
+    true
 
 rel skip_newlines(tokens, rest)
     choose(is_token(tokens, 'NEWLINE'))
@@ -891,6 +922,8 @@ rel expression_loc(FieldExpr(_,_,loc), loc)
     true
 rel expression_loc(IndexExpr(_,_,loc), loc)
     true
+rel expression_loc(SliceExpr(_,_,_,loc), loc)
+    true
 rel expression_loc(SetFieldExpr(_,_,loc), loc)
     true
 rel expression_loc(ListExpr(_,_,loc), loc)
@@ -994,9 +1027,15 @@ rel parse_postfix_tail(tokens, base, expression, rest)
     elseif(is_token(tokens, '['))
         token_loc(tokens, loc)
         eat(tokens, '[', t1, _)
-        parse_term(t1, index, t2)
+        split_range(t1, from, to)
+        choose(from='none')
+            parse_term(t1, index, t2)
+            combined = IndexExpr(base, index, loc)
+        else
+            parse_term(from, start, ts)
+            parse_term(to, end, t2)
+            combined = SliceExpr(base, start, end, loc)
         eat(t2, ']', t3, _)
-        combined = IndexExpr(base, index, loc)
         parse_postfix_tail(t3, combined, expression, rest)
     elseif(is_token(tokens, ':'))
         token_loc(tokens, loc)

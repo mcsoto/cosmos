@@ -76,6 +76,7 @@ remain its single goal node. A nested named relation in a body is parsed as a
 | `SizeExpr(operand, loc)` | `#operand`. |
 | `FieldExpr(owner, key, loc)` | `owner.key`; `key` is a string. |
 | `IndexExpr(owner, key, loc)` | `owner[key]`; `key` is an expression. |
+| `SliceExpr(owner, from, to, loc)` | Range `owner[from:to]`, lowered to the host `slice_/4`. Both bounds are expressions. |
 | `SetFieldExpr(field, value, loc)` | Functional update `owner.key:value`; `field` is a `FieldExpr`. |
 | `ListExpr(items, tail, loc)` | List literal. `tail` is `None` for an ordinary closed list. |
 | `DictExpr(entries, loc)` | Table literal. Each entry is `Entry(key, value)` with expression children. |

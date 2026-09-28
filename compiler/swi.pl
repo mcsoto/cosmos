@@ -86,6 +86,9 @@ add_(X,Y,Z) :- is_list(X),!,append(X,Y,Z).
 add_(X,Y,Z) :- is_assoc(X),!,default_lib("table",T),get_(T,"update",Clos),call_cl(Clos,[X,Y,Z]).
 %calc(X+Y,Z) :- ((string(X),string(Y))->s_concat(X,Y,Z);((number(X),number(Y))->{Z = X+Y};Z = X+Y)).
 
+slice_(S,X,Y,Z) :- string(S),!,s_slice(S,X,Y,Z).
+slice_(S,X,Y,Z) :- is_list(S),slice(S,X,Y,Z).
+
 cosmos_string(X,S) :- var(X),!,freeze(X,cosmos_string(X,S)).
 cosmos_string(X,X) :- string(X),!.
 cosmos_string(X,S) :- number(X),!,number_string(X,S).
