@@ -1,0 +1,1 @@
+t("module","test2",<,t("fields",t,-,t("exports",t,-,t,t),t("format",1.0,-,t,t)),t("schemas",t,-,t,t)).

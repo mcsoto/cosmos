@@ -453,7 +453,7 @@ tload(F) :- exists_source(F), %write("file:"),writeln(F),
 	ensure_loaded(F).
 cload(F) :- exists_source(F), ensure_loaded(F).
 
-load_any([X|L],Mod) :- replace(X,"?",Mod,F),(tload(F) -> true ; load_any(L,Mod)).
+load_any([X|L],Mod) :- replace(X,"?",Mod,F),(cload(F) -> true ; load_any(L,Mod)).
 
 crequire(Mod,Y,_) :-
 	% search PATH; standalone compiler invocations may not set it

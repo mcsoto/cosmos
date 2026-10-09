@@ -1,4 +1,255 @@
-// Space host facade. The embedding supplies the actual Canvas2D object.
-space=js::space
-space.canvas=js::canvas
-export(space)
+// Space - graphics API for Cosmos (native XPCE backend).
+//
+// The browser/JS backend is disabled for now:
+//   space=js::space
+//   space.canvas=js::canvas
+//   export(space)
+//
+// Native programs use the XPCE implementation instead.
+//
+// This module is a forwarding layer over libs/space_xpce.co. Re-exporting the
+// required module on its own does not work: `require('space_xpce', sp)` plus
+// `export(sp)` leaves the interface with no members at all, because an
+// `export` of a require-bound name records neither a callable nor a field
+// (see compiler_issue.txt). The relations below restore the surface so
+// `require('space', sp)` gives consumers the same checking as a direct
+// `require('space_xpce', sp)`.
+//
+// Two rules keep this honest:
+//   1. Signatures mirror libs/space_xpce.co exactly, including the parameter
+//      that carries the result last. That last-parameter rule is what lets
+//      `setFont(newFont(24,'sans','normal'))` work in value position.
+//   2. No parameter is annotated here. The Space API declares no types, so
+//      adding them would make this entry point stricter than space_xpce and
+//      reject programs that work today. Annotate both files together, or
+//      neither.
+//
+// A method added to space_xpce.co must be added here as well, or it stays
+// invisible to anyone requiring 'space'.
+require('space_xpce', xpce)
+
+// ---- Window lifecycle ----
+
+rel init(width, height)
+    xpce.init(width, height)
+
+rel start(intervalMs, callbacks, initialState)
+    xpce.start(intervalMs, callbacks, initialState)
+
+rel startCanvas(fps, callbacks, initialState)
+    xpce.startCanvas(fps, callbacks, initialState)
+
+rel quit()
+    xpce.quit()
+
+rel dispose()
+    xpce.dispose()
+
+rel loadImage(source, name)
+    xpce.loadImage(source, name)
+
+// ---- Graphics ----
+
+rel setBackgroundColor(color)
+    xpce.graphics.setBackgroundColor(color)
+
+rel getBackgroundColor(color)
+    xpce.graphics.getBackgroundColor(color)
+
+rel setColor(color)
+    xpce.graphics.setColor(color)
+
+rel getColor(color)
+    xpce.graphics.getColor(color)
+
+rel clear(color)
+    xpce.graphics.clear(color)
+
+rel rectangle(mode, x, y, width, height)
+    xpce.graphics.rectangle(mode, x, y, width, height)
+
+rel line(points)
+    xpce.graphics.line(points)
+
+rel circle(mode, x, y, radius)
+    xpce.graphics.circle(mode, x, y, radius)
+
+rel ellipse(mode, x, y, radiusX, radiusY)
+    xpce.graphics.ellipse(mode, x, y, radiusX, radiusY)
+
+rel arc(mode, arcType, x, y, radius, angle1, angle2)
+    xpce.graphics.arc(mode, arcType, x, y, radius, angle1, angle2)
+
+rel polygon(mode, points)
+    xpce.graphics.polygon(mode, points)
+
+rel print(text, x, y)
+    xpce.graphics.print(text, x, y)
+
+rel printf(text, x, y, width, align)
+    xpce.graphics.printf(text, x, y, width, align)
+
+// Result last, so newFont(...) also works nested in value position.
+rel newFont(size, family, style, font)
+    xpce.graphics.newFont(size, family, style, font)
+
+rel setFont(font)
+    xpce.graphics.setFont(font)
+
+rel getFont(font)
+    xpce.graphics.getFont(font)
+
+rel getDimensions(size)
+    xpce.graphics.getDimensions(size)
+
+rel getWidth(w)
+    xpce.graphics.getWidth(w)
+
+rel getHeight(h)
+    xpce.graphics.getHeight(h)
+
+rel push()
+    xpce.graphics.push()
+
+rel pop()
+    xpce.graphics.pop()
+
+rel origin()
+    xpce.graphics.origin()
+
+rel translate(x, y)
+    xpce.graphics.translate(x, y)
+
+rel rotate(angle)
+    xpce.graphics.rotate(angle)
+
+rel scale(x, y)
+    xpce.graphics.scale(x, y)
+
+rel shear(x, y)
+    xpce.graphics.shear(x, y)
+
+rel setLineWidth(width)
+    xpce.graphics.setLineWidth(width)
+
+rel getLineWidth(w)
+    xpce.graphics.getLineWidth(w)
+
+rel setLineStyle(style)
+    xpce.graphics.setLineStyle(style)
+
+rel setScissor(x, y, width, height)
+    xpce.graphics.setScissor(x, y, width, height)
+
+rel clearScissor()
+    xpce.graphics.clearScissor()
+
+rel getScissor(scissor)
+    xpce.graphics.getScissor(scissor)
+
+rel draw(image, x, y)
+    xpce.graphics.draw(image, x, y)
+
+rel refresh()
+    xpce.graphics.refresh()
+
+// ---- Input (one table, reachable as input / keyboard / mouse) ----
+
+rel isDown(key)
+    xpce.input.isDown(key)
+
+rel getX(x)
+    xpce.input.getX(x)
+
+rel getY(y)
+    xpce.input.getY(y)
+
+rel getPosition(pos)
+    xpce.input.getPosition(pos)
+
+rel buttonDown(button)
+    xpce.input.buttonDown(button)
+
+// ---- Timer ----
+
+rel getTime(time)
+    xpce.timer.getTime(time)
+
+rel getDelta(delta)
+    xpce.timer.getDelta(delta)
+
+rel getFPS(fps)
+    xpce.timer.getFPS(fps)
+
+// The nested tables mirror the shape of space_xpce's own export, so consumer
+// call sites are unchanged: sp.init, sp.graphics.clear, sp.keyboard.isDown.
+export({
+    init = init,
+    start = start,
+    startCanvas = startCanvas,
+    quit = quit,
+    dispose = dispose,
+    loadImage = loadImage,
+    graphics = {
+        setBackgroundColor = setBackgroundColor,
+        getBackgroundColor = getBackgroundColor,
+        setColor = setColor,
+        getColor = getColor,
+        clear = clear,
+        rectangle = rectangle,
+        line = line,
+        circle = circle,
+        ellipse = ellipse,
+        arc = arc,
+        polygon = polygon,
+        print = print,
+        printf = printf,
+        newFont = newFont,
+        setFont = setFont,
+        getFont = getFont,
+        getDimensions = getDimensions,
+        getWidth = getWidth,
+        getHeight = getHeight,
+        push = push,
+        pop = pop,
+        origin = origin,
+        translate = translate,
+        rotate = rotate,
+        scale = scale,
+        shear = shear,
+        setLineWidth = setLineWidth,
+        getLineWidth = getLineWidth,
+        setLineStyle = setLineStyle,
+        setScissor = setScissor,
+        clearScissor = clearScissor,
+        getScissor = getScissor,
+        draw = draw,
+        refresh = refresh
+    },
+    input = {
+        isDown = isDown,
+        getX = getX,
+        getY = getY,
+        getPosition = getPosition,
+        buttonDown = buttonDown
+    },
+    keyboard = {
+        isDown = isDown,
+        getX = getX,
+        getY = getY,
+        getPosition = getPosition,
+        buttonDown = buttonDown
+    },
+    mouse = {
+        isDown = isDown,
+        getX = getX,
+        getY = getY,
+        getPosition = getPosition,
+        buttonDown = buttonDown
+    },
+    timer = {
+        getTime = getTime,
+        getDelta = getDelta,
+        getFPS = getFPS
+    }
+})

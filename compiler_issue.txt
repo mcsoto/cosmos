@@ -1,0 +1,104 @@
+Compiler issues found while auditing the XPCE / Space integration
+===============================================================
+
+Found during the review of misc/simple_xpce.co and the libs/space*.co backend.
+None of these stop a program from compiling. What they cost is *checking*: a
+member reached through a re-exported module is silently unchecked, and the
+moment an interface file is reachable the same code is rejected outright.
+
+
+1. export(<name bound by require>) records nothing at all
+--------------------------------------------------------
+
+A module that requires another module and re-exports its alias
+
+    require('space_xpce', sp)
+    export(sp)                       % libs/space.co
+
+produces an interface with an empty "exports" map *and* an empty "fields" map
+except "$call". Every member reached through it is then rejected:
+
+    require('space', sp)
+    sp.init(320,480)                 -> Unknown imported member: sp.init
+    sp.graphics.clear('#fff')        -> Unknown imported member: sp.graphics.clear
+
+Note the asymmetry: without an interface file present the same source compiles
+clean, so the program looks checked when it is not. misc/ has no space.cif, so
+misc/simple_xpce.co and misc/demo_space_xpce.co currently take that path.
+
+Cause, in src/check.co:
+
+  * imported_calls/4 (645) registers a required unit under "<alias>.<member>"
+    keys via import_members/4 (652). A bare "<alias>" key is only registered
+    when the unit itself exports "$call"; space_xpce does not.
+  * export_bindings/3 (781) collects names from UnifyGoal and TypedDecl only.
+    A require binds its alias through a CallGoal, so "sp" is not in bindings.
+  * expand_export/4 (788) therefore leaves VarExpr(sp) untouched.
+  * public_exports/5 (676) reaches public_callable/3 (661), which does
+    get_assoc(sp, calls, params) and finds nothing, so the clause falls
+    through to middle=before.
+
+Fix: have expand_export/4 (or export_bindings/3) treat a name bound by a
+require call as re-exporting the required unit, copying unit.exports under the
+same "<alias>.<member>" keys import_members/4 already builds for direct
+requires. A direct require already carries types and modes correctly
+(verified), so the re-export only needs to forward the same entries.
+
+Worked around in libs/space.co by forwarding each method through a local rel
+(see issue 2).
+
+
+2. export({member = alias.member}) records a field but drops the contract
+------------------------------------------------------------------------
+
+    require('mylib', m)
+    export({twice = m.twice})        % builds, but see below
+
+emits fields = {twice: Relation} and an empty exports map. A consumer's
+r.twice('str', y) then resolves as a callable of type Relation, which carries
+no parameters, so no type or mode is checked and the bad call is accepted.
+Compare the non-re-exporting module, which records the full contract:
+
+    exports = {twice: [[In Number x, Out Number y]]}
+
+So this spelling appears to work but silently disables checking, which is worse
+than the outright rejection in issue 1. Same fix as issue 1; until then a
+re-exporting module must declare real forwarding relations to get contracts
+into its interface.
+
+Worked around in libs/space.co, which is now a forwarding layer of one rel per
+method behind a nested export table. Verified to restore arity and unknown-
+member checking for `require('space', sp)`, with both apps under misc/ still
+compiling once the interface is made reachable. The cost is a second list of
+the API to keep in step.
+
+
+3. Nothing verifies checked-in .cif sidecars against their .co sources
+---------------------------------------------------------------------
+
+compiler/build.mjs rebuilds and verifies the six compiler modules and fails if
+they differ. It says nothing about libs/*.cif, so an edited library keeps a
+stale interface until someone recompiles it by hand.
+
+libs/space.cif was in exactly that state: it still advertised members that no
+longer existed in libs/space_xpce.co, including duplicate overloads
+(isDown/1 alongside isDown/2, clear/0 alongside clear/1, and two entries each
+for setScissor, draw, start and startCanvas) from an intermediate revision of
+the source. Because issue 1 leaves both maps empty, no consumer was affected --
+but a stale interface is a trap for whoever reads it.
+
+Fix: extend the build to recompile every libs/*.co and compare the emitted
+.pl/.cif against what is checked in.
+
+
+Known and intentional
+---------------------
+
+Host goals carry no inferred mode effects. A host call such as
+pl::string_length('abc', x) binds x, but the static Out-mode check still sees
+x as free, so a later call passing x to an Out parameter is accepted at compile
+time and rejected at runtime by cosmos_input/3. That is deliberate: the author
+of a host call takes care of the modes. Recorded here only so it is not filed
+again as a compiler bug. The remaining asymmetry is that such a program gets
+no compile-time hint at all; if that is ever worth changing, the natural place
+is the effect inference for host goals, not the Out-mode rule itself.

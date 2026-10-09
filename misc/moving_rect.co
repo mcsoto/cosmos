@@ -1,0 +1,44 @@
+// Moving rectangle - the Cosmos/Space equivalent of ui2.pl
+//
+//   swipl-win -q -f ui2.pl -g start
+//
+// ui2.pl builds a 640x480 picture, puts a blue 80x50 box at (100,100), and
+// shifts it +2 in x every 16 ms until the window is closed. Space is
+// immediate-mode: the runtime clears and flushes the window once per frame,
+// so the box is re-issued at its new position instead of being moved.
+//
+// Mapping from ui2.pl:
+//   picture('Moving Rectangle') + size(640,480)  ->  sp.init(640, 480)
+//   box(80,50) fill blue at point(100,100)       ->  g.rectangle('fill', x, 100, 80, 50)
+//   timer(0.016, tick)                           ->  sp.start(16, {update and draw}, state)
+//   tick: get(Rect,x,X), X1 is X+2, set           ->  update: s2 = {x = s.x + 2}
+//   done_message -> stop_app                     ->  closing the window halts
+//
+// One deliberate difference: ui2.pl lets the box walk off the right edge and
+// never returns it. Here it wraps at x = 520 so the motion stays visible.
+// Drop the `% 520` for the original behaviour.
+//
+// Window title: ui2.pl sets 'Moving Rectangle'; Space hardcodes 'Cosmos Space'
+// (libs/space_xpce_prolog.pl, space_xpce_boot_window/1) and exposes no setter.
+//
+// See XPCE_SIMPLE_LIBRARY.md for the loop model and the full API.
+
+// Advance the simulation. dt is seconds since the previous frame; this demo
+// moves a fixed step per tick to match ui2.pl, so dt is unused.
+rel update(_dt, s, s2)
+    s2 = {x = (s.x + 2) % 520}
+
+// Paint one frame from the current state.
+rel draw(s)
+    require('space', sp)
+    g = sp.graphics
+    g.clear('#1b1b2f')
+    g.setColor('#3050ff')
+    g.rectangle('fill', s.x, 100, 80, 50)
+
+// require stays inside the rel bodies: a top-level require would capture sp
+// and turn main/1 into main/2, breaking --main.
+rel main(_args)
+    require('space', sp)
+    sp.init(640, 480)
+    sp.start(16, {update=update and draw=draw}, {x=100})

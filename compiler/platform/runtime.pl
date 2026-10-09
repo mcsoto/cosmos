@@ -91,11 +91,34 @@ cosmos_checked_call(Kind,Name,Options,Args,Schemas,Goal) :-
 cosmos_checked_call(Kind,Name,Options,Args,Schemas,Goal,Loc) :-
     nb_setval(cosmos_contract_location,Loc),
     (member(Option,Options),get_assoc("parameters",Option,Spec),maplist(cosmos_input(Schemas),Spec,Args)->true
-    ;cosmos_contract_message(Kind,Name,Spec,Args,Loc,Message),throw(error(cosmos_contract(Message),_))),
+    ;cosmos_contract_violation(input,Kind,Name,Options,Args,Loc)),
     get_assoc("determinism",Option,Determinism),
     cosmos_declared_call(Determinism,Name,Args,cosmos_callable(Kind,Name,Goal)),
     (maplist(cosmos_output(Schemas),Spec,Args)->true
-    ;cosmos_contract_message(Kind,Name,Spec,Args,Loc,Message),throw(error(cosmos_contract(Message),_))).
+    ;cosmos_contract_violation(output,Kind,Name,Options,Args,Loc)).
+
+% The declared parameters are resolved here instead of being passed in from the
+% caller's failing if-then-else: (C -> T ; E) discards C's bindings, so a Spec
+% looked up inside the condition arrives unbound and the signature reported
+% below collapses to "". The formal names the phase so a caller can tell a bad
+% argument from an unsatisfied result; the signature rides in the context so
+% printing the error still shows it.
+cosmos_contract_violation(Phase,Kind,Name,Options,Args,Loc) :-
+    cosmos_contract_signature_of(Options,Spec),
+    cosmos_contract_message(Kind,Name,Spec,Args,Loc,Message),
+    cosmos_contract_formal(Phase,Name,Formal),
+    throw(error(Formal,cosmos_contract_detail(Message))).
+
+cosmos_contract_signature_of([],[]) :- !.
+cosmos_contract_signature_of([Option|Options],Spec) :-
+    (get_assoc("parameters",Option,Spec)->true
+    ;cosmos_contract_signature_of(Options,Spec)).
+
+% Built by hand rather than with `=..`: a one-element list deconstructs to an
+% atom, which would throw `cosmos_input_contract` instead of
+% `cosmos_input_contract(Name)`.
+cosmos_contract_formal(input,Name,cosmos_input_contract(Name)) :- !.
+cosmos_contract_formal(output,Name,cosmos_output_contract(Name)).
 
 cosmos_contract_message(Kind,Name,Spec,Args,Loc,Message) :-
     cosmos_contract_kind(Kind,KindName),
@@ -143,7 +166,10 @@ cosmos_contract_join(Piece,"",Piece) :- !.
 cosmos_contract_join(Piece,Tail,Text) :- format(string(Text),'~s ~s',[Piece,Tail]).
 
 :- multifile prolog:message//1.
-prolog:message(error(cosmos_contract(Message),_)) --> [Message].
+prolog:message(error(cosmos_input_contract(_),cosmos_contract_detail(Detail))) --> [Detail].
+prolog:message(error(cosmos_output_contract(_),cosmos_contract_detail(Detail))) --> [Detail].
+prolog:message(error(cosmos_input_contract(Name),_)) --> ['input contract violated for "',Name,'"'].
+prolog:message(error(cosmos_output_contract(Name),_)) --> ['output contract violated for "',Name,'"'].
 prolog:message(error(cosmos_function_failed(Name),_)) -->
     [ 'function "',Name,'" failed' ].
 prolog:message(error(cosmos_type_error(Expected,Value),_)) -->

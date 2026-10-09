@@ -1,3 +1,10 @@
+check types/how functors apply when def. in different files
+
+
+
+
+---solved---
+
 Core IR is not yet a backend boundary: expressions, fields, indexes, tables, and arithmetic are still lowered during Prolog emission.
 Name resolution still infers bindings from spelling during capture analysis instead of marking references local/captured/global/builtin.
 Protocol method bodies support opt-in debug postconditions on typed views, as described below.

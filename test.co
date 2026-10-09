@@ -1,3 +1,5 @@
+require('test1',_)
+print(':test:')
 protocol(Positioned,{
     Relation Any Number Number Any move
 })
@@ -19,3 +21,6 @@ t={x=1}
 print(t)
 !t = t.x:2
 print(t1)
+
+rel main()
+	print(1)

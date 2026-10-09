@@ -1,0 +1,40 @@
+// Simple one-shot drawing test for Space XPCE
+// NOTE: require stays inside rels so main/1 keeps its argv entry shape
+// (a top-level require would capture sp and turn main into main/2).
+
+rel draw_once(_s)
+    require('space', sp)
+    g = sp.graphics
+    g.clear('#07111f')
+
+    // Red filled rect
+    g.setColor('#e74c3c')
+    g.rectangle('fill', 100, 100, 200, 100)
+
+    // Blue circle
+    g.setColor('#3498db')
+    g.circle('fill', 400, 200, 50)
+
+    // Green ellipse
+    g.setColor('#2ecc71')
+    g.ellipse('fill', 300, 350, 80, 40)
+
+    // Yellow line
+    g.setColor('#f1c40f')
+    g.setLineWidth(3)
+    g.line([50, 50, 590, 430])
+    g.setLineWidth(1)
+
+    // Text
+    g.setColor('#ecf0f1')
+    g.print('Space XPCE - One Shot Test', 200, 20)
+
+rel noop_update(_dt, s, s2)
+    s2 = s
+
+rel main(_args)
+    require('space', sp)
+    width = 320
+    height = 480
+    sp.init(width, height)
+    sp.start(100, {update=noop_update and draw=draw_once}, {})

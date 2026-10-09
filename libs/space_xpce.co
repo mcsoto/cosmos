@@ -1,0 +1,203 @@
+// Space XPCE Backend - Native graphics API for Cosmos
+// Implements the Space Canvas API using SWI-Prolog's XPCE toolkit
+// Uses pl:: to call the predicates in libs/space_xpce_prolog.pl
+
+// Graphics module
+graphics = {
+    // Background color
+    rel setBackgroundColor(color)
+        pl::space_xpce_set_color(_, color)
+
+    rel getBackgroundColor(color)
+        color = '#000000'
+
+    // Foreground color
+    rel setColor(color)
+        pl::space_xpce_set_color(_, color)
+
+    rel getColor(color)
+        color = '#ffffff'
+
+    // Clear canvas (color required; pass explicit color)
+    rel clear(color)
+        pl::space_xpce_clear(_, color)
+
+    // Rectangle
+    rel rectangle(mode, x, y, width, height)
+        pl::space_xpce_rectangle(_, mode, int(x), int(y), int(width), int(height))
+
+    // Line
+    rel line(points)
+        pl::space_xpce_line(_, points)
+
+    // Circle
+    rel circle(mode, x, y, radius)
+        pl::space_xpce_circle(_, mode, int(x), int(y), int(radius))
+
+    // Ellipse
+    rel ellipse(mode, x, y, radiusX, radiusY)
+        pl::space_xpce_ellipse(_, mode, int(x), int(y), int(radiusX), int(radiusY))
+
+    // Arc
+    rel arc(mode, arcType, x, y, radius, angle1, angle2)
+        pl::space_xpce_arc(_, mode, arcType, int(x), int(y), int(radius), angle1, angle2)
+
+    // Polygon
+    rel polygon(mode, points)
+        pl::space_xpce_polygon(_, mode, points)
+
+    // Text
+    rel print(text, x, y)
+        pl::space_xpce_print(_, text, int(x), int(y))
+
+    rel printf(text, x, y, width, align)
+        // Simplified - just print at position
+        pl::space_xpce_print(_, text, int(x), int(y))
+
+    // Font handle: last param is the out value, so newFont(...) also
+    // works nested in value position (e.g. setFont(newFont(...))).
+    rel newFont(size, family, style, font)
+        font = {size=size and family=family and style=style}
+
+    rel setFont(font)
+        pl::space_xpce_set_font(_, font.size, font.family, font.style)
+
+    rel getFont(font)
+        font = {size=12 and family='sans' and style='normal'}
+
+    // Dimensions
+    rel getDimensions(size)
+        size = {width=640 and height=480}
+
+    rel getWidth(w)
+        w = 640
+
+    rel getHeight(h)
+        h = 480
+
+    // Transform stack
+    rel push()
+        pl::space_xpce_push(_)
+
+    rel pop()
+        pl::space_xpce_pop(_)
+
+    rel origin()
+        pl::space_xpce_origin(_)
+
+    rel translate(x, y)
+        pl::space_xpce_translate(_, int(x), int(y))
+
+    rel rotate(angle)
+        pl::space_xpce_rotate(_, angle)
+
+    rel scale(x, y)
+        pl::space_xpce_scale(_, x, y)
+
+    rel shear(x, y)
+        // Not directly supported in XPCE
+        true
+
+    // Line style
+    rel setLineWidth(width)
+        pl::space_xpce_set_line_width(_, width)
+
+    rel getLineWidth(w)
+        w = 1.0
+
+    rel setLineStyle(style)
+        // XPCE doesn't have line style directly
+        true
+
+    // Scissor/clipping (recorded; use clearScissor() to reset)
+    rel setScissor(x, y, width, height)
+        pl::space_xpce_set_scissor(_, int(x), int(y), int(width), int(height))
+
+    rel clearScissor()
+        pl::space_xpce_clear_scissor(_)
+
+    rel getScissor(scissor)
+        // Recorded only: XPCE device clip cannot be called safely here.
+        scissor = {x=0 and y=0 and width=640 and height=480}
+
+    // Images
+    rel draw(image, x, y)
+        pl::space_xpce_draw_image(_, image, int(x), int(y))
+
+    rel refresh()
+        true  // XPCE renders immediately
+}
+
+// Input modules (one rel per name; goal forms for polling)
+input = {
+    // Keyboard: succeeds while the key is held
+    rel isDown(key)
+        pl::space_xpce_keyboard_is_down(_, key, down)
+        down = 1
+
+    // Mouse
+    rel getX(x)
+        pl::space_xpce_mouse_get_position(_, x, _)
+
+    rel getY(y)
+        pl::space_xpce_mouse_get_position(_, _, y)
+
+    rel getPosition(pos)
+        pl::space_xpce_mouse_get_position(_, x, y)
+        pos = {x=x and y=y}
+
+    // Mouse button: succeeds while the button is held
+    rel buttonDown(button)
+        pl::space_xpce_mouse_is_down(_, int(button), down)
+        down = 1
+}
+
+// Timer module
+timer = {
+    rel getTime(time)
+        pl::space_xpce_get_time(_, time)
+
+    rel getDelta(delta)
+        pl::space_xpce_get_delta(_, delta)
+
+    rel getFPS(fps)
+        pl::space_xpce_get_fps(_, fps)
+}
+
+// Main Space API
+sp = {
+    // Initialize
+    rel init(width, height)
+        pl::space_xpce_init(_, int(width), int(height))
+
+    // Start with fixed interval (ms); size comes from init/2
+    rel start(intervalMs, callbacks, initialState)
+        pl::space_xpce_start(_, int(intervalMs), callbacks, initialState)
+
+    // Start with FPS; size comes from init/2
+    rel startCanvas(fps, callbacks, initialState)
+        pl::space_xpce_start_canvas(_, fps, callbacks, initialState)
+
+    // Quit
+    rel quit()
+        pl::space_xpce_quit(_)
+
+    // Dispose
+    rel dispose()
+        pl::space_xpce_dispose(_)
+
+    // Load image
+    rel loadImage(source, name)
+        pl::space_xpce_load_image(_, source, name)
+
+    // Graphics, input, timer
+    'graphics' = graphics
+    'input' = input
+    'keyboard' = input
+    'mouse' = input
+    'timer' = timer
+}
+
+// Export the Space table directly so `require('space', sp)`
+// gives sp.init / sp.graphics / sp.start / ...
+export(sp)

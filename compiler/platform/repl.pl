@@ -4,12 +4,17 @@
 :- initialization(main, main).
 
 version :- 
-	writeln("0.851").
+	writeln("0.86").
 
 main :-
     current_prolog_flag(argv, RawArguments),
     cosmos_runtime_options(RawArguments,Arguments),
-    catch((cosmos_main(Arguments), halt), Error, (compiler_report(Error), halt(1))).
+    % halt/abort travel as unwind/1 balls; rethrow them instead of
+    % reporting them as failures (otherwise every clean exit becomes 1).
+    catch((cosmos_main(Arguments), halt), Error,
+          ( ( Error = unwind(_) ; Error = '$abort' ) -> throw(Error)
+          ; compiler_report(Error), halt(1)
+          )).
 
 cosmos_main([]) :- !, cosmos_repl.
 cosmos_main(['-i']) :- !, cosmos_repl.
@@ -167,7 +172,13 @@ cosmos_run(File, Module) :-
     atomic_list_concat([Local, Previous], ';', Path),
     nb_setval(path, Path),
     consult(Absolute),
-    Goal =.. [Module, Output],
+    % A --main build carries its own entry point, which the compiler appends
+    % as `:- initialization(cosmos_entry_main, main).`  That directive only
+    % fires when the file is loaded as the main program, and consult/1 does
+    % not count as that -- so calling the module goal here would run the
+    % generated stub (moving_rect([]) :- true) and print [] instead of
+    % starting the program.  Prefer the entry when the file defines one.
+    ( current_predicate(cosmos_entry_main/0) -> Goal = cosmos_entry_main ; Goal =.. [Module, Output] ),
     ( once(cosmos_execute(Goal)) -> repl_print_result(Output)
     ; writeln(false)
     ).

@@ -1,0 +1,29 @@
+//callbacks
+
+for(x in [1,2,3])
+	print(x)
+
+for(c in '[1,2,3]')
+	print(c)
+/* */
+
+print(''+#s3)
+x=1+z
+y=''+2	
+
+s='asdf'
+//a=s[0:i]
+//a=s[0:2]
+print(a)
+
+x1=:fc
+print(x1)
+
+rel increment(In Number x, Out Number y)
+    y=x+1
+	
+out=1
+//increment(2,out)
+
+print('-')
+require('test3',_)

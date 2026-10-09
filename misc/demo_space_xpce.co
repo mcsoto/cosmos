@@ -1,0 +1,84 @@
+// Space XPCE Demo - Drawing primitives
+// NOTE: require stays inside rels so main/1 keeps its argv entry shape.
+
+rel update(dt, s, s2)
+    s2 = {angle = s.angle + dt * 2}
+
+rel draw(s)
+    require('space', sp)
+    g = sp.graphics
+    g.clear('#1a1a2e')
+    
+    // Draw rectangles
+    g.setColor('#e94560')
+    g.rectangle('fill', 50, 50, 100, 60)
+    g.setColor('#00d9ff')
+    g.rectangle('line', 50, 50, 100, 60)
+    
+    // Draw filled rectangle
+    g.setColor('#ffd700')
+    g.rectangle('fill', 200, 50, 100, 60)
+    
+    // Draw circles
+    g.setColor('#00ff7f')
+    g.circle('fill', 400, 80, 30)
+    g.setColor('#ffffff')
+    g.circle('line', 400, 80, 30)
+    
+    // Draw ellipse
+    g.setColor('#ff69b4')
+    g.ellipse('fill', 550, 80, 50, 25)
+    g.setColor('#ffffff')
+    g.ellipse('line', 550, 80, 50, 25)
+    
+    // Draw arcs
+    g.setColor('#ffa500')
+    g.arc('fill', 'pie', 700, 80, 40, 0, 3.14159/2)
+    g.arc('line', 'open', 700, 180, 40, 0, 3.14159)
+    
+    // Draw polygon
+    g.setColor('#8a2be2')
+    g.polygon('fill', [100, 200, 150, 150, 200, 200, 175, 250, 125, 250])
+    g.setColor('#ffffff')
+    g.polygon('line', [100, 200, 150, 150, 200, 200, 175, 250, 125, 250])
+    
+    // Draw lines
+    g.setColor('#00ffff')
+    g.line([50, 300, 200, 300, 200, 400, 50, 400, 50, 300])
+    
+    // Draw points
+    g.setColor('#ff00ff')
+    g.setLineWidth(5)
+    g.line([300, 300, 310, 310, 320, 300, 330, 310, 340, 300])
+    g.setLineWidth(1)
+    
+    // Rotating rectangle using transform
+    g.push()
+    g.translate(500, 350)
+    g.rotate(s.angle)
+    g.setColor('#ff4444')
+    g.rectangle('fill', -50, -30, 100, 60)
+    g.setColor('#ffffff')
+    g.rectangle('line', -50, -30, 100, 60)
+    g.pop()
+    
+    // Scissor test
+    g.setScissor(600, 300, 150, 150)
+    g.setColor('#00ff00')
+    g.rectangle('fill', 550, 250, 250, 250)
+    g.clearScissor()
+    
+    // Text
+    g.setColor('#ffffff')
+    g.setFont(g.newFont(24, 'sans', 'normal'))
+    g.print('Space XPCE Demo', 50, 500)
+    g.setFont(g.newFont(14, 'sans', 'normal'))
+    g.print('Rect, Circle, Ellipse, Arc, Polygon, Line, Transform, Scissor', 50, 530)
+
+rel main(_args)
+    require('space', sp)
+    width = 800
+    height = 600
+    state = {angle=0}
+    sp.init(width, height)
+    sp.startCanvas(60, {update=update and draw=draw}, state)

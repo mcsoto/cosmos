@@ -22,9 +22,9 @@
     "compiler/src/compiler.co": "8453af960576dec18622b53dad06c6d769ce236f97159807aef018ccfe1074d2",
     "compiler/seed/compiler.pl": "c0a31f7ef213a430e55298dddb3365acd8698353d2763f6461197ff7999ba83e",
     "compiler/generated/compiler.pl": "c0a31f7ef213a430e55298dddb3365acd8698353d2763f6461197ff7999ba83e",
-    "compiler/swi.pl": "248a1090ad1fc0c266b4f1a68b1c3b6dd21c69c34c07d3933fe3580f3117d509",
+    "compiler/swi.pl": "ab92236863f39d00cdb3adb9384e051914743fcbddf0b59b1651bb700a68e85b",
     "compiler/reif.pl": "285708cec1a9e5079b3fcb63320dbb6eac055e4ea315fdd201494c1fab5237bb",
-    "compiler/platform/runtime.pl": "31eafd38c85319af6e9340cac8add509ce378c5f27e79ed2510d1c4c5cda4c19",
+    "compiler/platform/runtime.pl": "4e56fb64b6232a9ceb8ead47bd9cfea047b8ff232fae0ec7b022dcfa3f83aed6",
     "compiler/platform/terms.pl": "345c5a88b73eaa8d3af1c4b3ec211b251d8fc71b83e046ae5a6c8c05cdb9443a",
     "compiler/platform/codec.pl": "11f51e01e190ce8c993f91e07efe8cd58816f55caf06c78d543fef388ec7e5a3"
   }
