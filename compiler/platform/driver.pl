@@ -44,10 +44,16 @@ compiler_compile_file(Stage,Input,Output,Module) :-
             write_term(Stream2,Interface,[quoted(true),fullstop(true),nl(true)]),close(Stream2))).
 
 % Command-line launch support is deliberately appended after ordinary code
-% generation.  It does not inspect application source: every program with a
-% relation named main/1 receives the same argv-list adapter.
-compiler_add_main_entry(Output, Module) :-
-    atom_concat(Module, '::main', Predicate),
+% generation.  It does not parse application source; it reads the generated
+% .pl back to decide which entry goal to emit (see compiler_entry_goal/4).
+%
+% Kind is one of:
+%   main  -- call Module:main, honouring arity 0 or 1 (--main, and --exe)
+%   xpce  -- call the module goal itself, i.e. run the file's top-level
+%           goals.  This is what makes a top-level `require('space', sp)`
+%           legal: a capture there would otherwise change main's arity and
+%           break the --main adapter.
+compiler_add_entry(Output, Module, Kind) :-
     compiler_platform(PlatformDirectory0),
     absolute_file_name(PlatformDirectory0, PlatformDirectory),
     absolute_file_name(Output, AbsoluteOutput),
@@ -60,11 +66,20 @@ compiler_add_main_entry(Output, Module) :-
     % at build time poisons the saved image, so it is never embedded).
     directory_file_path(PlatformDirectory, '../../libs/space_xpce_prolog.pl', AbsBackend0),
     absolute_file_name(AbsBackend0, AbsBackend),
-    ( read_file_to_string(Output, OutputCode, []),
-      sub_string(OutputCode, _, _, _, "cosmos_require(\"space") ->
-        SpaceBackend = AbsBackend
-    ; SpaceBackend = none
+    % Read the generated .pl once and reuse it for BOTH decisions: whether
+    % this is a Space/XPCE program, and what arity main ended up with.
+    % (These must not be two separate read_file_to_string/3 calls in the
+    % branches -- an earlier version clobbered OutputCode with '' in the
+    % non-space branch, which silently forced the arity-1 entry.)
+    (   read_file_to_string(Output, OutputCode, [])
+    ->  true
+    ;   OutputCode = ""
     ),
+    (   sub_string(OutputCode, _, _, _, "cosmos_require(\"space")
+    ->  SpaceBackend = AbsBackend
+    ;   SpaceBackend = none
+    ),
+    compiler_entry_goal(OutputCode, Module, Kind, GoalText),
     % Record everything RELATIVE to the output file, not as absolute paths.
     % The build machine's directory layout has no business being baked into
     % a generated artifact: it makes the .pl machine-specific, and it goes
@@ -127,10 +142,74 @@ compiler_add_main_entry(Output, Module) :-
           format(Stream, '      directory_file_path(Root, ~q, SourceTemplate),~n', ['?']),
           format(Stream, '      atomic_list_concat([SourceTemplate,LibsTemplate,UserLibsTemplate,?],;,Path),~n', []),
           format(Stream, '      nb_setval(path,Path),~n', []),
-          format(Stream, '      Arguments = [Executable|RawArguments], ~q(Arguments)~n', [Predicate]),
+          format(Stream, '      ~w~n', [GoalText]),
           format(Stream, '    ).~n', [])
         ),
         close(Stream)).
+
+% Which goal the appended entry should run, rendered as source text.
+compiler_entry_goal(OutputCode, Module, Kind, GoalText) :-
+    atom_concat(Module, '::main', Predicate),
+    (   Kind == xpce
+    ->  % Run the module goal, i.e. the file's top-level goals.  This is what
+        % makes a top-level `require('space', sp)` legal: a capture there
+        % changes main's arity, which the --main adapter cannot absorb.
+        %
+        % The argument matters.  emit_prolog/3 gives the module clause its
+        % last export when the file exports something, and the empty list
+        % when it does not -- so a file with only top-level goals has the
+        % head `module([]):-...' and calling it with a non-empty argv list
+        % fails to unify.  Probe for that head and pass [] in that case.
+        (   compiler_module_takes_empty_list(OutputCode, Module, _)
+        ->  ArgsText = "([])"
+        ;   ArgsText = "(Arguments)"
+        ),
+        format(string(QuotedModule), '~q', [Module]),
+        format(string(GoalText),
+               'Arguments = [Executable|RawArguments], ~s~w', [QuotedModule, ArgsText])
+    ;   compiler_main_arity(OutputCode, Module, Arity),
+        (   Arity == 0
+        ->  % A zero-argument relation is emitted as a BARE atom, because
+            % cc_term/3 (terms.pl) writes an empty argument list as a plain
+            % atom: `'M::main':-'M::$impl_main'.`  So the arity-0 call is the
+            % bare atom -- writing `'M::main'(Arguments)` would raise an
+            % existence_error at run time.  argv is bound anonymously: a
+            % zero-argument main cannot consume it, and a named variable left
+            % unused would trip style_check(-singleton).
+            format(string(GoalText),
+                   '_ = [Executable|RawArguments], ~q', [Predicate])
+        ;   format(string(GoalText),
+                   'Arguments = [Executable|RawArguments], ~q(Arguments)', [Predicate])
+        )
+    ).
+
+% True when the generated module clause binds its parameter to the empty
+% list, which is what emit_prolog/3 does for a file with no export(...).
+% The module name is written unquoted when it is a plain identifier and
+% quoted otherwise, so both spellings have to be probed.
+compiler_module_takes_empty_list(OutputCode, Module, Takes) :-
+    atomic_list_concat(["'", Module, "'([]):-"], Quoted),
+    atomic_list_concat([Module, "([]):-"], Bare),
+    (   sub_string(OutputCode, _, _, _, Quoted)
+    ;   sub_string(OutputCode, _, _, _, Bare)
+    ),
+    Takes = true.
+% Probe the generated .pl rather than the source: a zero-argument relation
+% is emitted as the bare atom `'M::main':-'M::$impl_main'.` while any other
+% arity gets `'M::main'(...)`.  `$impl_main'(` does not match, because the
+% text before the quote differs.
+compiler_main_arity(OutputCode, Module, Arity) :-
+    atom_concat(Module, '::main', Predicate),
+    atomic_list_concat(["'", Predicate, "':("], Called),
+    atomic_list_concat(["'", Predicate, "':"], Bare),
+    (   sub_string(OutputCode, _, _, _, Called)
+    ->  Arity = 1
+    ;   sub_string(OutputCode, _, _, _, Bare)
+    ->  Arity = 0
+    ;   % No main at all.  Emitting the arity-1 call keeps the previous
+        % behaviour (an existence_error naming the missing relation).
+        Arity = 1
+    ).
 
 compiler_executable_file(Output, Executable) :-
     file_name_extension(Base, _, Output),
@@ -263,24 +342,31 @@ compiler_native_dll(true, 'libgcc_s_seh-1.dll').
 compiler_native_dll(true, 'libstdc++-6.dll').
 compiler_native_dll(true, 'zlib1.dll').
 
-compiler_compile_application(Stage, Input, Output, Module, Main, Executable) :-
+% Entry is one of: none (bare compile), main (call Module:main/0 or /1),
+% xpce (call the module goal, i.e. run the file's top-level goals).
+compiler_compile_application(Stage, Input, Output, Module, Entry, Executable) :-
     compiler_compile_file(Stage, Input, Output, Module),
-    ( Main == true -> compiler_add_main_entry(Output, Module) ; true ),
+    (   Entry == none -> true
+    ;   compiler_add_entry(Output, Module, Entry)
+    ),
     ( Executable == true -> compiler_executable_file(Output, Exe), compiler_make_executable(Output, Exe) ; true ).
 
-% Options accepted by both command-line front ends.  --exe always creates a
-% main wrapper because a standalone image must have a predictable entry.
-compiler_cli_options(Options, DefaultModule, Module, Main, Executable) :-
-    compiler_cli_options(Options, DefaultModule, DefaultModule, false, false, Module, Main, Executable).
-compiler_cli_options([], _, Module, Main, Executable, Module, Main, Executable).
-compiler_cli_options(['--main'|Rest], Default, Current, _, Executable, Module, Main, FinalExecutable) :- !,
-    compiler_cli_options(Rest, Default, Current, true, Executable, Module, Main, FinalExecutable).
-compiler_cli_options(['--exe'|Rest], Default, Current, _, _, Module, Main, FinalExecutable) :- !,
-    compiler_cli_options(Rest, Default, Current, true, true, Module, Main, FinalExecutable).
-compiler_cli_options(['--module', Name|Rest], Default, _, Main, Executable, Module, FinalMain, FinalExecutable) :- !,
-    compiler_cli_options(Rest, Default, Name, Main, Executable, Module, FinalMain, FinalExecutable).
-compiler_cli_options([Name|Rest], Default, _, Main, Executable, Module, FinalMain, FinalExecutable) :-
-    compiler_cli_options(Rest, Default, Name, Main, Executable, Module, FinalMain, FinalExecutable).
+% Options accepted by both command-line front ends.  --exe always needs an
+% entry because a standalone image must have a predictable start; it picks
+% main rather than xpce so existing --exe programs are unaffected.
+compiler_cli_options(Options, DefaultModule, Module, Entry, Executable) :-
+    compiler_cli_options(Options, DefaultModule, DefaultModule, none, false, Module, Entry, Executable).
+compiler_cli_options([], _, Module, Entry, Executable, Module, Entry, Executable).
+compiler_cli_options(['--main'|Rest], Default, Current, _, Executable, Module, Entry, FinalExecutable) :- !,
+    compiler_cli_options(Rest, Default, Current, main, Executable, Module, Entry, FinalExecutable).
+compiler_cli_options(['--xpce'|Rest], Default, Current, _, Executable, Module, Entry, FinalExecutable) :- !,
+    compiler_cli_options(Rest, Default, Current, xpce, Executable, Module, Entry, FinalExecutable).
+compiler_cli_options(['--exe'|Rest], Default, Current, _, _, Module, Entry, FinalExecutable) :- !,
+    compiler_cli_options(Rest, Default, Current, main, true, Module, Entry, FinalExecutable).
+compiler_cli_options(['--module', Name|Rest], Default, _, Entry, Executable, Module, FinalEntry, FinalExecutable) :- !,
+    compiler_cli_options(Rest, Default, Name, Entry, Executable, Module, FinalEntry, FinalExecutable).
+compiler_cli_options([Name|Rest], Default, _, Entry, Executable, Module, FinalEntry, FinalExecutable) :-
+    compiler_cli_options(Rest, Default, Name, Entry, Executable, Module, FinalEntry, FinalExecutable).
 
 % Data-only sidecars. No consult/1, directives, or imported application execution.
 compiler_read_interfaces(Names,Directory,Pairs) :-

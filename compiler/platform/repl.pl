@@ -54,22 +54,22 @@ cosmos_main(['-b', Program|Rest]) :- !,
 cosmos_main(['-l', Source|Options]) :- !,
     cosmos_source_file(Source, Input),
     cosmos_output_file(Input, Output),
-    cosmos_compile_options(Options, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable),
+    cosmos_compile_options(Options, Output, Module, Entry, Executable),
+    cosmos_compile(Input, Output, Module, Entry, Executable),
     ( Executable == true -> true ; cosmos_run(Output, Module) ).
 cosmos_main(['-c', Source|Options]) :- !,
     cosmos_source_file(Source, Input),
     cosmos_output_file(Input, Output),
-    cosmos_compile_options(Options, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable),
+    cosmos_compile_options(Options, Output, Module, Entry, Executable),
+    cosmos_compile(Input, Output, Module, Entry, Executable),
     format('Compiled ~w -> ~w~n', [Input, Output]).
 cosmos_main(['-f', Input, '-o', Output|Rest]) :- !,
-    cosmos_compile_options(Rest, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable).
+    cosmos_compile_options(Rest, Output, Module, Entry, Executable),
+    cosmos_compile(Input, Output, Module, Entry, Executable).
 cosmos_main(['-f', Input|Options]) :- !,
     cosmos_output_file(Input, Output),
-    cosmos_compile_options(Options, Output, Module, Main, Executable),
-    cosmos_compile(Input, Output, Module, Main, Executable).
+    cosmos_compile_options(Options, Output, Module, Entry, Executable),
+    cosmos_compile(Input, Output, Module, Entry, Executable).
 cosmos_main([Input]) :- !,
     cosmos_source_file(Input, Source),
     cosmos_output_file(Source, Output),
@@ -92,6 +92,8 @@ cosmos_help :-
     format('                                        Compile a source file.~n', []),
     format('  cosmos.bat -c name                    Compile name.co to name.pl.~n', []),
     format('  cosmos.bat -c name [--main] [--exe]   Add argv-list main entry; --exe saves a standalone app.~n', []),
+    format('  cosmos.bat -l name --xpce             Run a file\'s top-level goals, with no main.~n', []),
+    format('                                        Lets `require(''space'', sp)'' sit at the top.~n', []),
     format('  cosmos.bat -l name                    Compile name.co and run it.~n', []),
     format('  cosmos.bat -l file.co -q "query" [--vars x,y]~n', []),
     format('                                        Run a query in that file\'s source scope.~n', []),
@@ -150,16 +152,16 @@ cosmos_module_argument([], Path, Module) :-
     file_base_name(Path, Base),
     file_name_extension(Module, _, Base).
 
-cosmos_compile_options(Options, Output, Module, Main, Executable) :-
+cosmos_compile_options(Options, Output, Module, Entry, Executable) :-
     compiler_file_module(Output, DefaultModule),
-    compiler_cli_options(Options, DefaultModule, Module, Main, Executable).
+    compiler_cli_options(Options, DefaultModule, Module, Entry, Executable).
 
 cosmos_compile(Input, Output, Module) :-
-    cosmos_compile(Input, Output, Module, false, false).
-cosmos_compile(Input, Output, Module, Main, Executable) :-
+    cosmos_compile(Input, Output, Module, none, false).
+cosmos_compile(Input, Output, Module, Entry, Executable) :-
     compiler_platform(Here),
     directory_file_path(Here, '../generated', Stage),
-    compiler_compile_application(Stage, Input, Output, Module, Main, Executable).
+    compiler_compile_application(Stage, Input, Output, Module, Entry, Executable).
 
 cosmos_run(File, Module) :-
     compiler_platform(Here),
@@ -179,8 +181,11 @@ cosmos_run(File, Module) :-
     % generated stub (moving_rect([]) :- true) and print [] instead of
     % starting the program.  Prefer the entry when the file defines one.
     ( current_predicate(cosmos_entry_main/0) -> Goal = cosmos_entry_main ; Goal =.. [Module, Output] ),
-    ( once(cosmos_execute(Goal)) -> repl_print_result(Output)
-    ; writeln(false)
+    % An entry-driven run binds nothing here (the entry called main/the module
+    % goal itself), so only report a result when the module goal produced one.
+    (   once(cosmos_execute(Goal)), nonvar(Output)
+    ->  repl_print_result(Output)
+    ;   true
     ).
 
 repl :- repl(none).

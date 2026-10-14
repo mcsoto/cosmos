@@ -476,6 +476,54 @@ test('--main adds an argv-list entry point for main/1', () => {
   assert.equal(run.status, 0, run.stderr);
   assert.equal(run.stdout.trim(), 'Ada');
 });
+test('--main supports a zero-argument main/0', () => {
+  const source = join(root, 'tests/compiler/main_zero.co');
+  const output = join(temporary, 'main_zero.pl');
+  const result = spawnSync(swi, ['-q', '-s', cli, '--', source, output, '--main'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const code = readFileSync(output, 'utf8');
+  assert.match(code, /initialization\(cosmos_entry_main, main\)/);
+  // The call has to be the BARE atom.  cc_term/3 emits an empty argument
+  // list as an atom, so `'fixture0::main'(Arguments)` would not exist.
+  assert.match(code, /'main_zero::main'\s*$/m);
+  assert.doesNotMatch(code, /'main_zero::main'\(/);
+  const run = spawnSync(swi, ['-q', '-s', output], { cwd: temporary, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.stdout.trim(), 'zero-arg entry ran');
+});
+test('--xpce runs the top-level goals with no main', () => {
+  const source = join(root, 'tests/compiler/xpce_top.co');
+  const output = join(temporary, 'xpce_top.pl');
+  const result = spawnSync(swi, ['-q', '-s', cli, '--', source, output, '--xpce'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const code = readFileSync(output, 'utf8');
+  assert.match(code, /initialization\(cosmos_entry_main, main\)/);
+  // No export(...) in the fixture, so emit_prolog gives the module clause
+  // the empty list as its parameter; the entry must call it with [] or the
+  // call fails to unify and the program exits 1 with no output.
+  assert.match(code, /xpce_top\(\[\]\)/);
+  const run = spawnSync(swi, ['-q', '-s', output], { cwd: temporary, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /xpce top level ran/);
+  assert.match(run.stdout, /42\.0/);
+});
+test('--xpce pure bridge: objects, values and timer callbacks headless', () => {
+  const source = join(root, 'tests/compiler/xpce_lib.co');
+  const output = join(temporary, 'xpce_lib.pl');
+  const result = spawnSync(swi, ['-q', '-s', cli, '--', source, output, '--xpce'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const run = spawnSync(swi, ['-q', '-s', output, '-t', 'halt'], { cwd: temporary, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  // Handles round-trip through create/send/get; atoms come back as strings.
+  assert.match(run.stdout, /\[width=,80\]/);
+  assert.match(run.stdout, /\[pos=,33,44\]/);
+  assert.match(run.stdout, /\[text=,hello xpce\]/);
+  assert.match(run.stdout, /\[point x=,7\]/);
+  assert.match(run.stdout, /\[size width=,640\]/);
+  // Shared slots hold plain values; the timer callback gets its handle.
+  assert.match(run.stdout, /\[slot=,42\.0\]/);
+  assert.match(run.stdout, /\[TICKED tm=,\d+\]/);
+});
 test('--exe saves a standalone main/1 application', () => {
   const source = join(root, 'tests/compiler/main_args.co');
   const output = join(temporary, 'main_args_exe.pl');

@@ -13,6 +13,7 @@ SWI-Prolog's XPCE toolkit (`library(pce)` + `library(pce_main)`).
 | `libs/space_xpce.pl` / `.cif` | Compiled form of `space_xpce.co` (checked in, like other libs). |
 | `misc/simple_xpce.co` | Minimal app: one rect, circle, ellipse, line, text. |
 | `misc/moving_rect.co` | Animated app: the Cosmos equivalent of `ui2.pl`'s moving rectangle. |
+| `test4.co` | Header-only app (`--xpce`): arrow-key-controlled rectangle, driven by the event queue. |
 | `misc/demo_space_xpce.co` | Full demo: rect/circle/ellipse/arc/polygon/line, transforms, fonts, scissor record. |
 | `misc/*.exe` + `misc/*.dll` | Built apps plus staged XPCE native libraries. |
 
@@ -20,12 +21,65 @@ SWI-Prolog's XPCE toolkit (`library(pce)` + `library(pce_main)`).
 
 `sp.init(w,h)`, `sp.start(ms,callbacks,state)`, `sp.startCanvas(fps,callbacks,state)`,
 `sp.quit/dispose/loadImage`, `graphics.clear/setColor/rectangle/line/circle/ellipse/arc/polygon/print/printf/push/pop/origin/translate/rotate/scale/setLineWidth/setScissor/clearScissor/draw/refresh`,
-plus `newFont/setFont/getFont`, `getDimensions/getWidth/getHeight`, timer (`getTime/getDelta/getFPS`)
-and input stubs (`isDown/getX/getY/getPosition/buttonDown`).
+plus `newFont/setFont/getFont`, `getDimensions/getWidth/getHeight`, timer (`getTime/getDelta/getFPS`),
+input (`isDown/getX/getY/getPosition/buttonDown`) and the event queue
+(`event.get/getType/peek`, plus the `on` callback table passed to `sp.start`).
 
-Deliberate v1 limits (XPCE has no safe polling/clip API through this layer):
+## Input
 
-- Keyboard/mouse-button polling always reports "up"; mouse position `(0,0)`.
+XPCE has no polling API in this build. There is no `push_event/4`,
+`push_global_event/4`, `get_event/3` or `key_name/2` — neither
+`library(pce)` nor the Prolog layer under `C:\Program Files\swipl\xpce`
+defines them, and calling them raises `existence_error`. Input therefore
+arrives as callbacks.
+
+The hook is the `->event` method of class `graphical`, redefined on a
+subclass of `picture`:
+
+```prolog
+:- op(1200, xfx, :->).
+:- pce_begin_class(space_picture, picture, "...").
+event(G, Ev:event) :->
+    (   space_xpce_capture(G, Ev)
+    ;   true
+    ),
+    (   send_super(G, event, Ev)
+    ;   true
+    ).
+:- pce_end_class.
+```
+
+Two constraints shape the whole implementation, and both are expensive to
+rediscover:
+
+1. **An XPCE error raised while the loop is running opens a MODAL dialog**
+   that blocks dispatch for good. `catch/3` does not help: the error is
+   raised in C++ and aborts the goal rather than becoming a Prolog
+   exception. One bad call freezes the app with no way back, so every call
+   in `space_xpce_read/4` is verified against this build.
+2. **`?/2` does not exist here.** It raises
+   `existence_error(procedure, (?)/2)` even after
+   `use_module(library(yall))`. Use `get/3` and `send/2,3` only.
+
+Verified accessors: `get(Ev, id, _)`, `get(Ev, position, _)` followed by
+`get(Pt, x, _)`, `get(Pt, y, _)`, `get(Ev, button, _)`,
+`get(Ev, multiclick, _)`, `send(Ev, is_a, mouse)`,
+`send(Ev, is_down|is_up|is_drag)` (zero-argument behaviours, so `send/2`), and
+`send(Ev, has_modifier, s|c|m)` — bare atoms; `e` is not accepted. Absent:
+`event <-modifiers`, `event <-click_time`.
+
+Event ids come from `@event_tree`: mouse press/release/drag as
+`ms_left_down` and friends, `loc_move`, `loc_still`, `wheel`, `area_enter`;
+keys as the **ASCII code** (an integer) or a named atom (`f1`,
+`cursor_left`, `'ESC'`). Shift is already folded into the code, so shift+A
+arrives as `65` with modifier `s`.
+
+Two consequences: there is no `'keyup'` (the tree has no release events under
+`keyboard/`), and the wheel *rotation amount* is left at `0` because the
+`->attribute` accessor could not be verified without risking the dialog.
+
+Deliberate limits:
+
 - `setScissor` only records the rect; clipping is not enforced.
 - `shear` / `setLineStyle` / `get*` accessors are stubs.
 - Rotation of ellipses only moves the centre (shape stays axis-aligned).
@@ -60,8 +114,12 @@ The user-facing spec is `XPCE_SIMPLE_LIBRARY.md`.
 - Single-quoted literals are **strings**, not atoms. Prolog predicates that
   need atoms (e.g. `current_prolog_flag`) must convert via `atom_string`.
 - A top-level `require('space', sp)` captures `sp` into every rel, turning
-  `main/1` into `main/2` and breaking `--main`/`--exe`. Keep `require`
-  **inside** rel bodies for programs with an entry point.
+  `main/1` into `main/2` and breaking the `--main`/`--exe` argv adapter. Keep
+  `require` **inside** rel bodies for programs built with `--main`, or build
+  with `--xpce` instead and keep `require` at the top of the file (see Build
+  integration). The captured callbacks are fine either way: `call_cl/2`
+  appends a closure's captures as the final argument, so `update` and `draw`
+  still land on the right predicates.
 
 ## XPCE facts found by probing (SWI-Prolog 10)
 
@@ -90,15 +148,26 @@ The user-facing spec is `XPCE_SIMPLE_LIBRARY.md`.
 
 ## Build integration (`compiler/platform/driver.pl`, `compiler/swi.pl`)
 
-- `--main` **and** `--exe` share one entry template, and both record **absolute**
-  library/source templates at build time (exe-dir-relative `../libs` breaks when
-  the exe is not in a subdirectory) and run `abolish_all_tables` first (the
-  tabled module loader otherwise poisons standalone runs).
-- That same template appends `ensure_loaded('<abs>/libs/space_xpce_prolog.pl')`,
+- `--main`, `--xpce` and `--exe` all share one entry template, and each records
+  the library/source templates at build time (exe-dir-relative `../libs` breaks
+  when the exe is not in a subdirectory) and runs `abolish_all_tables` first
+  (the tabled module loader otherwise poisons standalone runs).
+- That same template appends `ensure_loaded(.../libs/space_xpce_prolog.pl)`,
   but **only when the compiled output contains `cosmos_require("space`** — the
   compiler detects a Space program by that string. Consequence: a Space program
-  compiled *without* `--main` has no entry point, so it cannot load the backend
-  and dies with `Unknown procedure: space_xpce_…`. Build with `--main`.
+  compiled with **no** entry flag has no entry point at all, so it cannot load
+  the backend and dies with `Unknown procedure: space_xpce_…`.
+- Three entry kinds, chosen by flag (`compiler_add_entry/3`):
+  - `main` — call `Module:main/1` with the argv list. Implied by `--exe`.
+  - `xpce` — call the module goal itself, i.e. run the file's top-level goals.
+  - `none` — bare compile, no entry point, not runnable.
+
+  `xpce` exists so a program can be written header-only: a top-level
+  `require('space', sp)` captures `sp` into every relation, which would turn
+  `main/1` into `main/2` and leave the `--main` argv adapter calling it with the
+  wrong arity. Running the top-level goals avoids naming `main` at all, so
+  `require`, `sp.init` and `sp.start` can sit at the top of the file. It is not
+  a different renderer — same window, same loop.
 - `load_any` uses the non-tabled `cload` for the same reason.
 - `compiler_stage_xpce_dlls/2` copies the probed `pl2xpce` closure
   (SDL3/cairo/pango/glib/fontconfig/freetype stack + `libswipl.dll`,

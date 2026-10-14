@@ -20,13 +20,62 @@
 :- dynamic space_pending/3.  % space_pending(Prefix, Width, Height) from init
 :- dynamic space_ink/2.      % space_window(Prefix, colour-object)
 :- dynamic space_width/2.    % space_window(Prefix, WidthNumber)
-:- dynamic space_font/2.     % space_window(Prefix, font-object)
+:- dynamic space_font/2.       % space_font(Prefix, spec(Fam, Style, Size))
+:- dynamic space_font_object/2. % space_font_object(Prefix, Font), built lazily
 :- dynamic space_frame/4.    % space_frame(Prefix, IntervalMs, Callbacks, State)
 :- dynamic space_last/2.     % space_last(Prefix, WallSeconds)
 :- dynamic space_image/3.    % space_image(Prefix, Name, ImageObject)
 :- dynamic space_xform/6.    % space_xform(Prefix, DX, DY, Angle, SX, SY)
 :- dynamic space_xstack/2.   % space_xstack(Prefix, [xform(DX,DY,Angle,SX,SY)|...])
 :- dynamic space_scissor/5.  % space_scissor(Prefix, X, Y, W, H) recorded only
+:- dynamic space_events/2.   % space_events(Prefix, [Event|...]) oldest first
+:- dynamic space_mouse/4.     % space_mouse(Prefix, X, Y, [HeldButton|...])
+:- dynamic space_keys/2.      % space_keys(Prefix, [KeyName|...]) held
+
+% --- input plumbing ---------------------------------------------------------
+%
+% XPCE has no polling API in this build: there is no push_event/4,
+% push_global_event/4, get_event/3 or key_name/2 (the Prolog layer under
+% C:\Program Files\swipl\xpce does not define them, and library(pce) exports
+% only new/send/get plus the threading helpers).  Input therefore arrives as
+% callbacks.  The documented hook is the ->event method of class graphical,
+% redefined on a subclass:
+%
+%   graphical ->event: event
+%     "May be redefined to modify event processing.  This is a class-level
+%      alternative for graphical ->recogniser."
+%
+% The recogniser alternative needs a recogniser class per event kind and is
+% much heavier, so ->event is what this backend uses.
+%
+% Two hard constraints shape everything below, both learned the hard way:
+%
+%  1. An XPCE error raised while the loop is running opens a MODAL dialog.
+%     That dialog blocks dispatch for good, so one bad call freezes the app
+%     with no way back.  catch/3 does NOT help: the error is raised in C++ and
+%     aborts the goal rather than becoming a Prolog exception.  Every call in
+%     space_xpce_read/4 is therefore verified against this build.
+%  2. The ?/2 shortcut does not exist here -- it raises
+%     existence_error(procedure, (?)/2) even after use_module(library(yall)).
+%     Use get/3 and send/2,3 only.
+
+% XPCE pushes these operators into its own compilation units rather than
+% exporting them, so a client file has to declare them itself.
+:- op(1200, xfx, :->).
+:- op(1200, xfx, :<-).
+
+:- pce_begin_class(space_picture, picture,
+                   "Cosmos Space picture: routes XPCE input into the event queue").
+
+event(G, Ev:event) :->
+    (   space_xpce_capture(G, Ev)
+    ;   true
+    ),
+    (   send_super(G, event, Ev)
+    ;   true
+    ).
+
+:- pce_end_class.
 
 % --- helpers ---------------------------------------------------------------
 
@@ -90,10 +139,26 @@ space_ink_for(Prefix, Colour) :-
 space_width_for(Prefix, Width) :-
     ( space_width(Prefix, Width) -> true ; Width = 1 ).
 
+% XPCE objects cannot be built before the event loop has realised the
+% display: `new(Font, font(...))` called at top level, before sp.start/3,
+% FAILS.  That matters because a Cosmos program quite reasonably configures
+% its font up front:
+%
+%     require('space', sp)
+%     sp.setFont({size=14 and family='sans' and style='normal'})
+%     sp.start(...)
+%
+% so setFont only records the SPEC here, and the real font object is
+% materialised on first use -- by which time the loop is running.
 space_font_for(Prefix, Font) :-
-    ( space_font(Prefix, Font) -> true
-    ; new(Font, font(helvetica, roman, 12)),
-      assertz(space_font(Prefix, Font))
+    (   space_font_object(Prefix, Font)
+    ->  true
+    ;   (   space_font(Prefix, spec(Fam, Sty, Size))
+        ->  true
+        ;   Fam = helvetica, Sty = roman, Size = 12
+        ),
+        new(Font, font(Fam, Sty, Size)),
+        assertz(space_font_object(Prefix, Font))
     ).
 
 % Fill-mode test for Cosmos "fill"/"line" strings (atoms tolerated).
@@ -166,10 +231,20 @@ space_xpce_init(Prefix0, W0, H0) :-
 space_xpce_boot_window(Prefix) :-
     ( space_window(Prefix, _) -> true
     ; ( space_pending(Prefix, W, H) -> true ; W = 640, H = 480 ),
-      new(Window, picture('Cosmos Space')),
+      % space_picture, not picture: the subclass is what routes ->event into
+      % space_xpce_capture/2.  A plain picture would simply ignore input.
+      new(Window, space_picture('Cosmos Space')),
       send(Window, size, size(W, H)),
       send(Window, open),
-      assertz(space_window(Prefix, Window))
+      % window ->keyboard_focus takes a GRAPHICAL, not @on/@off; pointing it
+      % at the picture is what makes keyboard events arrive here.  It has to
+      % come AFTER open: asking for focus on a picture that is not on screen
+      % yet is an XPCE error, which the event loop turns into a modal dialog.
+      send(Window, keyboard_focus, Window),
+      assertz(space_window(Prefix, Window)),
+      retractall(space_events(Prefix, _)),
+      retractall(space_mouse(Prefix, _, _, _)),
+      retractall(space_keys(Prefix, _))
     ).
 
 % NOTE: never destroy/hide an opened XPCE window programmatically: outside
@@ -179,7 +254,10 @@ space_xpce_boot_window(Prefix) :-
 space_xpce_forget_window(Prefix) :-
     retractall(space_window(Prefix, _)),
     retractall(space_frame(Prefix, _, _, _)),
-    retractall(space_last(Prefix, _)).
+    retractall(space_last(Prefix, _)),
+    retractall(space_events(Prefix, _)),
+    retractall(space_mouse(Prefix, _, _, _)),
+    retractall(space_keys(Prefix, _)).
 
 space_xpce_start(Prefix0, IntervalMs, Callbacks, InitialState) :-
     space_prefix(Prefix0, Prefix),
@@ -237,6 +315,15 @@ space_xpce_tick(Prefix) :-
         get_time(Now),
         ( retract(space_last(Prefix, Last)) -> Dt is Now - Last ; Dt = 0.016 ),
         assertz(space_last(Prefix, Now)),
+        % XPCE has delivered whatever input arrived since the last tick.
+        % Callbacks registered under "on" fire here, BEFORE update/draw, so a
+        % handler sees the frame's events.  The queue is only PEEKED at: it is
+        % drained by event.get/2, which is what a polling program calls from
+        % update.  Draining here instead would starve every polling caller.
+        space_xpce_events_pending(Prefix, Events),
+        ( Events == [] -> true
+        ; space_xpce_dispatch_callbacks(Prefix, Events)
+        ),
         ( get_assoc("update", Callbacks, Update) ->
             catch(call_cl(Update, [Dt, State, NewState]), E,
                   ( print_message(warning, E), NewState = State ))
@@ -512,8 +599,11 @@ space_xpce_set_font(Prefix0, Size0, Family, Style) :-
     space_font_name(Family, Fam),
     space_font_style(Style, Sty),
     retractall(space_font(Prefix, _)),
-    new(Font, font(Fam, Sty, Size)),
-    assertz(space_font(Prefix, Font)).
+    % Record the SPEC, not the real font object: see space_font_for/2 for
+    % why a font cannot be built before the loop realises the display.
+    % Any already-materialised font is dropped so the new spec takes effect.
+    assertz(space_font(Prefix, spec(Fam, Sty, Size))),
+    retractall(space_font_object(Prefix, _)).
 
 space_font_name(Family, Fam) :-
     ( Family == "serif" ; Family == serif ) -> Fam = times ;
@@ -540,13 +630,316 @@ space_xpce_draw_image(Prefix0, Name, X, Y) :-
     space_round(X2, XI), space_round(Y2, YI),
     catch(send(Window, display, Image, point(XI, YI)), _, true).
 
-% --- input (stubs: XPCE has no polling API; events later) --------------------
+% --- input ------------------------------------------------------------------
+%
+% space_xpce_capture/2 runs inside XPCE's event dispatch.  It must not fail
+% (the guard in the ->event method above swallows failure) and, more
+% importantly, must not raise: see the two constraints at the top.
 
-space_xpce_keyboard_is_down(_Prefix, _Key, 0).
+space_xpce_capture(Window, Ev) :-
+    ( space_xpce_prefix_of(Window, Prefix) -> true ; Prefix = default ),
+    space_xpce_read(Ev, Type, Fields),
+    % Build the table FIRST and pass that on.  Downstream code indexes it
+    % with get_assoc/3, which needs the assoc -- passing the raw Key-Value
+    % list raises "'$btree_find_node'/5: Type error: `btree' expected".
+    space_event_assoc(Fields, Event),
+    space_xpce_update_state(Prefix, Type, Event),
+    retractall(space_events(Prefix, _)),
+    ( space_events(Prefix, Queue) -> true ; Queue = [] ),
+    append(Queue, [Event], Queue1),
+    assertz(space_events(Prefix, Queue1)).
 
-space_xpce_mouse_get_position(_Prefix, 0, 0).
+space_xpce_prefix_of(Window, Prefix) :-
+    space_window(Prefix, Window).
 
-space_xpce_mouse_is_down(_Prefix, _Button, 0).
+% Build the Cosmos-facing event table.  A Cosmos "table" is a Prolog assoc
+% (swi.pl: cosmos_type/2 maps is_assoc/1 to "Table"), so list_to_assoc/2 is
+% the right bridge.
+space_event_assoc(Fields, Event) :-
+    list_to_assoc(Fields, Event).
+
+% Verified accessors for this XPCE build:
+%   get(Ev, id, Id)              integer (ASCII) or atom (named key / event)
+%   get(Ev, position, Pt)        a point object; coords come from
+%   get(Pt, x, X), get(Pt, y, Y) which is why there is no ?/2 anywhere here
+%   get(Ev, button, B)           left | middle | right
+%   get(Ev, multiclick, Mc)      single | double | triple
+%   send(Ev, is_a, mouse)        type test
+%   send(Ev, is_down|is_up|is_drag)   zero-argument behaviours (send/2)
+%   send(Ev, has_modifier, s|c|m)     bare atoms; 'e' is NOT accepted
+% Absent in this build: event <-modifiers, event <-click_time.
+space_xpce_read(Ev, Type, Fields) :-
+    get(Ev, id, Id),
+    ( send(Ev, is_a, mouse) -> Mouse = true ; Mouse = false ),
+    ( Mouse == true -> space_xpce_read_mouse(Ev, Id, Type, Fields)
+                     ; space_xpce_read_key(Ev, Id, Type, Fields)
+    ).
+
+space_xpce_read_mouse(Ev, Id, Type, Fields) :-
+    get(Ev, position, Pt),
+    get(Pt, x, X0), get(Pt, y, Y0),
+    ( send(Ev, is_down) -> Down = true ; Down = false ),
+    ( send(Ev, is_up)   -> Up   = true ; Up   = false ),
+    ( send(Ev, is_drag) -> Drag = true ; Drag = false ),
+    ( catch(get(Ev, button, Button0), _, fail) -> Button = Button0 ; Button = none ),
+    ( catch(get(Ev, multiclick, Clicks0), _, fail) -> Clicks = Clicks0 ; Clicks = none ),
+    space_xpce_mouse_type(Id, Down, Up, Drag, Type),
+    space_xpce_mods(Ev, Mod),
+    space_xpce_button_number(Button, ButtonNumber),
+    % The wheel ROTATION amount is deliberately not read.  The documented
+    % accessor is `->attribute', and nothing in this build has been verified
+    % to accept it; an XPCE error here would open a modal dialog and kill the
+    % event loop (see the constraints at the top of this file).  The wheel
+    % EVENT itself still arrives, with type, position and button.
+    %
+    % Keys are STRINGS, not atoms.  A Cosmos table is an assoc and every
+    % Cosmos-level lookup goes through cosmos_get/3 with a string key, so an
+    % atom-keyed assoc reads back as missing and `ev.type' yields null.
+    Fields = [ "type"-Type, "mod"-Mod,
+               "posx"-X0, "posy"-Y0, "x"-X0, "y"-Y0,
+               "button"-ButtonNumber, "clicks"-Clicks, "wheel"-0.0 ].
+
+space_xpce_read_key(Ev, Id, Type, Fields) :-
+    space_xpce_mods(Ev, Mod),
+    % space_xpce_key/3 already applies shift: XPCE reports the shifted code,
+    % so `char' is the character as typed and `key' the lower-case name.
+    space_xpce_key(Id, Key, Char),
+    Type = "keydown",
+    Fields = [ "type"-Type, "key"-Key, "char"-Char, "mod"-Mod ].
+
+% Mouse event ids.  XPCE reports press/release/drag separately, and pointer
+% motion as loc_move (moving) or loc_still (present but stationary).
+space_xpce_mouse_type(Id, Down, Up, Drag, Type) :-
+    (   Down == true
+    ->  Type = "mousedown"
+    ;   Up == true
+    ->  Type = "mouseup"
+    ;   Drag == true
+    ->  Type = "mousemotion"
+    ;   space_xpce_mouse_id(Id, Type)
+    ).
+
+space_xpce_mouse_id(loc_move, Type) :- !, Type = "mousemotion".
+space_xpce_mouse_id(loc_still, Type) :- !, Type = "mousemotion".
+space_xpce_mouse_id(wheel, Type) :- !, Type = "mousewheel".
+% A down/up/drag id reached us with the corresponding behaviour false (XPCE
+% reported it out of the usual order); fall back to the id itself.
+space_xpce_mouse_id(Id, Type) :-
+    atom_concat('ms_', Rest, Id),
+    atom_concat(Button, Suffix, Rest),
+    space_xpce_button_name(Button),
+    (   suffix(Suffix, "_down") -> Type = "mousedown"
+    ;   suffix(Suffix, "_up")   -> Type = "mouseup"
+    ;   suffix(Suffix, "_drag") -> Type = "mousemotion"
+    ;   Type = "mousemotion"
+    ).
+space_xpce_mouse_id(_, Type) :- Type = "mousemotion".
+
+space_xpce_button_number(none, N) :- !, N = 0.
+space_xpce_button_number(B, N) :-
+    ( B == left -> N = 1 ; B == middle -> N = 2 ; B == right -> N = 3 ; N = 0 ).
+
+space_xpce_button_name(Button) :-
+    memberchk(Button, [left, middle, right]).
+
+% Modifier string in PyGame style: any of "s" (shift), "c" (control),
+% "m" (meta/super).  Only these three are accepted by has_modifier/1.
+space_xpce_mods(Ev, Mods) :-
+    findall(L,
+            ( member(L, [s, c, m]), send(Ev, has_modifier, L) ),
+            Ms),
+    ( Ms == [] -> Mods = "" ; atom_chars(Mods, Ms) ).
+
+% Key naming.  XPCE gives a printable key as its ASCII code and everything
+% else as an atom from the @event_tree hierarchy.  Names are returned as
+% STRINGS, not atoms: the whole event table has to be Cosmos-shaped, where
+% `ev.key' is compared against string literals.
+space_xpce_key(Id, Name, Char) :-
+    (   integer(Id)
+    ->  space_xpce_ascii_atom(Id, KeyAtom, CharAtom)
+    ;   atom(Id)
+    ->  (   space_xpce_named_key(Id, Named)
+        ->  KeyAtom = Named, CharAtom = ''
+        ;   atom_chars(Id, Chars),
+            (   Chars == []
+            ->  KeyAtom = '', CharAtom = ''
+            ;   Chars = [C|_],
+                downcase_atom(C, KeyAtom),
+                CharAtom = C
+            )
+        )
+    ;   KeyAtom = '', CharAtom = ''
+    ),
+    atom_string(KeyAtom, Name),
+    atom_string(CharAtom, Char).
+
+% A printable key arrives as its ASCII code, so shift is already folded into
+% the number: shift+a is 65, plain a is 97.  That gives PyGame's split for
+% free -- `key' is the lower-case name, `char' is the character as typed.
+% Control codes carry no printable character, so char is empty for them.
+space_xpce_ascii_atom(Code, KeyAtom, CharAtom) :-
+    char_code(C, Code),
+    (   space_xpce_control_char(C, Special)
+    ->  KeyAtom = Special, CharAtom = ''
+    ;   downcase_atom(C, KeyAtom), CharAtom = C
+    ).
+
+% These are CHARACTERS, not codes: the caller has already done char_code/2.
+space_xpce_control_char('\b',  "backspace").
+space_xpce_control_char('\t',  "tab").
+space_xpce_control_char('\n',  "return").
+space_xpce_control_char('\r',  "return").
+space_xpce_control_char('\e',  "escape").
+space_xpce_control_char(' ',   "space").
+
+space_xpce_named_key('TAB', "tab").
+space_xpce_named_key('RET', "return").
+space_xpce_named_key('ESC', "escape").
+space_xpce_named_key('BS',  "backspace").
+space_xpce_named_key('DEL', "delete").
+space_xpce_named_key(cursor_left,  "left").
+space_xpce_named_key(cursor_right, "right").
+space_xpce_named_key(cursor_up,    "up").
+space_xpce_named_key(cursor_down,  "down").
+space_xpce_named_key(cursor_home,  "home").
+space_xpce_named_key(begin,         "home").
+space_xpce_named_key(end,           "end").
+space_xpce_named_key(page_up,       "pageup").
+space_xpce_named_key(page_down,     "pagedown").
+space_xpce_named_key(insert,        "insert").
+space_xpce_named_key(delete,        "delete").
+space_xpce_named_key(undo,          "undo").
+space_xpce_named_key(redo,          "redo").
+space_xpce_named_key(cancel,        "escape").
+space_xpce_named_key(execute,       "enter").
+space_xpce_named_key(print,         "printscreen").
+space_xpce_named_key(select,        "select").
+space_xpce_named_key(menu,          "menu").
+space_xpce_named_key(find,          "find").
+space_xpce_named_key(help,          "help").
+space_xpce_named_key(pause,         "pause").
+space_xpce_named_key(break,         "pause").
+% f1..f12.  Name and key are the same atom, so f1 stays "f1" rather than
+% collapsing to "f".
+space_xpce_named_key(F, F) :-
+    atom_length(F, 2),
+    sub_atom(F, 0, 1, _, "f"),
+    atom_number(F, N),
+    between(1, 12, N).
+
+% --- polling state ----------------------------------------------------------
+
+% Every event carries only SOME of the fields: a keydown has no button or
+% position, a mousedown has no key.  get_assoc/3 simply FAILS on a missing
+% key, so a direct call would abort space_xpce_update_state/3 -- and because
+% the ->event method swallows failure, the event would be silently dropped.
+% All lookups therefore go through this tolerant accessor.
+space_field(Key, Fields, Default, Value) :-
+    (   get_assoc(Key, Fields, V)
+    ->  Value = V
+    ;   Value = Default
+    ).
+
+% ...and the same for the internal lookups, which use the same string keys.
+
+space_xpce_update_state(Prefix, Type, Fields) :-
+    space_field("posx", Fields, 0, X),
+    space_field("posy", Fields, 0, Y),
+    space_xpce_mouse_buttons(Prefix, Type, Fields, Buttons),
+    retractall(space_mouse(Prefix, _, _, _)),
+    assertz(space_mouse(Prefix, X, Y, Buttons)),
+    (   Type == "keydown"
+    ->  space_field("key", Fields, "", Key0),
+        space_xpce_key_name(Key0, Key),
+        retractall(space_keys(Prefix, _)),
+        assertz(space_keys(Prefix, [Key]))
+    ;   true
+    ).
+
+space_xpce_mouse_buttons(Prefix, Type, Fields, Buttons) :-
+    ( space_mouse(Prefix, _, _, Held0) -> true ; Held0 = [] ),
+    space_field("button", Fields, 0, N),
+    (   Type == "mousedown"
+    ->  exclude(==(N), Held0, Kept), Buttons = [N|Kept]
+    ;   Type == "mouseup"
+    ->  exclude(==(N), Held0, Buttons)
+    ;   Buttons = Held0
+    ).
+
+% Normalise whatever a caller passed as a key name into a string.  Event
+% keys arrive as strings (space_xpce_key/3), a Cosmos program passes a
+% string, and an old caller may pass an atom or a number.
+space_xpce_key_name(N, Name) :-
+    (   string(N)
+    ->  Name = N
+    ;   atom(N)
+    ->  atom_string(N, Name)
+    ;   number_string(N, Name)
+    ).
+
+% PyGame-style event queue.  get/2 hands the accumulated list over and
+% clears it, so a program that never calls get/1 does not grow the queue
+% without bound -- the tail is simply dropped on the next get/2.
+space_xpce_events_pending(Prefix0, Events) :-
+    space_prefix(Prefix0, Prefix),
+    ( space_events(Prefix, Events) -> true ; Events = [] ).
+
+space_xpce_event_get(Prefix0, Events) :-
+    space_prefix(Prefix0, Prefix),
+    ( space_events(Prefix, Events) -> true ; Events = [] ),
+    retractall(space_events(Prefix, _)).
+
+space_xpce_event_get(Prefix0, Type, Events) :-
+    space_prefix(Prefix0, Prefix),
+    ( space_events(Prefix, All) -> true ; All = [] ),
+    include(space_event_type(Type), All, Events),
+    retractall(space_events(Prefix, _)).
+
+space_event_type(Type, Event) :-
+    ( get_assoc("type", Event, Type) -> true ; fail ).
+
+% Filtering on an unbound-or-different Type simply drops the event.
+
+space_xpce_keyboard_is_down(Prefix0, Key, 1) :-
+    space_prefix(Prefix0, Prefix),
+    space_xpce_key_name(Key, Name),
+    ( space_keys(Prefix, Held) -> true ; Held = [] ),
+    memberchk(Name, Held), !.
+space_xpce_keyboard_is_down(_, _, 0).
+
+space_xpce_mouse_get_position(Prefix0, X, Y) :-
+    space_prefix(Prefix0, Prefix),
+    ( space_mouse(Prefix, X0, Y0, _) -> true ; X0 = 0, Y0 = 0 ),
+    X = X0, Y = Y0.
+
+space_xpce_mouse_is_down(Prefix0, Button, 1) :-
+    space_prefix(Prefix0, Prefix),
+    ( space_mouse(Prefix, _, _, Held) -> true ; Held = [] ),
+    memberchk(Button, Held), !.
+space_xpce_mouse_is_down(_, _, 0).
+
+% Dispatch queued events to Love2D-style callbacks supplied in the sp.start
+% map under "on".  Called from the frame tick, after XPCE has had the whole
+% frame to deliver input.
+space_xpce_dispatch_callbacks(Prefix, Events) :-
+    space_frame(Prefix, _, Callbacks, _),
+    ( get_assoc("on", Callbacks, Handlers) -> true ; Handlers = none ),
+    Handlers \== none,
+    forall(member(Event, Events), space_xpce_fire(Handlers, Event)),
+    !.
+space_xpce_dispatch_callbacks(_, _).
+
+% Kept separate on purpose.  Nesting an if-then-else inside the conjunction
+% passed to forall/2 made the parser collapse forall/2 into a call to
+% forall/1, which does not exist; because this runs inside the XPCE event
+% dispatch that surfaced as a modal "SWI-Prolog" error dialog that froze the
+% app before a single frame ran.
+space_xpce_fire(Handlers, Event) :-
+    (   get_assoc("type", Event, Type),
+        get_assoc(Type, Handlers, Handler)
+    ->  catch(call_cl(Handler, [Event]), E, print_message(warning, E))
+    ;   true
+    ).
 
 % --- timer --------------------------------------------------------------------
 

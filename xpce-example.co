@@ -1,0 +1,81 @@
+// Pure-XPCE GUI demo: a dialog window with a title, a blinking box, a
+// name field, and Greet/Quit buttons.  Run it with:
+//
+//   cosmos -l xpce-example.co --xpce
+//
+// --xpce runs the file's top-level goals (no main involved), which is what
+// makes the top-level require legal.  Callback relations take exactly one
+// argument (their source handle) and must not mention any top-level
+// binding -- that would capture it into an extra parameter and miss the
+// call.  Shared state lives in xp.set_data/get_data, so every callback
+// below requires 'xpce' inside its own body.
+require('xpce', xp)
+
+xp.create('dialog', ['Cosmos XPCE'], win)
+
+xp.create('text', ['Pure XPCE, driven from Cosmos'], title)
+xp.send(win, 'append', [title])
+
+xp.create('box', [120, 50], gauge)
+xp.color('#3050ff', blue)
+xp.color('#ff5533', orange)
+xp.send(gauge, 'fill_pattern', [blue])
+xp.send(win, 'append', [gauge])
+xp.set_data('gauge', gauge)
+xp.set_data('blue', blue)
+xp.set_data('orange', orange)
+xp.set_data('phase', 0)
+xp.set_data('ticks', 0)
+
+xp.create('text', ['name:'], namelabel)
+xp.send(win, 'append', [namelabel])
+xp.create('text_item', ['name', 'Ada'], namefield)
+xp.send(win, 'append', [namefield])
+xp.set_data('namefield', namefield)
+
+xp.create('button', ['Greet'], greet)
+xp.on_click(greet, do_greet)
+xp.send(win, 'append', [greet])
+
+xp.create('button', ['Quit'], quit)
+xp.on_click(quit, do_quit)
+xp.send(win, 'append', [quit])
+
+xp.send(win, 'open', [])
+xp.timer(0.2, tick, _t)
+xp.timer(25.0, auto_quit, _t2)
+xp.loop()
+
+rel tick(_tm)
+    require('xpce', xp)
+    xp.get_data('ticks', n)
+    xp.set_data('ticks', n + 1)
+    xp.get_data('phase', phase)
+    xp.get_data('gauge', gauge)
+    if(phase = 0)
+        xp.get_data('orange', c)
+        xp.set_data('phase', 1)
+    else
+        xp.get_data('blue', c)
+        xp.set_data('phase', 0)
+    xp.send(gauge, 'fill_pattern', [c])
+    if(n % 25 = 0)
+        print(['tick ', n])
+    else
+        true
+
+rel do_greet(_btn)
+    require('xpce', xp)
+    xp.get_data('namefield', nf)
+    xp.get(nf, 'selection', who)
+    print(['hello, ', who])
+
+rel do_quit(_btn)
+    require('xpce', xp)
+    print('quit clicked')
+    xp.quit()
+
+rel auto_quit(_tm)
+    require('xpce', xp)
+    print('auto-quit')
+    xp.quit()

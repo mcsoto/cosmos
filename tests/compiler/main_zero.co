@@ -1,0 +1,6 @@
+// A zero-argument main.  cc_term/3 in compiler/platform/terms.pl writes an
+// empty argument list as a bare atom, so the compiler emits
+// `'fixture0::main':-'fixture0::$impl_main'.`  A --main entry that called
+// `'fixture0::main'(Arguments)` would raise existence_error at run time.
+rel main()
+    print('zero-arg entry ran')

@@ -1,0 +1,97 @@
+// Keyboard-controlled rectangle - the arrow keys move it.
+//
+//   cosmos -l test4.co --xpce
+//
+// --xpce compiles the file and then runs its top-level goals. That is what
+// makes this header-only shape legal: `require` and the sp.init / sp.start
+// calls sit at the top of the file instead of inside a `main` relation.
+//
+// The other shape is --main, which needs a `main` relation and wants `require`
+// inside the rel bodies, because a top-level require captures sp into main as
+// well and the --main argv adapter then has to call it with that capture.
+// --xpce sidesteps the question by running the file's top-level goals instead
+// of naming an entry relation. It is not a different renderer: same window,
+// same loop.
+//
+// Same window and loop shape as test3.co (the ui2.pl port), but instead of a
+// fixed step per frame the rectangle is driven by the arrow keys, through the
+// PyGame-style event queue on sp.event.
+//
+// Two notes on the input:
+//
+// 1. Every arrow press moves the rectangle one step. This XPCE build's
+//    @event_tree has no keyboard release events, so there is no keyup to react
+//    to and a "move while held" model has no way to know when to stop. Holding
+//    a key down still glides, because the OS repeats the press.
+//
+// 2. Arrow keys arrive as key='left' / 'right' / 'up' / 'down'. A field an
+//    event does not carry reads back as null rather than failing, so any other
+//    key just falls through nudge/5 unchanged.
+//
+// See XPCE_SIMPLE_LIBRARY.md for the loop model, the event queue and the API.
+
+require('space', sp)
+
+// ---- simulation ----
+
+// Drain this frame's keydowns and fold them into the position. Polling with
+// getType/2 rather than using an `on` callback keeps every state change inside
+// update, which is the only place state changes in this loop model.
+rel update(_dt, s, s2)
+    sp.event.getType('keydown', keys)
+    walk_keys(keys, s.x, s.y, x, y)
+    s2 = {x = x and y = y}
+
+// Apply each event's key in turn, threading the position through the list.
+rel walk_keys([], x, y, xf, yf)
+    xf = x
+    yf = y
+rel walk_keys([ev|rest], x, y, xf, yf)
+    nudge(ev.key, x, y, nx, ny)
+    walk_keys(rest, nx, ny, xf, yf)
+
+// One arrow press, clamped so the rectangle stays inside the window.
+rel nudge(key, x, y, xf, yf)
+    step = 10
+    if(key='left')
+        clamp(x-step, 0, 560, xf)
+        yf = y
+    elseif(key='right')
+        clamp(x+step, 0, 560, xf)
+        yf = y
+    elseif(key='up')
+        xf = x
+        clamp(y-step, 0, 430, yf)
+    elseif(key='down')
+        xf = x
+        clamp(y+step, 0, 430, yf)
+    else
+        xf = x
+        yf = y
+
+rel clamp(v, lo, hi, out)
+    if(v<lo)
+        out = lo
+    elseif(v>hi)
+        out = hi
+    else
+        out = v
+
+// ---- rendering ----
+
+rel draw(s)
+    g = sp.graphics
+    g.clear('#12121c')
+    // Outline the limits the clamp above enforces, so they are visible.
+    g.setColor('#2b2b45')
+    g.rectangle('line', 0, 0, 640, 480)
+    g.setColor('#5ee7a0')
+    g.rectangle('fill', s.x, s.y, 80, 50)
+    g.setColor('#c8c8e0')
+    g.setFont(g.newFont(16, 'sans', 'normal'))
+    g.print('Arrow keys move the rectangle', 16, 16)
+
+// ---- run ----
+
+sp.init(640, 480)
+sp.start(16, {update=update and draw=draw}, {x=280 and y=215})

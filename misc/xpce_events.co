@@ -1,0 +1,101 @@
+// --xpce demo: a top-level require is the whole point of the flag.
+//
+// With --main the generated entry has to call main/1, and a top-level
+// `require` turns sp into a capture of every relation that mentions it --
+// which changes main's arity and breaks that entry.  --xpce runs the file's
+// top-level goals instead, so no main is involved at all.
+//
+// Exercises both input styles: sp.event.get() polling, and Love2D-style
+// callbacks handed to start() under "on".  It also quits by itself, which
+// matters for testing: a force-killed process discards whatever is still
+// buffered on its stdout pipe.
+
+require('space', sp)
+require('list', list)
+require('mutable', mutable)
+
+frames = mutable.new()
+mutable.set(frames, 'value', 0)
+
+sp.init(460, 320)
+sp.graphics.setFont({size=13 and family='sans' and style='normal'})
+
+// --- callback style -------------------------------------------------------
+// Registered as VALUES in the start map, so they reach
+// space_xpce_dispatch_callbacks/2 as clos/2 terms and are invoked with
+// call_cl/2 -- the same mechanism an upvalue-capturing closure uses.
+
+rel on_keydown(ev)
+    print(['CALLBACK keydown key=', ev.key, ' char=', ev.char, ' mod=', ev.mod])
+
+rel on_mousedown(ev)
+    print(['CALLBACK mousedown x=', ev.posx, ' y=', ev.posy, ' button=', ev.button])
+
+// --- polling style --------------------------------------------------------
+
+// list.each/3 builds on eachIndex/4, which calls `p(Index, Element, Result)`
+// -- three arguments, so a predicate passed to it must take three.  Getting
+// this wrong raises inside the frame tick, where it is swallowed, and the
+// events then disappear with no error anywhere.
+rel show_one(i, ev, out)
+    print(['POLL #', i, ' ', ev.type,
+           ' x=', ev.posx, ' y=', ev.posy,
+           ' button=', ev.button, ' clicks=', ev.clicks,
+           ' key=', ev.key, ' char=', ev.char, ' mod=', ev.mod])
+    out = 0
+
+rel handle(events)
+    list.each(events, show_one, _walked)
+    list.size(events, n)
+    if(n > 0)
+        print(['POLL drained ', n, ' event(s) this frame'])
+    else
+        true
+
+rel draw(s)
+    sp.graphics.clear('#101820')
+    sp.graphics.setColor('#7ec8ff')
+    sp.graphics.rectangle('fill', 20, 20, 340, 28)
+    sp.graphics.setColor('#ffffff')
+    sp.graphics.print('click in the window, or press a key', 30, 38)
+    sp.graphics.setColor('#ffd166')
+    sp.input.getPosition(pos)
+    // sp.graphics.print takes exactly (text, x, y), and XPCE's text wants a
+    // string, not a Cosmos list.  Build the message with +, which is how the
+    // rest of the standard library assembles strings.
+    sp.graphics.print('mouse x=' + pos.x + ' y=' + pos.y, 20, 58)
+    // Draining in draw rather than update is deliberate: the tick PEEKS at the
+    // queue to fire callbacks and never drains, so a polling program owns the
+    // drain and decides which frame sees which events.
+    sp.event.get(events)
+    list.size(events, n)
+    sp.graphics.print('queue holds ' + n + ' event(s) since the last get()', 20, 74)
+    if(sp.input.buttonDown(1))
+        sp.graphics.print('LEFT BUTTON HELD', 20, 86)
+    else
+        true
+
+rel update(_dt, s, s2)
+    mutable.get(frames, 'value', n)
+    mutable.set(frames, 'value', n + 1)
+    sp.event.get(events)
+    list.size(events, count)
+    // Only walk the queue when there is one.  list.each/3 on an empty list
+    // fails, and a failing relation makes the whole frame tick fail -- which
+    // silently freezes the app after one frame, with no error anywhere.
+    if(count > 0)
+        handle(events)
+    else
+        true
+    if(n % 30 = 0)
+        print(['frame ', n, ' events ', count])
+    else
+        true
+    if(n > 400)
+        print(['STOPPING after ', n, ' frames'])
+        sp.quit()
+    else
+        true
+    s2 = s
+
+sp.start(33, {update=update and draw=draw and on={keydown=on_keydown and mousedown=on_mousedown}}, s)

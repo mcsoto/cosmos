@@ -164,6 +164,32 @@ timer = {
         pl::space_xpce_get_fps(_, fps)
 }
 
+// PyGame-style event queue.  sp.event.get() drains everything XPCE has
+// delivered since the last call and hands back a list of tables, each with
+// at least a `type` field:
+//   mousemotion  posx posy x y button clicks mod
+//   mousedown    + the above
+//   mouseup      + the above
+//   mousewheel   + wheel (always 0 here, see the backend)
+//   keydown      key char mod
+// There is no keyup: this XPCE build's @event_tree has no release events
+// under keyboard/ (only ascii/control/printable, function_key, cursor and
+// named_function), so only presses are ever delivered.
+//
+// get/1 and getType/2 are separate NAMES rather than one overloaded get,
+// because the Cosmos compiler resolves a method by name, not by arity.
+event = {
+    rel get(events)
+        pl::space_xpce_event_get(_, events)
+
+    rel getType(type, events)
+        pl::space_xpce_event_get(_, type, events)
+
+    // Non-draining peek, used by the frame tick to fire callbacks.
+    rel peek(events)
+        pl::space_xpce_events_pending(_, events)
+}
+
 // Main Space API
 sp = {
     // Initialize
@@ -190,12 +216,13 @@ sp = {
     rel loadImage(source, name)
         pl::space_xpce_load_image(_, source, name)
 
-    // Graphics, input, timer
+    // Graphics, input, timer, events
     'graphics' = graphics
     'input' = input
     'keyboard' = input
     'mouse' = input
     'timer' = timer
+    'event' = event
 }
 
 // Export the Space table directly so `require('space', sp)`

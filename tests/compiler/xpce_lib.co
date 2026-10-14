@@ -1,0 +1,50 @@
+// Headless test for the pure XPCE bridge: no window is opened, so this
+// runs anywhere SWI has library(pce).  Exercises require-chain loading,
+// create/send/get/free, value conversions, shared slots, and timer+poll
+// callback delivery (callbacks take exactly one argument: the source).
+require('xpce', xp)
+
+// create box + read back
+xp.create('box', [80, 50], box)
+xp.get(box, 'width', w)
+print(['width=', w])
+
+// move it, read position
+xp.send(box, 'set', [33, 44])
+xp.get(box, 'x', x)
+xp.get(box, 'y', y)
+print(['pos=', x, y])
+
+// text round trip (atoms come back as strings)
+xp.create('text', ['hello xpce'], t)
+xp.get(t, 'string', s)
+print(['text=', s])
+
+// value constructors compose inside send args
+xp.color('#ff0000', red)
+xp.send(box, 'fill_pattern', [red])
+xp.point(7, 9, pt)
+xp.get(pt, 'x', px)
+print(['point x=', px])
+xp.size(640, 480, sz)
+xp.get(sz, 'width', sw)
+print(['size width=', sw])
+
+// shared slots round-trip untouched values
+xp.set_data('count', 41)
+xp.get_data('count', n)
+print(['slot=', n + 1])
+
+// timer callback via manual pumping (no loop, no window)
+xp.timer(0.01, ticked, _tm)
+pump(400)
+
+rel ticked(tm)
+    print(['TICKED tm=', tm])
+
+rel pump(n)
+    if(n <= 0)
+        true
+    else
+        xp.poll()
+        pump(n - 1)

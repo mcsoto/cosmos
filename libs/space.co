@@ -181,6 +181,21 @@ rel getDelta(delta)
 rel getFPS(fps)
     xpce.timer.getFPS(fps)
 
+// ---- Events (PyGame-style queue) ----
+// get/1 drains everything XPCE delivered since the last call.  getType/2
+// drains only one kind.  peek/1 does not drain, and is what the frame tick
+// uses to fire callbacks; a polling program normally wants get/1, because
+// two frames can see the same event otherwise.
+
+rel getEvents(events)
+    xpce.event.get(events)
+
+rel getEventsOf(type, events)
+    xpce.event.getType(type, events)
+
+rel peekEvents(events)
+    xpce.event.peek(events)
+
 // The nested tables mirror the shape of space_xpce's own export, so consumer
 // call sites are unchanged: sp.init, sp.graphics.clear, sp.keyboard.isDown.
 export({
@@ -251,5 +266,10 @@ export({
         getTime = getTime,
         getDelta = getDelta,
         getFPS = getFPS
+    },
+    event = {
+        get = getEvents,
+        getType = getEventsOf,
+        peek = peekEvents
     }
 })

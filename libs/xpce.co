@@ -1,0 +1,96 @@
+// Pure XPCE bridge: use SWI-Prolog's XPCE GUI toolkit normally from Cosmos.
+//
+// This is NOT Space (libs/space_xpce.co): no canvas, no game loop, no
+// drawing primitives -- just XPCE objects, messages and callbacks.  You
+// create windows, boxes, buttons and text, arrange them with XPCE's own
+// layout (dialog appends, picture display), and hand Cosmos relations to
+// XPCE as event callbacks.
+//
+// Objects cross into Cosmos as integer HANDLES, never as raw references:
+// handles survive arithmetic as 3.0, round-trip exactly, and fail loudly
+// when unknown.  Numbers pass through (integral floats are rounded, since
+// XPCE slots usually want ints); strings become atoms on the way in and
+// come back as strings; live objects come back as fresh handles and empty
+// (@nil) reads back as null.
+//
+// One rel per method name: table literals cannot overload, so optional
+// arguments do not exist here -- every rel below has exactly one arity.
+// A relation's result is its last parameter, which is what lets e.g.
+// `xp.send(win, 'append', [b])` nest handles positionally.
+//
+// The raw bridge loads itself through the ordinary module path:
+// libs/xpce_prolog.pl defines xpce_prolog/1 so this require finds it,
+// loads library(pce) via its own directive, and succeeds.  Loading is
+// idempotent, so requiring 'xpce' twice is harmless.
+require('xpce_prolog', _)
+
+xp = {
+    // Create an XPCE object: class name plus a flat argument list.
+    // Answers with an integer handle.
+    rel create(cls, args, handle)
+        pl::xpce_new(cls, args, handle)
+
+    // Send a message: method name plus a flat argument list.  Handles
+    // inside the list resolve back to their objects.
+    rel send(handle, method, args)
+        pl::xpce_send(handle, method, args)
+
+    // Read an attribute into value.
+    rel get(handle, attr, value)
+        pl::xpce_get(handle, attr, value)
+
+    // Destroy an object and forget its handle.  Never call on an open
+    // window outside the event loop -- close the window instead.
+    rel free(handle)
+        pl::xpce_free(handle)
+
+    // Value constructors for the XPCE compounds Cosmos cannot spell.
+    rel color(spec, handle)
+        pl::xpce_color(spec, handle)
+
+    rel point(x, y, handle)
+        pl::xpce_point(int(x), int(y), handle)
+
+    rel size(w, h, handle)
+        pl::xpce_size(int(w), int(h), handle)
+
+    rel font(family, style, size, handle)
+        pl::xpce_font(family, style, size, handle)
+
+    // Fire `callback` on each button click.  The callback takes exactly
+    // one argument -- the button's own handle -- so one relation can
+    // serve many buttons.  It must not mention any top-level binding
+    // (that would capture it into an extra parameter and miss the call);
+    // shared state lives in set_data/get_data instead.
+    rel on_click(handle, callback)
+        pl::xpce_on_click(handle, callback)
+
+    // Repeating timer, interval in seconds; the callback gets the timer's
+    // own handle, so a one-shot frees itself.  Free the handle to stop it.
+    rel timer(seconds, callback, handle)
+        pl::xpce_timer(seconds, callback, handle)
+
+    // Named shared slots: callbacks take one argument and see no
+    // top-level bindings, so this is where shared state lives.  Values
+    // are stored and returned untouched (numbers, strings, handles).
+    rel set_data(key, value)
+        pl::xpce_set_data(key, value)
+
+    rel get_data(key, value)
+        pl::xpce_get_data(key, value)
+
+    // Enter the XPCE event loop.  Never returns: closing a top-level
+    // window quits (the bridge wires done_message to halt when it
+    // creates one), as does quit() from a callback.
+    rel loop()
+        pl::xpce_loop()
+
+    // End the process.
+    rel quit()
+        c::halt()
+
+    // Pump the display exactly once, for tests and custom loops.
+    rel poll()
+        pl::xpce_poll()
+}
+export(xp)

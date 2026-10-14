@@ -1,0 +1,38 @@
+--safety
+//init clock=range([0,1])
+tick(clock) <- if(clock=0) next clock=1 else clock=0
+spec: init clock in [0,1] and always tick()
+
+--
+init clock in [0,1]
+while(true)
+	if(clock=0) next clock=1 else clock=0
+
+always tick(clock) 
+
+//spec=init clock=list.has([0,1]) and always tick()
+--liveness
+
+//while(A) do C = C until (not A)
+
+
+--
+init clock=0, if(clock=0) next clock=1 else clock=0
+
+protocol(Server, {
+    rel init():
+        self.version = 1
+        self.cache = [0] * NUM_SERVERS
+})
+
+servers = []
+for i in range(NUM_SERVERS):
+  servers.append(Server())
+
+--VARIABLE clock
+
+Init == clock \in {0, 1}
+
+Tick == IF clock = 0 THEN clock' = 1 ELSE clock' = 0
+
+Spec == Init /\ Always [][Tick]_<<clock>>

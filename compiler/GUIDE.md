@@ -569,6 +569,47 @@ cosmos.bat -c app.co --exe
 app.exe Ada
 ```
 
+`main` may also take no arguments. A zero-argument relation is emitted as a
+bare Prolog atom (`'app::main':-'app::$impl_main'.`), and the generated entry
+calls it that way:
+
+```cosmos
+rel main()
+    print('hello')
+```
+
+```powershell
+cosmos.bat -c app.co --main
+swipl -q -s app.pl
+```
+
+`main` is an ordinary relation, so it can also be passed around as a closure
+value like any other; upvalues are packed and unpacked for you.
+
+### `--xpce`: top-level programs
+
+`--xpce` runs a file's **top-level goals** instead of calling `main`, so no
+`main` is involved at all:
+
+```cosmos
+require('space', sp)
+
+sp.init(640, 480)
+
+rel draw(_s)
+    sp.graphics.clear('#101820')
+```
+
+```powershell
+cosmos.bat -c game.co --xpce
+```
+
+This exists because of a specific interaction. A top-level `require` turns
+`sp` into a *capture* of every relation that mentions it, and the compiler
+adds captured variables to a relation's parameters. A `main` that mentions
+`sp` therefore stops being `main/1` and becomes `main/2`, which the `--main`
+entry cannot call. `--xpce` sidesteps that by never calling `main`.
+
 ## Prolog and JavaScript hosts
 
 `pl::name(...)` calls a Prolog predicate exposed by the runtime. This is an
@@ -637,7 +678,7 @@ The active tree additionally has:
 - arbitrary undeclared functors through `:Name(...)` and `:Name`;
 - `.cif` interfaces with exported and nested table-member checking;
 - one-shot queries in a file's lexical scope;
-- generic `--main` and `--exe` application entry points;
+- generic `--main`, `--xpce` and `--exe` application entry points;
 - generated SWI-WASM compiler assets and synchronous Canvas host dispatch.
 
 Compared with the archived `compiler-0.8.43`, the active compiler source is

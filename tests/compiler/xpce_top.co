@@ -1,0 +1,10 @@
+// --xpce runs the file's TOP-LEVEL goals; no main is involved.  That is the
+// whole point of the flag: a top-level require makes `sp` a capture of every
+// relation that mentions it, which changes main's arity and breaks the
+// --main adapter.
+print('xpce top level ran')
+
+rel helper(n)
+    print(n + 1)
+
+helper(41)

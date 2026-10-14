@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Space on XPCE — API &amp; User Guide</title>
+<meta name="description" content="API reference and user guide for the Cosmos Space library backed by SWI-Prolog XPCE: window, immediate-mode 2D drawing, timer game loop and a PyGame-style event queue.">
+<style>
+:root{
+  --bg:#ffffff; --bg-soft:#f6f7f9; --bg-code:#f4f5f7; --fg:#1b1d21; --fg-dim:#5b6169;
+  --line:#dfe2e6; --line-soft:#eceef1; --accent:#2f5fd0; --accent-soft:#e8eefc;
+  --warn-bg:#fff6e5; --warn-line:#e0a800; --warn-fg:#6b4c00;
+  --note-bg:#eef4ff; --note-line:#2f5fd0;
+  --ok-bg:#eaf7ee; --ok-line:#2e7d43;
+  --radius:8px; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#14161a; --bg-soft:#1b1e24; --bg-code:#1e2128; --fg:#e6e8ec; --fg-dim:#a2aab6;
+    --line:#2c313a; --line-soft:#24282f; --accent:#7aa2f7; --accent-soft:#1e2637;
+    --warn-bg:#2b2411; --warn-line:#c99a1a; --warn-fg:#f0d79a;
+    --note-bg:#1a2130; --note-line:#3d5f9e;
+    --ok-bg:#16261b; --ok-line:#3d7a4f;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:8px;top:8px;position:fixed;z-index:99;background:var(--bg);padding:8px 12px;border:2px solid var(--accent);border-radius:var(--radius)}
+.wrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:48px;max-width:1220px;margin:0 auto;padding:0 24px}
+@media (max-width:900px){.wrap{grid-template-columns:1fr;gap:0}}
+
+/* ---------- sidebar / TOC ---------- */
+nav{
+  position:sticky; top:0; align-self:start; max-height:100vh; overflow-y:auto;
+  padding:32px 0 48px; font-size:14px; line-height:1.5;
+}
+@media (max-width:900px){nav{position:static;max-height:none;border-bottom:1px solid var(--line);padding:24px 0;margin-bottom:8px}}
+nav h2{margin:0 0 10px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-dim)}
+nav ol{list-style:none;margin:0;padding:0}
+nav li{margin:0}
+nav a{
+  display:block;padding:5px 10px 5px 12px;color:var(--fg-dim);text-decoration:none;
+  border-left:2px solid var(--line);border-radius:0 var(--radius) var(--radius) 0;
+}
+nav a:hover{color:var(--fg);background:var(--bg-soft)}
+nav a.active{color:var(--accent);border-left-color:var(--accent);background:var(--accent-soft);font-weight:600}
+nav .sub a{padding-left:26px;font-size:13.5px}
+
+/* ---------- content ---------- */
+main{padding:40px 0 96px;min-width:0}
+header.hero{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:8px}
+h1{font-size:31px;line-height:1.25;margin:0 0 10px;letter-spacing:-.015em}
+.subtitle{margin:0;color:var(--fg-dim);font-size:17px}
+h2{
+  font-size:23px;margin:52px 0 14px;padding-bottom:7px;letter-spacing:-.01em;
+  border-bottom:1px solid var(--line);scroll-margin-top:20px;
+}
+h3{font-size:18px;margin:32px 0 10px;scroll-margin-top:20px}
+h4{font-size:15.5px;margin:22px 0 8px;color:var(--fg-dim)}
+p{margin:12px 0}
+ul,ol{padding-left:22px}
+li{margin:5px 0}
+a{color:var(--accent)}
+strong{font-weight:650}
+hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+
+/* ---------- code ---------- */
+code{
+  font-family:var(--mono);font-size:.885em;
+  background:var(--bg-code);padding:.14em .38em;border-radius:5px;
+  border:1px solid var(--line-soft);white-space:nowrap;
+}
+pre{
+  position:relative;margin:16px 0;padding:15px 16px;overflow-x:auto;
+  background:var(--bg-code);border:1px solid var(--line);border-radius:var(--radius);
+  font-family:var(--mono);font-size:13.5px;line-height:1.6;tab-size:4;
+}
+pre code{background:none;border:0;padding:0;font-size:inherit;white-space:pre}
+.copy{
+  position:absolute;top:8px;right:8px;
+  font:inherit;font-size:11.5px;line-height:1;padding:5px 8px;cursor:pointer;
+  color:var(--fg-dim);background:var(--bg);border:1px solid var(--line);border-radius:6px;
+  opacity:0;transition:opacity .12s;
+}
+pre:hover .copy,.copy:focus-visible{opacity:1}
+.copy:hover{color:var(--fg);border-color:var(--accent)}
+.copy.done{color:var(--ok-line);border-color:var(--ok-line);opacity:1}
+.tok-c{color:#6a8759;font-style:italic}
+.tok-s{color:#2f7d8f}
+.tok-k{color:#8a5cc4;font-weight:600}
+.tok-n{color:#a35b2c}
+@media (prefers-color-scheme:dark){
+  .tok-c{color:#7d9a6b}
+  .tok-s{color:#6fc2d4}
+  .tok-k{color:#c39ae8}
+  .tok-n{color:#e0a06a}
+}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:var(--radius)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+thead th{
+  background:var(--bg-soft);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--fg-dim);font-weight:650;white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--bg-soft)}
+td code{white-space:nowrap}
+
+/* ---------- callouts ---------- */
+.box{border-radius:var(--radius);padding:13px 16px;margin:18px 0;border:1px solid;font-size:15px}
+.box p:first-child{margin-top:0}
+.box p:last-child{margin-bottom:0}
+.box .tag{
+  display:block;font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px;
+}
+.note{background:var(--note-bg);border-color:var(--note-line)}
+.note .tag{color:var(--note-line)}
+.warn{background:var(--warn-bg);border-color:var(--warn-line)}
+.warn .tag{color:var(--warn-line);color:var(--warn-fg)}
+.ok{background:var(--ok-bg);border-color:var(--ok-line)}
+.ok .tag{color:var(--ok-line)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:18px 0}
+.card{border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;background:var(--bg-soft)}
+.card h3{margin:0 0 6px;font-size:15.5px}
+.card p{margin:0;font-size:14.5px;color:var(--fg-dim)}
+
+.filemap{font-family:var(--mono);font-size:13.5px}
+footer{border-top:1px solid var(--line);margin-top:56px;padding-top:18px;color:var(--fg-dim);font-size:14px}
+@media print{
+  nav,.copy{display:none}
+  .wrap{grid-template-columns:1fr}
+  body{font-size:11pt}
+  h2{page-break-after:avoid}
+  pre{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="wrap">
+<nav aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#quickstart">Quick start</a></li>
+    <li><a href="#build">Build &amp; run</a></li>
+    <li><a href="#loop">The loop model</a></li>
+    <li><a href="#events">Events</a></li>
+    <li><a href="#api">API reference</a></li>
+    <li><a href="#drawing">Drawing conventions</a></li>
+    <li><a href="#checking">Compile-time checking</a></li>
+    <li><a href="#rules">Rules that bite</a></li>
+    <li><a href="#limits">Limits</a></li>
+    <li><a href="#trouble">Troubleshooting</a></li>
+    <li><a href="#files">Files</a></li>
+  </ol>
+</nav>
+
+<main id="main">
+<header class="hero">
+  <h1>Space on XPCE</h1>
+  <p class="subtitle">API reference and user guide for the Cosmos <code>Space</code> library, backed by SWI-Prolog's XPCE toolkit.</p>
+</header>
+
+<section id="overview">
+<h2>Overview</h2>
+
+<p>A native desktop canvas for Cosmos. It gives a program a real OS window with
+immediate-mode 2D drawing, a timer-driven game loop and an input event queue —
+no browser, no Electron, no network in the loop.</p>
+
+<div class="grid">
+  <div class="card">
+    <h3>Library source</h3>
+    <p><code>libs/space.co</code> — the module you <code>require('space', sp)</code>.</p>
+  </div>
+  <div class="card">
+    <h3>Implementation</h3>
+    <p><code>libs/space_xpce.co</code> (Cosmos wrapper) over <code>libs/space_xpce_prolog.pl</code> (raw Prolog/XPCE).</p>
+  </div>
+  <div class="card">
+    <h3>Compiled artifacts</h3>
+    <p><code>space.pl</code> + <code>space.cif</code>, <code>space_xpce.pl</code> + <code>space_xpce.cif</code>. Checked in; regenerate after editing either <code>.co</code>.</p>
+  </div>
+  <div class="card">
+    <h3>Worked example</h3>
+    <p><code>test4.co</code> — an arrow-key-controlled rectangle in the header-only shape.</p>
+  </div>
+</div>
+
+<h3>Requirements</h3>
+<ul>
+  <li>SWI-Prolog built with the XPCE toolkit. <code>library(pce)</code> and
+      <code>library(pce_main)</code> must load, which on Windows also means the
+      XPCE/SDL3 DLLs are reachable.</li>
+  <li>A <code>--main</code>, <code>--xpce</code> or <code>--exe</code> build (see
+      <a href="#build">Build &amp; run</a>). A bare compile cannot run.</li>
+</ul>
+
+<p>Verify the toolkit before anything else:</p>
+<pre><code><span class="tok-c">?- </span>use_module(library(pce)).</code><button class="copy" type="button">Copy</button></pre>
+
+<div class="box note">
+  <span class="tag">Not the same library</span>
+  <p><code>libs/xpce.co</code> (<code>require('xpce', xp)</code>, documented in
+  <code>XPCE_LIBRARY.md</code>) is the <em>raw</em> toolkit: objects, messages,
+  callbacks, event loop, no canvas. Reach for it when you want XPCE widgets;
+  reach for <code>space</code> when you want to draw. Both are built the same
+  way.</p>
+</div>
+</section>
+
+<section id="quickstart">
+<h2>Quick start</h2>
+
+<p>A complete program needs two relations — <code>update</code> advances state,
+<code>draw</code> paints it — plus a window and a loop. Run it with:</p>
+
+<pre><code>cosmos -l quickstart.co --xpce</code><button class="copy" type="button">Copy</button></pre>
+
+<pre><code><span class="tok-k">require</span>(<span class="tok-s">'space'</span>, sp)
+
+<span class="tok-k">rel</span> update(dt, s, s2)
+    s2 = {x = s.x + dt * <span class="tok-n">120</span>}          <span class="tok-c">// 120 px per second</span>
+
+<span class="tok-k">rel</span> draw(s)
+    g = sp.graphics
+    g.clear(<span class="tok-s">'#1b1b2f'</span>)
+    g.setColor(<span class="tok-s">'#3050ff'</span>)
+    g.rectangle(<span class="tok-s">'fill'</span>, s.x, <span class="tok-n">100</span>, <span class="tok-n">80</span>, <span class="tok-n">50</span>)
+
+sp.init(<span class="tok-n">640</span>, <span class="tok-n">480</span>)
+sp.start(<span class="tok-n">16</span>, {update=update and draw=draw}, {x=<span class="tok-n">100</span>})</code><button class="copy" type="button">Copy</button></pre>
+
+<p>That is the whole program — no <code>main</code> relation, and
+<code>require</code> at the top of the file. <code>--xpce</code> is what makes
+this shape work; <a href="#build">see below</a> for why, and for the
+<code>--main</code> alternative if you want program arguments.</p>
+</section>
+
+<section id="build">
+<h2>Build &amp; run</h2>
+
+<h3>The short way</h3>
+<pre><code>cosmos -l test4.co --xpce</code><button class="copy" type="button">Copy</button></pre>
+<p><code>-l</code> compiles a <code>.co</code> and runs it. <code>--xpce</code>
+picks the <strong>top-level-goals entry</strong>, which runs the file's own
+top-level goals instead of naming an entry relation.</p>
+
+<h3>The long way</h3>
+<p>Useful when you want the <code>.pl</code> or a standalone
+<code>.exe</code> instead of running straight from source.</p>
+
+<pre><code><span class="tok-k">$SWIPL</span> = <span class="tok-s">'C:/Program Files/swipl/bin/swipl.exe'</span>
+
+<span class="tok-c"># 1. Compile check only - no entry point, cannot be run.</span>
+<span class="tok-k">&amp;</span> <span class="tok-k">$SWIPL</span> -q -s compiler/platform/cli.pl -- test4.co test4.pl test4
+
+<span class="tok-c"># 2. Runnable .pl with an argv entry point (needs a `main` relation).</span>
+<span class="tok-k">&amp;</span> <span class="tok-k">$SWIPL</span> -q -s compiler/platform/cli.pl -- test4.co test4.pl test4 --main
+
+<span class="tok-c"># 2b. Same, but for a header-only program: --xpce instead of --main.</span>
+<span class="tok-k">&amp;</span> <span class="tok-k">$SWIPL</span> -q -s compiler/platform/cli.pl -- test4.co test4.pl test4 --xpce
+
+<span class="tok-c"># 3. Standalone .exe - stages the XPCE DLL closure next to the binary.</span>
+<span class="tok-k">&amp;</span> <span class="tok-k">$SWIPL</span> -q -s compiler/platform/cli.pl -- app.co app.exe app --main --exe</code><button class="copy" type="button">Copy</button></pre>
+
+<pre><code><span class="tok-k">&amp;</span> app.exe                   <span class="tok-c"># option 3, self-contained</span>
+swipl -q -s test4.pl          <span class="tok-c"># options 2 and 2b</span></code><button class="copy" type="button">Copy</button></pre>
+
+<div class="box warn">
+  <span class="tag">Option 1 does not run</span>
+  <p>The XPCE backend is not embedded — loading PCE at build time poisons a saved
+  image — so it is loaded at <em>runtime</em> from a path recorded in the entry
+  template, and that only happens for an entry shape. Build with
+  <code>--main</code>, <code>--xpce</code> or <code>--exe</code>. The compiler
+  adds the backend load on its own, by noticing that the output calls
+  <code>cosmos_require("space", _)</code>.</p>
+</div>
+
+<h3><code>--main</code> vs <code>--xpce</code></h3>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">&nbsp;</th><th scope="col"><code>--main</code></th><th scope="col"><code>--xpce</code></th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Entry</th><td>calls <code>Module:main/1</code> with the argv list</td><td>runs the file's top-level goals</td></tr>
+    <tr><th scope="row">Needs <code>main</code></th><td>yes</td><td>no</td></tr>
+    <tr><th scope="row">Where <code>require</code> goes</th><td>inside the rel bodies</td><td>top of the file</td></tr>
+    <tr><th scope="row">Program arguments</th><td><code>main(_args)</code> receives them</td><td>not available</td></tr>
+    <tr><th scope="row">Use when</th><td>you want argv, or a reusable module</td><td>you want the shortest possible program</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Pick one per program. <code>--exe</code> implies <code>--main</code>, not
+<code>--xpce</code>.</p>
+</section>
+
+<section id="loop">
+<h2>The loop model</h2>
+
+<pre><code>sp.init(width, height)                 <span class="tok-c">// size the window (created on start)</span>
+sp.start(intervalMs, callbacks, state)    <span class="tok-c">// fixed interval, in milliseconds</span>
+sp.startCanvas(fps, callbacks, state)     <span class="tok-c">// fixed frame rate, in frames/second</span></code><button class="copy" type="button">Copy</button></pre>
+
+<p><code>callbacks</code> is a table with up to two entries, both optional:</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Key</th><th scope="col">Signature</th><th scope="col">Called</th></tr></thead>
+  <tbody>
+    <tr><td><code>update</code></td><td><code>update(dt, state, newState)</code></td><td>once per frame, before drawing; binds <code>newState</code></td></tr>
+    <tr><td><code>draw</code></td><td><code>draw(state)</code></td><td>once per frame, with the state <code>update</code> produced</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Semantics that matter</h3>
+<ul>
+  <li><strong><code>dt</code> is in seconds</strong>, not milliseconds, even
+      though <code>start</code> takes milliseconds. It comes from
+      <code>get_time/1</code>. Multiply your per-second rates by <code>dt</code>
+      to stay frame-rate independent.</li>
+  <li>If <code>update</code> is omitted, state passes through unchanged. If
+      <code>draw</code> is omitted, the frame is cleared and nothing is
+      painted.</li>
+  <li><strong>The window is cleared and flushed around <code>draw</code>,
+      automatically.</strong> You do not call <code>refresh</code>. Clearing
+      happens before <code>draw</code> using whatever background colour was last
+      set, so <code>g.clear('#202020')</code> inside <code>draw</code> both
+      paints and sets the background for subsequent frames.</li>
+  <li><strong>An exception in <code>update</code> or <code>draw</code> is
+      caught, printed as a warning, and the loop continues.</strong> A throwing
+      callback will not stop the app; check stderr.</li>
+  <li><strong>Closing the window quits</strong>, and so does <code>sp.quit()</code>;
+      both halt the process. There is no need to stop a timer or destroy the
+      picture — never try to close the window programmatically, it crashes the
+      process outside the event loop.</li>
+  <li><strong>One window per process.</strong> Every generated call passes an
+      unbound prefix, which the backend resolves to <code>default</code>, so all
+      Space state is shared. Calling <code>init</code> again resizes the existing
+      window; two concurrent Spaces are not supported.</li>
+</ul>
+</section>
+
+<section id="events">
+<h2>Events</h2>
+
+<p>XPCE has no polling API in this build, so input arrives as callbacks into the
+backend and is queued here, PyGame-style.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>get(events)</code></td><td>Drains everything delivered since the last call.</td></tr>
+    <tr><td><code>getType(type, events)</code></td><td>Drains only events of one kind.</td></tr>
+    <tr><td><code>peek(events)</code></td><td>Does <strong>not</strong> drain. This is what the frame tick uses.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Each event is a table with at least a <code>type</code> field:</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col"><code>type</code></th><th scope="col">Extra fields</th></tr></thead>
+  <tbody>
+    <tr><td><code>'mousemotion'</code></td><td><code>posx</code> <code>posy</code> <code>x</code> <code>y</code> <code>button</code> <code>clicks</code> <code>mod</code></td></tr>
+    <tr><td><code>'mousedown'</code></td><td>as above</td></tr>
+    <tr><td><code>'mouseup'</code></td><td>as above</td></tr>
+    <tr><td><code>'mousewheel'</code></td><td>as above, plus <code>wheel</code> (always <code>0</code>)</td></tr>
+    <tr><td><code>'keydown'</code></td><td><code>key</code> <code>char</code> <code>mod</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>A field an event does not carry reads back as <code>null</code> rather than
+failing, so <code>ev.posx</code> on a keydown is harmless.</p>
+
+<p><code>key</code> is the lower-case name
+(<code>'a'</code>, <code>'space'</code>, <code>'escape'</code>,
+<code>'left'</code>, <code>'f1'</code>), <code>char</code> is the character as
+typed, and <code>mod</code> is any of <code>"s"</code> (shift),
+<code>"c"</code> (control), <code>"m"</code> (meta). Shift is already folded
+into the character, so shift+A arrives as <code>key='a'</code>,
+<code>char='A'</code>, <code>mod='s'</code>.</p>
+
+<pre><code><span class="tok-k">rel</span> update(_dt, s, s2)
+    sp.event.get(events)
+    list.each(events, show, _out)   <span class="tok-c">// each/3 calls p(index, element, result)</span>
+    s2 = s</code><button class="copy" type="button">Copy</button></pre>
+
+<div class="box warn">
+  <span class="tag">No keyup</span>
+  <p>This XPCE build's <code>@event_tree</code> has no release events under
+  <code>keyboard/</code>, so only presses are ever delivered. A
+  "move while held" model therefore has no way to know when to stop — nudge per
+  press instead. Holding a key still glides, because the OS repeats the press.</p>
+</div>
+
+<h3>Callbacks (Love2D style)</h3>
+<p>Pass an <code>on</code> table to <code>sp.start</code> and each event of that
+type is handed to the relation, before <code>update</code> runs for that
+frame:</p>
+
+<pre><code><span class="tok-k">rel</span> on_keydown(ev)
+    print([<span class="tok-s">'key '</span>, ev.key])
+
+sp.start(<span class="tok-n">33</span>, {update=update and draw=draw and on={keydown=on_keydown}}, s)</code><button class="copy" type="button">Copy</button></pre>
+
+<div class="box note">
+  <span class="tag">peek vs get</span>
+  <p>The tick <strong>peeks</strong> at the queue for callbacks, so a polling
+  program that drains with <code>get()</code> decides which frame sees which
+  event. Pick one style per program.</p>
+</div>
+</section>
+
+<section id="api">
+<h2>API reference</h2>
+
+<p>Everything hangs off the <code>sp</code> table. <code>sp.graphics</code>,
+<code>sp.input</code>, <code>sp.keyboard</code>, <code>sp.mouse</code>,
+<code>sp.timer</code> and <code>sp.event</code> are sub-tables;
+<code>input</code>, <code>keyboard</code> and <code>mouse</code> are the same
+table under three names, matching the browser Canvas vocabulary.</p>
+
+<h3>Top level</h3>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>sp.init(width, height)</code></td><td>Size in pixels. The window is created on <code>start</code>, or resized if one already exists.</td></tr>
+    <tr><td><code>sp.start(intervalMs, callbacks, state)</code></td><td>Fixed-interval loop.</td></tr>
+    <tr><td><code>sp.startCanvas(fps, callbacks, state)</code></td><td>Fixed-fps loop; <code>intervalMs = 1000/fps</code>.</td></tr>
+    <tr><td><code>sp.quit()</code></td><td>End the process. Same as closing the window.</td></tr>
+    <tr><td><code>sp.dispose()</code></td><td>Currently just another name for <code>quit</code>.</td></tr>
+    <tr><td><code>sp.loadImage(source, name)</code></td><td>Loads via XPCE <code>image/1</code>; see <a href="#drawing">drawing conventions</a>.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3><code>sp.graphics</code></h3>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>setBackgroundColor(c)</code> / <code>getBackgroundColor(c)</code></td><td>Getter returns the fixed <code>#000000</code>.</td></tr>
+    <tr><td><code>setColor(c)</code> / <code>getColor(c)</code></td><td>Current ink; sticky until changed. Getter returns <code>#ffffff</code>.</td></tr>
+    <tr><td><code>clear(c)</code></td><td>Paint background and clear.</td></tr>
+    <tr><td><code>rectangle(mode, x, y, w, h)</code></td><td></td></tr>
+    <tr><td><code>line(points)</code></td><td>Flat <code>[x1,y1,x2,y2,…]</code>.</td></tr>
+    <tr><td><code>circle(mode, x, y, r)</code></td><td><code>r</code> is a <strong>radius</strong>.</td></tr>
+    <tr><td><code>ellipse(mode, x, y, rx, ry)</code></td><td><code>rx</code>/<code>ry</code> are <strong>radii</strong>.</td></tr>
+    <tr><td><code>arc(mode, arcType, x, y, r, angle1, angle2)</code></td><td>Angles in radians.</td></tr>
+    <tr><td><code>polygon(mode, points)</code></td><td>Flat <code>[x1,y1,…]</code>; filled by even-odd scanline.</td></tr>
+    <tr><td><code>print(text, x, y)</code></td><td></td></tr>
+    <tr><td><code>printf(text, x, y, width, align)</code></td><td><code>width</code>/<code>align</code> ignored.</td></tr>
+    <tr><td><code>newFont(size, family, style, font)</code></td><td>Returns a font handle; result is the <strong>last</strong> parameter.</td></tr>
+    <tr><td><code>setFont(font)</code> / <code>getFont(font)</code></td><td></td></tr>
+    <tr><td><code>getDimensions(size)</code></td><td><code>{width, height}</code>.</td></tr>
+    <tr><td><code>getWidth(w)</code> / <code>getHeight(h)</code></td><td></td></tr>
+    <tr><td><code>push()</code> / <code>pop()</code></td><td>Transform stack.</td></tr>
+    <tr><td><code>origin()</code></td><td>Reset the transform.</td></tr>
+    <tr><td><code>translate(x, y)</code> / <code>rotate(angle)</code> / <code>scale(x, y)</code></td><td>Scale also affects shape sizes.</td></tr>
+    <tr><td><code>shear(x, y)</code></td><td>No-op.</td></tr>
+    <tr><td><code>setLineWidth(w)</code> / <code>getLineWidth(w)</code></td><td></td></tr>
+    <tr><td><code>setLineStyle(style)</code></td><td>No-op.</td></tr>
+    <tr><td><code>setScissor(x, y, w, h)</code> / <code>clearScissor()</code> / <code>getScissor(scissor)</code></td><td>Recorded, <strong>not enforced</strong>.</td></tr>
+    <tr><td><code>draw(image, x, y)</code></td><td></td></tr>
+    <tr><td><code>refresh()</code></td><td>Unnecessary; the loop flushes each frame.</td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>mode</code> is <code>'fill'</code> or <code>'line'</code>. Fill also
+strokes the outline.</p>
+
+<h3><code>sp.input</code> / <code>sp.keyboard</code> / <code>sp.mouse</code></h3>
+<p>These read the state the event layer maintains, so they only report real
+values after the first input event has arrived.</p>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>isDown(key)</code></td><td>Succeeds while the named key is held.</td></tr>
+    <tr><td><code>getX(x)</code> / <code>getY(y)</code> / <code>getPosition(pos)</code></td><td>Last known pointer position.</td></tr>
+    <tr><td><code>buttonDown(button)</code></td><td>Succeeds while that button is held. Buttons are <code>1</code> left, <code>2</code> middle, <code>3</code> right.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3><code>sp.timer</code></h3>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>getTime(time)</code></td><td>Seconds.</td></tr>
+    <tr><td><code>getDelta(delta)</code></td><td>Seconds since the previous frame.</td></tr>
+    <tr><td><code>getFPS(fps)</code></td><td></td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<section id="drawing">
+<h2>Drawing conventions</h2>
+<ul>
+  <li><strong>Colours</strong> are <code>'#rrggbb'</code> strings or
+      <code>[R,G,B]</code> numeric lists. Anything else silently becomes
+      <strong>white</strong> — a mistyped colour will not raise.</li>
+  <li><strong>Images</strong> are loaded by XPCE's <code>image/1</code>, so
+      format support is XPCE's: GIF, JPEG and XPM work; PNG needs
+      <code>library(pce_image)</code>. A path that cannot be loaded is swallowed,
+      so <code>loadImage</code> succeeds and <code>draw</code> then shows
+      nothing.</li>
+  <li><strong>Coordinates</strong> are pixels, rounded to integers; a non-number
+      becomes <code>0</code>. The origin is the top-left corner, <code>y</code>
+      grows downward.</li>
+  <li><strong><code>circle</code> and <code>ellipse</code> take radii</strong>,
+      whereas raw XPCE's <code>circle/1</code> and <code>ellipse/2</code> take a
+      bounding-box size. This is the one place the API deliberately departs from
+      XPCE so the numbers mean what they say.</li>
+  <li><strong><code>newFont</code> returns its result last</strong>, which is
+      what lets <code>g.setFont(g.newFont(24,'sans','normal'))</code> work in
+      value position.</li>
+  <li><strong>Transforms</strong> apply to coordinates <em>and</em> to shape
+      sizes, so <code>scale</code> inside a <code>push</code>/<code>pop</code>
+      pair magnifies what you draw.</li>
+</ul>
+</section>
+
+<section id="checking">
+<h2>Compile-time checking</h2>
+
+<p><code>require('space', sp)</code> is the supported entry point and is
+checked: arity and member existence are both enforced.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Source</th><th scope="col">Result</th></tr></thead>
+  <tbody>
+    <tr><td><code>sp.init(320,480)</code></td><td>accepted</td></tr>
+    <tr><td><code>sp.init(320)</code></td><td><code>Wrong arity for sp.init</code></td></tr>
+    <tr><td><code>sp.graphics.clear('#fff')</code></td><td>accepted</td></tr>
+    <tr><td><code>sp.graphics.clear()</code></td><td><code>Wrong arity for sp.graphics.clear</code></td></tr>
+    <tr><td><code>sp.nosuch(1)</code></td><td><code>Unknown imported member: sp.nosuch</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Checking only happens when the interface sidecar is reachable, and the
+compiler looks for <code>&lt;name&gt;.cif</code> <strong>next to the file being
+compiled</strong>. <code>misc/</code> has no <code>space.cif</code>, so the apps
+there are not checked. To check one:</p>
+
+<pre><code>Copy-Item libs\space.cif, libs\space_xpce.cif &lt;your-dir&gt;\</code><button class="copy" type="button">Copy</button></pre>
+
+<p>Arity and member existence are what get enforced. <strong>No parameter in the
+API carries a type annotation</strong>, so argument types are not checked today.
+Annotate <code>space.co</code> and <code>space_xpce.co</code> together or
+neither, or the two entry points will disagree about what compiles.</p>
+
+<div class="box warn">
+  <span class="tag">Keep the forwarding layer in step</span>
+  <p><code>libs/space.co</code> is a forwarding layer over
+  <code>libs/space_xpce.co</code> because re-exporting a <code>require</code>d
+  module directly does not work — the compiler records no members for it. See
+  <code>compiler_issue.txt</code>. <strong>If you add a method to
+  <code>space_xpce.co</code>, add a matching forwarder to
+  <code>space.co</code></strong>, or it stays invisible to anyone requiring
+  <code>'space'</code>.</p>
+</div>
+</section>
+
+<section id="rules">
+<h2>Rules that will bite you</h2>
+<p>Both come from Cosmos language rules, not from this library.</p>
+<ol>
+  <li><strong>Match <code>require</code>'s placement to the entry you build
+      with.</strong> With <code>--main</code>, <code>require</code> goes inside
+      the rel bodies: a top-level <code>require</code> captures the bound table
+      into every relation, <code>main/1</code> becomes <code>main/2</code>, and
+      the argv adapter has to call it with that capture. With
+      <code>--xpce</code> there is no <code>main</code> relation and the
+      <code>require</code> goes at the top of the file, which is the whole point
+      of that flag. Picking the wrong pairing is the usual reason a Space
+      program opens a window and then does nothing.</li>
+  <li><strong>A relation's result is its last parameter.</strong> That is what
+      makes <code>newFont(size, family, style, font)</code> usable in value
+      position, and it is why getters take an out-parameter rather than
+      returning a value.</li>
+</ol>
+
+<div class="box ok">
+  <span class="tag">Not a bug</span>
+  <p>When <code>require</code> is at the top level, <code>update</code> and
+  <code>draw</code> gain the captured <code>sp</code> as a trailing argument.
+  The callback table stores them as closures, and <code>call_cl/2</code> appends
+  a closure's captures as the final argument, so the runtime's 3-argument
+  <code>update</code> call still lands on the right predicate. Nothing to work
+  around.</p>
+</div>
+</section>
+
+<section id="limits">
+<h2>Limits</h2>
+<p>Known and deliberate for this version.</p>
+<ul>
+  <li><strong>Input arrives as events, not polling.</strong>
+      <code>sp.event.get()</code> drains the queue and <code>sp.input</code>
+      reads the state it maintains, so <code>isDown/1</code>,
+      <code>buttonDown/1</code> and <code>getX</code>/<code>getY</code>/<code>getPosition</code>
+      only report real values after the first event arrives. There is no
+      <code>'keyup'</code>, and <code>wheel</code> is always <code>0</code>.</li>
+  <li><strong><code>setScissor</code> records but does not clip.</strong></li>
+  <li><strong><code>shear</code> and <code>setLineStyle</code> are
+      no-ops</strong>; <code>getLineStyle</code>-style accessors do not
+      exist.</li>
+  <li><strong>Rotating an ellipse</strong> moves its centre; the shape stays
+      axis-aligned.</li>
+  <li><strong>No window title control.</strong> The title is always
+      <code>Cosmos Space</code>.</li>
+  <li><strong>Image loading is format-limited and fails silently.</strong></li>
+  <li><strong>No overloading inside a table literal.</strong> Two
+      <code>rel</code> with one name collapse, last one wins. That is why there
+      is exactly one <code>rel</code> per method name.</li>
+  <li><strong>No audio, no multiple windows, no z-order control.</strong></li>
+</ul>
+</section>
+
+<section id="trouble">
+<h2>Troubleshooting</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Symptom</th><th scope="col">Cause</th></tr></thead>
+  <tbody>
+    <tr><td><code>Unknown imported member: sp.…</code></td><td>An interface <code>.cif</code> is reachable but stale, or you called a method that does not exist. Regenerate <code>libs/*.cif</code>, or remove the <code>.cif</code> beside your program to compile unchecked.</td></tr>
+    <tr><td><code>Unknown procedure: space_xpce_…</code></td><td>The Prolog backend was never loaded. It is loaded at <em>runtime</em> from a path written into the entry template; a plain compile has no entry point and fails this way. Rebuild with <code>--main</code> or <code>--xpce</code>.</td></tr>
+    <tr><td>Window opens but nothing is drawn</td><td>A <code>draw</code>/<code>update</code> exception is being swallowed as a warning. Read stderr.</td></tr>
+    <tr><td>Shapes have the wrong size</td><td>You passed a diameter where a radius is expected, or <code>scale</code> is still active from an unbalanced <code>push</code>.</td></tr>
+    <tr><td>A colour came out white</td><td>The value was neither <code>'#rrggbb'</code> nor <code>[R,G,B]</code>.</td></tr>
+    <tr><td><code>main/2</code> where you expected <code>main/1</code></td><td>A top-level <code>require</code> with a <code>--main</code> build. Move it into the rel bodies, or build with <code>--xpce</code>.</td></tr>
+    <tr><td>Process crashes on shutdown</td><td>Something tried to close or destroy the window from outside the event loop. Let process exit reclaim it.</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<section id="files">
+<h2>Files</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">File</th><th scope="col">Role</th></tr></thead>
+  <tbody class="filemap">
+    <tr><td>libs/space.co</td><td>Public module. Forwarding layer + interface.</td></tr>
+    <tr><td>libs/space_xpce.co</td><td>Cosmos wrapper, one <code>rel</code> per method.</td></tr>
+    <tr><td>libs/space_xpce_prolog.pl</td><td>Raw Prolog/XPCE. Loaded at runtime.</td></tr>
+    <tr><td>test4.co</td><td>Arrow-key example, <code>--xpce</code> header-only shape.</td></tr>
+    <tr><td>misc/moving_rect.co</td><td>The animated <code>ui2.pl</code> port, <code>--main</code> shape.</td></tr>
+    <tr><td>misc/simple_xpce.co</td><td>One-shot drawing, no loop.</td></tr>
+    <tr><td>misc/demo_space_xpce.co</td><td>Every primitive, plus transforms, fonts, scissor.</td></tr>
+    <tr><td>XPCE_BACKEND.md</td><td>Backend layout, XPCE quirks, build integration.</td></tr>
+    <tr><td>compiler_issue.txt</td><td>The compiler gaps this library works around.</td></tr>
+    <tr><td>XPCE_LIBRARY.md</td><td>The other XPCE library (<code>libs/xpce.co</code>).</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<footer>
+  Generated from <code>XPCE_SIMPLE_LIBRARY.md</code>. Self-contained — no
+  network, no build step. Prints cleanly; respects
+  <code>prefers-color-scheme</code>.
+</footer>
+</main>
+</div>
+
+<script>
+(function () {
+  // Copy buttons on code blocks.
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = btn.parentNode;
+      var code = pre.querySelector('code');
+      var text = code ? code.innerText : '';
+      var done = function () {
+        var old = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('done');
+        setTimeout(function () { btn.textContent = old; btn.classList.remove('done'); }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } else { fallback(); }
+      function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { /* no-op */ }
+        document.body.removeChild(ta);
+      }
+    });
+  });
+
+  // Scroll-spy: highlight the section currently in view.
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+  var targets = links.map(function (a) {
+    return document.getElementById(a.getAttribute('href').slice(1));
+  }).filter(Boolean);
+
+  function update() {
+    var best = null, bestTop = -Infinity;
+    for (var i = 0; i < targets.length; i++) {
+      var top = targets[i].getBoundingClientRect().top;
+      if (top <= 90 && top > bestTop) { bestTop = top; best = targets[i]; }
+    }
+    if (!best) { best = targets[0]; }
+    links.forEach(function (a) { a.classList.remove('active'); });
+    if (best && byId[best.id]) { byId[best.id].classList.add('active'); }
+  }
+
+  var tick = false;
+  window.addEventListener('scroll', function () {
+    if (tick) return;
+    tick = true;
+    window.requestAnimationFrame(function () { update(); tick = false; });
+  }, { passive: true });
+  update();
+})();
+</script>
+</body>
+</html>
