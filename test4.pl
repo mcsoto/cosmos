@@ -50,8 +50,17 @@ cosmos_entry_main :-
       ; ensure_loaded(Runtime), ensure_loaded(Operations)
       ),
       directory_file_path(Root, 'libs/space_xpce_prolog.pl', Backend), ensure_loaded(Backend),
+      (   (   nb_current(cosmos_profile_requested,true),
+              directory_file_path(Root, 'compiler/platform/profile.pl', Profiler),
+              exists_file(Profiler),
+              ensure_loaded(Profiler),
+              cosmos_profile:cosmos_profile_start()
+          )
+      ->  true
+      ;   true
+      ),
       directory_file_path(Root, ?, SourceTemplate),
       atomic_list_concat([SourceTemplate,LibsTemplate,UserLibsTemplate,?],;,Path),
       nb_setval(path,Path),
-      Arguments = [Executable|RawArguments], test4([])
+      setup_call_cleanup(true,(Arguments = [Executable|RawArguments], test4([])),cosmos_profile_finish)
     ).

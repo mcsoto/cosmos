@@ -14,4 +14,4 @@ run :-
     atomic_list_concat([Local,Previous],';',Path),nb_setval(path,Path),
     consult(Absolute),Goal=..[Module,Output],
     (once(call(Goal))->(var(Output)->true;write_term(Output,[quoted(true)]),nl)
-    ; format(user_error,'Program failed.~n',[]),halt(1)).
+    ; throw(error(cosmos_program_failed, cosmos_run/2))).

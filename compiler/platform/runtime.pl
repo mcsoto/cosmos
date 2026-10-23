@@ -6,6 +6,17 @@
 % calls it.
 cc_trace_requested(1.0) :- nb_current(cosmos_trace_requested,true), !.
 cc_trace_requested(0.0).
+
+% Finish a profiling run, if there is one.  The generated entry point
+% calls this when the program ends: a program that was not profiled has
+% no profiler module loaded, so the call has to be safe.  The profiler
+% itself lives in compiler/platform/profile.pl and is only loaded when
+% a run asks for it.
+cosmos_profile_finish :-
+    (   catch(current_predicate(cosmos_profile:cosmos_profile_stop/1), _, fail)
+    ->  catch(cosmos_profile:cosmos_profile_stop(done), _, true)
+    ;   true
+    ).
 % Trace source-level calls, never the compiler's generated helper predicates.
 % Backtrackable depth restores nesting on success, redo, failure and exceptions.
 :- meta_predicate cosmos_trace_call(+,?,0).

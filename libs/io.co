@@ -1,4 +1,4 @@
-
+//functor(_, File)
 /* files */
 	/*
 	
@@ -14,6 +14,12 @@ rel readFile(String name, String s)
 	
 /* file utilities */
 
+rel open(String name, String mode, f)
+	c::fopen(name,mode,f)
+
+rel close(f) //issue type definition
+	c::close(f)
+	
 t={
 	//
 
@@ -27,12 +33,6 @@ t={
 	rel read(String x)
 		c::ioread(x)
 		
-	rel open(String name, String mode, f)
-		c::fopen(name,mode,f)
-
-	rel close(File f)
-		c::close(f)
-		
 
 	rel pause()
 		c::ioread(x)
@@ -42,16 +42,16 @@ t={
 
 	//files
 	
-	rel fwrite(File f, x)
+	rel fwrite(f, x)
 		c::write(f,x)
 		
-	rel fread(File f, String s)
+	rel fread(f, String s)
 		c::read(f,s)
 			
-	rel fileReadLine(File f, String s)
+	rel fileReadLine(f, String s)
 		pl::fread(f,s)
 		
-	rel fileReadChar(File f, String s)
+	rel fileReadChar(f, String s)
 		pl::read_string(f,int(1),s)
 		
 	//binary
@@ -80,7 +80,7 @@ t={
 	rel appendToFile(String name, String s)
 		open(name,'append',f)
 		c::write(f,s)
-		close(f)
+		close(f) //issue: not automatically understood be 'this.close' when in table
 	/*todo error
 	rel opened(String name, String mode, f)
 		c::fopen_(name,mode,f)

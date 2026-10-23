@@ -65,6 +65,11 @@ xp = {
     rel on_click(handle, callback)
         pl::xpce_on_click(handle, callback)
 
+    // Same mechanism for menu items (their `message` slot): fires the
+    // 1-argument relation per activation.
+    rel on_select(handle, callback)
+        pl::xpce_on_click(handle, callback)
+
     // Repeating timer, interval in seconds; the callback gets the timer's
     // own handle, so a one-shot frees itself.  Free the handle to stop it.
     rel timer(seconds, callback, handle)

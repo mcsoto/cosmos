@@ -1,6 +1,10 @@
 % File/platform adapter for the compiler whose implementation lives in .co.
 :- use_module(library(filesex)).
 :- dynamic compiler_platform_runtime_loaded/0.
+:- multifile prolog:message//1.
+
+prolog:message(error(cosmos_program_failed, _)) -->
+    ['CosmosError: Program didn''t return successfully'].
 
 compiler_platform(Here) :- source_file(compiler_platform(_),File),file_directory_name(File,Here).
 compiler_file_module(Path,Module) :-
@@ -96,6 +100,12 @@ compiler_add_entry(Output, Module, Kind) :-
     absolute_file_name(AbsOperations0, AbsOperations),
     cosmos_relative_to(SourceDir, AbsRuntime, RelRuntime),
     cosmos_relative_to(SourceDir, AbsOperations, RelOperations),
+    % The profiler lives next to the runtime it reports on.  It is loaded
+    % on demand: a program that was not asked to be profiled never sees
+    % it, and the entry keeps working when the file is missing.
+    directory_file_path(PlatformDirectory, 'profile.pl', AbsProfiler0),
+    absolute_file_name(AbsProfiler0, AbsProfiler),
+    cosmos_relative_to(SourceDir, AbsProfiler, RelProfiler),
     directory_file_path(RelLibsDir, '?', RelLibsTemplate),
     directory_file_path(RelUserLibsDir, '?', RelUserLibsTemplate),
     ( SpaceBackend == none -> true
@@ -139,10 +149,33 @@ compiler_add_entry(Output, Module, Kind) :-
           ( SpaceBackend == none -> true
           ; format(Stream, '      directory_file_path(Root, ~q, Backend), ensure_loaded(Backend),~n', [RelBackend])
           ),
+          % The profiler is optional: it is loaded and started only when
+          % the run asked for one.  Starting it here means the sampler
+          % covers the whole program, including the part that runs
+          % inside the Space event loop.  The condition of the
+          % if-then-else is parenthesised: a conjunction is not a legal
+          % condition of -> without brackets.
+          format(Stream, '      (   (   nb_current(cosmos_profile_requested,true),~n', []),
+          format(Stream, '              directory_file_path(Root, ~q, Profiler),~n', [RelProfiler]),
+          format(Stream, '              exists_file(Profiler),~n', []),
+          format(Stream, '              ensure_loaded(Profiler),~n', []),
+          format(Stream, '              cosmos_profile:cosmos_profile_start()~n', []),
+          format(Stream, '          )~n', []),
+          format(Stream, '      ->  true~n', []),
+          format(Stream, '      ;   true~n', []),
+          format(Stream, '      ),~n', []),
           format(Stream, '      directory_file_path(Root, ~q, SourceTemplate),~n', ['?']),
           format(Stream, '      atomic_list_concat([SourceTemplate,LibsTemplate,UserLibsTemplate,?],;,Path),~n', []),
           format(Stream, '      nb_setval(path,Path),~n', []),
-          format(Stream, '      ~w~n', [GoalText]),
+          % The program runs inside setup_call_cleanup/3 so the profiler
+          % gets its final report when the program ends, fails or
+          % raises.  A Space program never ends, so its report comes
+          % from the frame hook inside the loop instead.
+          %
+          % The goal is parenthesised: the entry goal is a conjunction
+          % (`Arguments = [...], program(...)') and an unbracketed
+          % conjunction here would be read as two arguments.
+          format(Stream, '      setup_call_cleanup(true,(~w),cosmos_profile_finish)~n', [GoalText]),
           format(Stream, '    ).~n', [])
         ),
         close(Stream)).

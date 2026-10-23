@@ -1,0 +1,53 @@
+Yes — this repo is already set up for local Ollama.
+
+The key pieces are:
+- config.sample.pl declares `config:llm_local(ollama).`
+- it also sets the Ollama endpoint to `http://localhost:11434/v1/chat/completions`
+- the Ollama wrapper is in llm/ollama.pl and exposes `ollama/0`, `ollama/1`, and `ollama/2`
+
+Typical local setup:
+
+1. Start Ollama
+- `ollama serve`
+
+2. Pull a model you want to use
+- `ollama pull llama3.2`
+- or any model you have locally
+
+3. Copy the sample config and keep the Ollama settings
+- `cp config.sample.pl config.pl`
+
+4. Load the library in SWI-Prolog
+```prolog
+?- ['config'].
+?- ['message'].
+?- ['llm'].
+?- ['llm/ollama'].
+```
+
+5. Call it
+```prolog
+?- ollama("Write a haiku about Prolog.", Reply).
+```
+
+or:
+```prolog
+?- ollama("Summarize recursion in one paragraph.", Text).
+```
+
+If you want to override the model:
+```prolog
+?- assertz(config:llm_model(ollama, 'llama3.2')).
+```
+
+Or if you want to set it explicitly in config.pl:
+```prolog
+config:llm_local(ollama).
+config:llm_endpoint(ollama, 'http://localhost:11434/v1/chat/completions').
+config:llm_model(ollama, 'llama3.2').
+config:llm_api_key(ollama, 'ollama-local-no-key-required').
+```
+
+One important note: this repo expects Ollama’s OpenAI-compatible endpoint, so it should work with the default local Ollama API at port 11434, not with the raw `/api/generate` route.
+
+If you want, I can give you a minimal working `config.pl` for local Ollama only, or a small Prolog script that sends a prompt and prints the streamed output.

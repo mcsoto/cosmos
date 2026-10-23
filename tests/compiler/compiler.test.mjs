@@ -402,6 +402,7 @@ test('some succeeds with empty exports and fails only when no item matches', () 
     const run = spawnSync(swi,['-q','-s',join(root,'compiler/platform/run.pl'),'--',result.output],{cwd:temporary,encoding:'utf8'});
     assert.equal(run.status,status,run.stderr);
     assert.equal(run.stdout.trim(),output);
+    if (status === 1) assert.match(run.stderr,/CosmosError: Program didn't return successfully/);
   }
 });
 test('codec preserves strings, numeric lists, shared variables and empty successes', () => {
@@ -485,7 +486,10 @@ test('--main supports a zero-argument main/0', () => {
   assert.match(code, /initialization\(cosmos_entry_main, main\)/);
   // The call has to be the BARE atom.  cc_term/3 emits an empty argument
   // list as an atom, so `'fixture0::main'(Arguments)` would not exist.
-  assert.match(code, /'main_zero::main'\s*$/m);
+  // The entry runs the goal inside setup_call_cleanup/3 (the profiler
+  // writes its report when the program ends), so the call is the last
+  // thing in the wrapper rather than the last thing in the file.
+  assert.match(code, /'main_zero::main'\s*[,)]/);
   assert.doesNotMatch(code, /'main_zero::main'\(/);
   const run = spawnSync(swi, ['-q', '-s', output], { cwd: temporary, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
@@ -523,6 +527,10 @@ test('--xpce pure bridge: objects, values and timer callbacks headless', () => {
   // Shared slots hold plain values; the timer callback gets its handle.
   assert.match(run.stdout, /\[slot=,42\.0\]/);
   assert.match(run.stdout, /\[TICKED tm=,\d+\]/);
+  // Menu assembly + manual message firing: the whole click path headless,
+  // ending in a real file round-trip through io like the notepad uses.
+  assert.match(run.stdout, /SAVED-CB/);
+  assert.match(run.stdout, /fileroundtrip=/);
 });
 test('--exe saves a standalone main/1 application', () => {
   const source = join(root, 'tests/compiler/main_args.co');
@@ -534,4 +542,20 @@ test('--exe saves a standalone main/1 application', () => {
   const run = spawnSync(executable, ['Ada'], { cwd: temporary, encoding: 'utf8' });
   assert.equal(run.status, 0, run.error?.message || run.stderr);
   assert.equal(run.stdout.trim(), 'Ada');
+});
+test('--profile writes a report for a compiled program', () => {
+  const repl = join(root, 'compiler/platform/repl.pl');
+  const source = join(temporary, 'profile_target.co');
+  const report = join(temporary, 'profile_target.profile.txt');
+  writeFileSync(source, "print('profiled')\n");
+  const result = spawnSync(swi, ['-q', '-s', repl, '--', '-l', source, '--profile', '--profile-out', report],
+    { cwd: temporary, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /profiled/);
+  assert.equal(existsSync(report), true, 'the profiler wrote no report');
+  const text = readFileSync(report, 'utf8');
+  assert.match(text, /Cosmos profile/);
+  assert.match(text, /program\s+: profile_target/);
+  assert.match(text, /Time by category/);
+  assert.match(text, /Hot predicates/);
 });

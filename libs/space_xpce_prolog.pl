@@ -18,19 +18,133 @@
 
 :- dynamic space_window/2.   % space_window(Prefix, Window)
 :- dynamic space_pending/3.  % space_pending(Prefix, Width, Height) from init
-:- dynamic space_ink/2.      % space_window(Prefix, colour-object)
 :- dynamic space_width/2.    % space_window(Prefix, WidthNumber)
 :- dynamic space_font/2.       % space_font(Prefix, spec(Fam, Style, Size))
 :- dynamic space_font_object/2. % space_font_object(Prefix, Font), built lazily
-:- dynamic space_frame/4.    % space_frame(Prefix, IntervalMs, Callbacks, State)
-:- dynamic space_last/2.     % space_last(Prefix, WallSeconds)
 :- dynamic space_image/3.    % space_image(Prefix, Name, ImageObject)
 :- dynamic space_xform/6.    % space_xform(Prefix, DX, DY, Angle, SX, SY)
 :- dynamic space_xstack/2.   % space_xstack(Prefix, [xform(DX,DY,Angle,SX,SY)|...])
 :- dynamic space_scissor/5.  % space_scissor(Prefix, X, Y, W, H) recorded only
-:- dynamic space_events/2.   % space_events(Prefix, [Event|...]) oldest first
 :- dynamic space_mouse/4.     % space_mouse(Prefix, X, Y, [HeldButton|...])
 :- dynamic space_keys/2.      % space_keys(Prefix, [KeyName|...]) held
+
+% --- per-frame state ------------------------------------------------------
+%
+% The things that change every frame - the state the program hands back,
+% the ink, the clock and the event queue - live in non-backtrackable
+% globals rather than in dynamic facts.
+%
+% A dynamic fact has to be retracted and re-asserted to change it, and
+% the retraction is the expensive half: it scans the clause store and it
+% leaves the old term behind for the collector.  Measured on this
+% machine, rewriting one small fact cost 2.2 us with retract/1 and
+% 616 us with retractall/1, while storing the same value in a global
+% costs 0.5 us.
+%
+% nb_linkval/2 stores the value *without copying it*, which matters for
+% the state: the Cosmos state of a Space program is a table holding the
+% level and the flow field, and copying it every frame was the single
+% biggest cost of the backend.  The value stays alive as long as the
+% global refers to it, and the caller's own reference stays valid.
+%
+% The event queue is kept newest-first so that adding an event is
+% constant time; it is reversed when it is read.  Appending to the end
+% of a list and re-asserting it was quadratic in the number of events
+% that piled up between two reads.
+
+% The globals are keyed by an atom (nb_setval/2 and friends want one),
+% so the key is the kind of value with the prefix of the window
+% appended.  The default window is the common case and needs no work
+% at all; other prefixes pay one atom_concat, which is a lookup in the
+% atom table rather than an allocation.
+space_key(Kind, Prefix, Key) :-
+    (   Prefix == default
+    ->  Key = Kind
+    ;   space_key_atom(Prefix, PrefixAtom),
+        atom_concat(Kind, PrefixAtom, Key)
+    ).
+
+space_key_atom(Prefix, Atom) :-
+    (   atom(Prefix)
+    ->  Atom = Prefix
+    ;   term_to_atom(Prefix, Atom)
+    ).
+
+space_state(Prefix, State) :-
+    space_key(space_state_, Prefix, Key),
+    catch(nb_getval(Key, State), _, fail).
+
+space_set_state(Prefix, State) :-
+    space_key(space_state_, Prefix, Key),
+    nb_linkval(Key, State).
+
+space_ink(Prefix, Colour) :-
+    space_key(space_ink_, Prefix, Key),
+    catch(nb_getval(Key, Colour), _, fail).
+
+space_set_ink(Prefix, Colour) :-
+    space_key(space_ink_, Prefix, Key),
+    nb_linkval(Key, Colour).
+
+space_last(Prefix, Time) :-
+    space_key(space_last_, Prefix, Key),
+    catch(nb_getval(Key, Time), _, fail).
+
+space_set_last(Prefix, Time) :-
+    space_key(space_last_, Prefix, Key),
+    nb_linkval(Key, Time).
+
+% The frame (interval and callbacks) is written once and read every
+% frame; the state is what changes.
+space_frame(Prefix, IntervalMs, Callbacks) :-
+    space_key(space_frame_, Prefix, Key),
+    catch(nb_getval(Key, Frame), _, fail),
+    Frame = frame(IntervalMs, Callbacks).
+
+space_set_frame(Prefix, IntervalMs, Callbacks) :-
+    space_key(space_frame_, Prefix, Key),
+    nb_linkval(Key, frame(IntervalMs, Callbacks)).
+
+% The event queue, newest first.
+space_events(Prefix, Events) :-
+    space_key(space_events_, Prefix, Key),
+    catch(nb_getval(Key, Queue), _, fail),
+    reverse(Queue, Events).
+
+space_push_event(Prefix, Event) :-
+    space_key(space_events_, Prefix, Key),
+    (   catch(nb_getval(Key, Queue), _, fail)
+    ->  true
+    ;   Queue = []
+    ),
+    nb_linkval(Key, [Event|Queue]).
+
+space_clear_events(Prefix) :-
+    space_key(space_events_, Prefix, Key),
+    nb_delete(Key).
+
+% Drop everything a window keeps between frames.
+space_forget(Prefix) :-
+    forall(member(Kind, [space_state_, space_ink_, space_last_, space_frame_, space_events_]),
+           (   space_key(Kind, Prefix, Key)
+           ->  nb_delete(Key)
+           ;   true
+           )).
+
+% --- profiling hook --------------------------------------------------------
+%
+% A Space program runs until its window is closed, so it never returns to
+% the caller and a profiler cannot take its measurement from the
+% outside.  The hook is called once per frame so the profiler can count
+% frames and write its report from inside the loop.
+%
+% The predicate is dynamic with a no-op default, so the cost when nobody
+% is profiling is one dynamic call per frame.  The Cosmos profiler
+% (compiler/platform/profile.pl) asserts its own clause in front of the
+% default when it starts.
+:- dynamic space_profile_frame/1.
+
+space_profile_frame(_).
 
 % --- input plumbing ---------------------------------------------------------
 %
@@ -113,7 +227,8 @@ space_colour_channels(Color, R, G, B) :-
         space_hex(RHex, R), space_hex(GHex, G), space_hex(BHex, B)
     ;   is_list(Color), Color = [R0, G0, B0], maplist(number, [R0, G0, B0]) ->
         space_channel(R0, R), space_channel(G0, G), space_channel(B0, B)
-    ;   R = 255, G = 255, B = 255
+    ; Color=fc_rgb(R,G,B) 
+	; R = 255, G = 255, B = 255
     ).
 
 space_channel(V0, V) :-
@@ -131,9 +246,10 @@ space_hex(HexString, Int) :-
     catch(number_codes(Int, Codes), _, fail).
 
 space_ink_for(Prefix, Colour) :-
-    ( space_ink(Prefix, Colour) -> true
-    ; new(Colour, colour(@default, 255, 255, 255)),
-      assertz(space_ink(Prefix, Colour))
+    (   space_ink(Prefix, Colour)
+    ->  true
+    ;   new(Colour, colour(@default, 255, 255, 255)),
+        space_set_ink(Prefix, Colour)
     ).
 
 space_width_for(Prefix, Width) :-
@@ -242,7 +358,7 @@ space_xpce_boot_window(Prefix) :-
       % yet is an XPCE error, which the event loop turns into a modal dialog.
       send(Window, keyboard_focus, Window),
       assertz(space_window(Prefix, Window)),
-      retractall(space_events(Prefix, _)),
+      space_clear_events(Prefix),
       retractall(space_mouse(Prefix, _, _, _)),
       retractall(space_keys(Prefix, _))
     ).
@@ -253,9 +369,7 @@ space_xpce_boot_window(Prefix) :-
 % halts via done_message).
 space_xpce_forget_window(Prefix) :-
     retractall(space_window(Prefix, _)),
-    retractall(space_frame(Prefix, _, _, _)),
-    retractall(space_last(Prefix, _)),
-    retractall(space_events(Prefix, _)),
+    space_forget(Prefix),
     retractall(space_mouse(Prefix, _, _, _)),
     retractall(space_keys(Prefix, _)).
 
@@ -270,8 +384,8 @@ space_xpce_start(Prefix0, IntervalMs, Callbacks, InitialState, W, H) :-
 
 space_xpce_start_loop(Prefix0, IntervalMs, Callbacks, State) :-
     space_prefix(Prefix0, Prefix),
-    retractall(space_frame(Prefix, _, _, _)),
-    assertz(space_frame(Prefix, IntervalMs, Callbacks, State)),
+    space_set_frame(Prefix, IntervalMs, Callbacks),
+    space_set_state(Prefix, State),
     % The window must be created inside pce_main_loop's boot goal:
     % pce_loop only dispatches frames created by that goal.
     %
@@ -293,10 +407,9 @@ space_xpce_loop_error(E) :-
 % Boot goal run by pce_loop (called with argv appended).
 space_xpce_boot(Prefix, _Argv) :-
     space_xpce_boot_window(Prefix),
-    space_frame(Prefix, IntervalMs, _, _),
+    space_frame(Prefix, IntervalMs, _),
     get_time(Now),
-    retractall(space_last(Prefix, _)),
-    assertz(space_last(Prefix, Now)),
+    space_set_last(Prefix, Now),
     Secs is IntervalMs / 1000.0,
     new(_Timer, timer(Secs, message(@prolog, space_xpce_tick, Prefix))),
     send(_Timer, start).
@@ -310,11 +423,15 @@ space_xpce_start_canvas(Prefix, Fps, Callbacks, State, W, H) :-
     space_xpce_start(Prefix, Ms, Callbacks, State, W, H).
 
 space_xpce_tick(Prefix) :-
-    ( space_frame(Prefix, Ms, Callbacks, State),
+    % One frame hook, so a profiler can measure a program that never
+    % returns.  A no-op unless somebody asserted a clause for it.
+    space_profile_frame(Prefix),
+    ( space_frame(Prefix, Ms, Callbacks),
+      space_state(Prefix, State),
       space_window(Prefix, Window) ->
         get_time(Now),
-        ( retract(space_last(Prefix, Last)) -> Dt is Now - Last ; Dt = 0.016 ),
-        assertz(space_last(Prefix, Now)),
+        ( space_last(Prefix, Last) -> Dt is Now - Last ; Dt = 0.016 ),
+        space_set_last(Prefix, Now),
         % XPCE has delivered whatever input arrived since the last tick.
         % Callbacks registered under "on" fire here, BEFORE update/draw, so a
         % handler sees the frame's events.  The queue is only PEEKED at: it is
@@ -329,9 +446,8 @@ space_xpce_tick(Prefix) :-
                   ( print_message(warning, E), NewState = State ))
         ; NewState = State
         ),
-        retractall(space_frame(Prefix, _, _, _)),
-        assertz(space_frame(Prefix, Ms, Callbacks, NewState)),
-        catch(send(Window, clear), _, true),
+        space_set_state(Prefix, NewState),
+        %catch(send(Window, clear), _, true),
         ( get_assoc("draw", Callbacks, Draw) ->
             catch(call_cl(Draw, [NewState]), E2, print_message(warning, E2))
         ; true
@@ -351,8 +467,7 @@ space_xpce_clear(Prefix0, Color) :-
 space_xpce_set_color(Prefix0, Color) :-
     space_prefix(Prefix0, Prefix),
     space_colour(Color, Colour),
-    retractall(space_ink(Prefix, _)),
-    assertz(space_ink(Prefix, Colour)).
+    space_set_ink(Prefix, Colour).
 
 space_xpce_rectangle(Prefix0, Mode, X0, Y0, W0, H0) :-
     space_window_checked(Prefix0, Window),
@@ -644,10 +759,7 @@ space_xpce_capture(Window, Ev) :-
     % list raises "'$btree_find_node'/5: Type error: `btree' expected".
     space_event_assoc(Fields, Event),
     space_xpce_update_state(Prefix, Type, Event),
-    retractall(space_events(Prefix, _)),
-    ( space_events(Prefix, Queue) -> true ; Queue = [] ),
-    append(Queue, [Event], Queue1),
-    assertz(space_events(Prefix, Queue1)).
+    space_push_event(Prefix, Event).
 
 space_xpce_prefix_of(Window, Prefix) :-
     space_window(Prefix, Window).
@@ -887,13 +999,13 @@ space_xpce_events_pending(Prefix0, Events) :-
 space_xpce_event_get(Prefix0, Events) :-
     space_prefix(Prefix0, Prefix),
     ( space_events(Prefix, Events) -> true ; Events = [] ),
-    retractall(space_events(Prefix, _)).
+    space_clear_events(Prefix).
 
 space_xpce_event_get(Prefix0, Type, Events) :-
     space_prefix(Prefix0, Prefix),
     ( space_events(Prefix, All) -> true ; All = [] ),
     include(space_event_type(Type), All, Events),
-    retractall(space_events(Prefix, _)).
+    space_clear_events(Prefix).
 
 space_event_type(Type, Event) :-
     ( get_assoc("type", Event, Type) -> true ; fail ).
@@ -922,7 +1034,7 @@ space_xpce_mouse_is_down(_, _, 0).
 % map under "on".  Called from the frame tick, after XPCE has had the whole
 % frame to deliver input.
 space_xpce_dispatch_callbacks(Prefix, Events) :-
-    space_frame(Prefix, _, Callbacks, _),
+    space_frame(Prefix, _, Callbacks),
     ( get_assoc("on", Callbacks, Handlers) -> true ; Handlers = none ),
     Handlers \== none,
     forall(member(Event, Events), space_xpce_fire(Handlers, Event)),
@@ -954,7 +1066,7 @@ space_xpce_get_delta(Prefix0, Delta) :-
 
 space_xpce_get_fps(Prefix0, Fps) :-
     space_prefix(Prefix0, Prefix),
-    ( space_frame(Prefix, Ms, _, _), Ms > 0 -> Fps is 1000.0 / Ms
+    ( space_frame(Prefix, Ms, _), Ms > 0 -> Fps is 1000.0 / Ms
     ; Fps = 60.0
     ).
 

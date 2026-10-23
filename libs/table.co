@@ -16,8 +16,7 @@ rel remove(t,k,v,t2)
 	pl::del_(t,k,v,t2)//removes a pair-value k,v
 	
 rel next_(t,t2,k,v)
-	pl::next_pair(t,t2,k,v)
-	//get(t,k,v)
+	pl::next_pair(t,t2,k,v)	//get(t,k,v)
 	true
 	//remove(t,k,v,t2)
 	

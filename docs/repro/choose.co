@@ -1,0 +1,47 @@
+// Repro 3: the conditional forms, and the fact that `cut` is not usable.
+//
+//   cosmos -l repro/choose.co -q "t1(r)" --vars r
+//
+// `if(A) B else C` lowers to `(A, B ; \+A, C)` - the condition runs twice.
+// `when`, `choose` and `soft_if` each run it once.  `choose` is the committed
+// form and is the one to reach for when the condition is expensive.
+//
+// `cut` is listed in docs/LOWERING_TABLE.md but `!` does not parse as a goal
+// and `cut` is a reserved word, so it cannot be used as a relation name
+// either.  See cut.co for the parse errors.
+
+rel ch1(a, r)
+    choose(a > 0)
+        r = 'pos'
+    else
+        r = 'neg'
+
+rel ch2(a, r)
+    when(a > 0)
+        r = 'pos'
+    else
+        r = 'neg'
+
+rel ch3(a, r)
+    soft_if(a > 0)
+        r = 'pos'
+    else
+        r = 'neg'
+
+rel t1(r)
+    ch1(5, r)
+
+rel t2(r)
+    ch1(-5, r)
+
+rel t3(r)
+    ch2(5, r)
+
+rel t4(r)
+    ch2(-5, r)
+
+rel t5(r)
+    ch3(5, r)
+
+rel t6(r)
+    ch3(-5, r)

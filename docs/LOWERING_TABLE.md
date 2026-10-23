@@ -46,7 +46,7 @@ deliberately revised; complexity elsewhere does not silently redefine a row.
 | `table = {k = V}` | persistent table construction | `new(T0), set_(T0, "k", V, T1), table = T1` |
 | `class(T,{...})` | declare nominal prototype table | `T = {...}` plus class/type metadata |
 | `X = table.k` | table read | `getnil(table, "k", X)` |
-| `X = table[K]` | indexed read | `getnil(table, K, X)` |
+| `X = coll[K]` | indexed read | `getnil(coll, K, X)` |
 | `New = table.k:V` | persistent table update | `set_(table, "k", V, New)` |
 | `table.method(A)` | closure lookup and call | `getnil(table, "method", F), call_cl(F, [A])` |
 | `T.method(A)` / `x.method(A)` for class `T` / typed `T x` | class method call | lookup method, then `call_cl(F, [Receiver,A])` |

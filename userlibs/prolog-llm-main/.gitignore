@@ -1,0 +1,4 @@
+.DS_Store
+*.qlf
+config.local.pl
+api_key.pl

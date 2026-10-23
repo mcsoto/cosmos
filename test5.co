@@ -1,0 +1,38 @@
+//f=io.read('','read')
+
+o={gems=[]}
+if(o.gems = [])
+	print(o.gems)
+	print(1)
+else
+	print(o.gems)
+
+c::random_between(int(1),int(4),x) //host_int
+print(x)
+t={1,2}
+print(t)
+pl::int(1.0,z)
+print(z)
+l=[3,4]
+print(l[1])
+/*
+rel walkable(x)
+	true
+
+if(walkable(x))
+	true
+else
+	true
+*/
+
+if(xyz=1)
+	true
+else
+	false
+
+s=io.readFile('readme.txt')
+print(s)
+
+f=io.open('tempfile.txt','write')
+f.writeToFile('asd')
+f.close()

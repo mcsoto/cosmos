@@ -33,6 +33,36 @@ Examples:
 Testing the graphics library (space) in xpce. 
 >cosmos -l test3 --xpce
 
+# Example programs
+
+`misc/dungeon.co` is a turn-based tile crawler built on Space. Enemies hunt by
+scent: one breadth-first flow field is rebuilt from the player's tile every
+turn, and every enemy inside its notice radius descends that gradient.
+
+>cosmos -l misc/dungeon.co --xpce
+
+`DUNGEON_TESTING.md` covers the level, the pathfinding and how the game is
+verified. `docs/ENGINE_ISSUES.md` collects the engine and compiler issues that
+came up while writing it: `sp.quit()` leaving an orphaned process, `libs/io.co`
+not being able to open a file, `l[i]` being a table read rather than a list
+read, `if` running its condition twice, and the `choose` / `cut` operators the
+lowering table mentions.
+
+# Profiling
+
+`--profile` runs a program under the sampling profiler and writes a report:
+where the time went, which predicates were called how often, and how much of it
+belongs to the Cosmos program, to the XPCE backend underneath it, and to
+SWI-Prolog.
+
+>cosmos -r test4 --xpce --profile
+>cosmos -l misc/dungeon.co --xpce --profile --profile-out dungeon.profile.txt
+
+The report is refreshed every 300 frames, so a Space program - which runs until
+its window closes - can be inspected while it runs. `docs/PROFILING.md` explains
+the report and has the measurements for `test4` and `misc/dungeon.co`; the
+reports are in `docs/profiles/`.
+
 # build
 
 Added the native build target to Makefile

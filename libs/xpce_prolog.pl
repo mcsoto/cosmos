@@ -231,6 +231,22 @@ xpce_set_data(Key, Value) :-
 xpce_get_data(Key, Value) :-
     xpce_data(Key, Value).
 
+% --- menu bitmap priming ------------------------------------------------------
+% Labelled popups die in initialise converting the submenu-arrow program
+% default (@ms_left_arrow_image): this install keeps its bitmaps outside
+% XPCE's built-in image path.  Preloading the file primes the image cache
+% and later popups just work.  Harmless where bitmaps resolve already;
+% silent no-op when the file is absent.
+xpce_prime_menu_bitmaps :-
+    (   get(@pce, home, Home),
+        atom_concat(Home, '/bitmaps/ms_left_arrow.png', Path),
+        catch(new(_, image(Path)), _, fail)
+    ->  true
+    ;   true
+    ).
+
+:- xpce_prime_menu_bitmaps.
+
 % --- event loop --------------------------------------------------------------
 % xpce_loop: dispatch XPCE events until the process ends (window close is
 % wired to halt at creation sites the program controls, and quit() ends

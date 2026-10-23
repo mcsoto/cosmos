@@ -1,0 +1,5 @@
+ ?- pack_install(tui).
+
+ swi-pl --open
+
+ send({"compile", cl, z)

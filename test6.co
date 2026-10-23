@@ -1,0 +1,48 @@
+/*l=[1,2,3]
+t0={' ',' ',' ',' ',' ',' ',' ',' ',' '}
+t1={{' ',' ',' '},
+	{' ',' ',' '}, 
+	{' ',' ',' '}}
+print(t1)
+range=math.range
+
+rel make_table(n,t)
+	t=table.new(n)
+	for(i in range(0,n))
+		t[i] = _
+	print(t)
+*/
+t1={}
+table.set(t1,0,i,t2)
+print(t2)
+table.set(t2,0,i,t3)
+print(t3)
+
+rel p(x)
+	x=1
+
+require('space',sp)
+// ---- rendering ----
+
+void draw(s)
+	true
+    //g = sp.graphics
+    //g.clear('#12121c')
+    //g.rectangle('fill', 0, 0, 50, 50)
+    
+void update(dt,s,s1)
+    s1=s
+	
+//for(start i=0; i<5; i+=1) --Parse error at 16:22: Compound assignment requires ! check 
+set=table.set
+start t={}	
+for(start i=0; i<5; next i+=1)
+	print(t)
+	next t = set(t,i,_)//t[i]:i //next t = t.i : i /// t:i?i
+print(t)
+print(2)
+
+g = sp.graphics
+//g.setColor('#5ee7a0') and g.rectangle('fill', 0, 0, 50, 50)
+sp.init(640, 480)
+sp.start(16, {update=update and draw=draw}, {x=280 and y=215})

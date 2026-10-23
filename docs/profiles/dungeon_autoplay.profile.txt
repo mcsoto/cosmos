@@ -1,0 +1,80 @@
+================================================================
+ Cosmos profile -- dungeon_autoplay
+----------------------------------------------------------------
+ program     : dungeon_autoplay
+ module      : dungeon_autoplay
+ source      : 
+ generated   : 
+ compiled in : 0 ms
+ profiled    : 11 frames, 45.83 s wall, 250184199 inferences
+ sampler     : 4565 samples, 42975 ticks, 44781.25 ms sampled (1.04 ms/tick, 4071.02 ms/frame)
+ report      : seconds(11,45.65857791900635)
+----------------------------------------------------------------
+ Time by category
+------------------------------------------------------------------------
+category            calls  self ms     %
+swi library     146774593  23773.9  71.1
+swi system       29578774   6689.8  20.0
+cosmos library    6676517   2110.1   6.3
+host              6821921    531.4   1.6
+cosmos runtime     815050    171.9   0.5
+space backend      237320    156.3   0.5
+profiler               81      0.0   0.0
+ Hot predicates (self time)
+------------------------------------------------------------------------
+predicate                                    calls  self ms     %
+nf_r:nf/2                                  6440898   7143.1  21.4
+system:'$garbage_collect'/1                    223   4595.4  13.7
+nf_r:submit_eq_c1/3                        6051083   4407.8  13.2
+nf_r:nf_mul_k/3                           12466964   1938.2   5.8
+nf_r:nf_add/4                             18550642   1609.9   4.8
+nf_r:{}/1                                  6440898   1359.8   4.1
+nf_r:nf_add_case/9                        12288189   1281.7   3.8
+dif:dif/2                                 12136374   1156.7   3.5
+nf_r:nf_mul_factor/3                      12466964   1031.6   3.1
+user:'dungeon_autoplay::$impl_lst_get'/3     39702    906.6   2.7
+user:'string::get'/3                         29995    765.9   2.3
+system: ?= / 2                            12136374    719.0   2.2
+nf_r:nf_add/3                             18748155    703.4   2.1
+nf_r:nf_number/2                          12881796    547.1   1.6
+assoc:is_assoc/4                             93179    547.1   1.6
+nf_r:submit_eq_c/3                         6051083    531.4   1.6
+system:compare/3                          13249785    515.8   1.5
+system:catch/3                               48757    468.9   1.4
+nf_r:submit_eq/2                           6096854    406.4   1.2
+user:r_sub/3                               6025746    406.4   1.2
+bv_r:export_binding/2                      6096854    297.0   0.9
+user:'dungeon_autoplay::$impl_lst_put'/4      5607    281.3   0.8
+nf_r:submit_eq/1                           6096854    265.7   0.8
+system:'$btree_find_node'/5                 513148    140.7   0.4
+'$attvar':freeze/2                          123672    109.4   0.3
+ ... and 309 more
+ Most called predicates
+------------------------------------------------------------------------
+predicate                              calls  self ms     %
+nf_r:nf_add/3                       18748155    703.4   2.1
+nf_r:nf_add/4                       18550642   1609.9   4.8
+system:compare/3                    13249785    515.8   1.5
+nf_r:nf_number/2                    12881796    547.1   1.6
+nf_r:nf_mul_k/3                     12466964   1938.2   5.8
+nf_r:nf_mul_factor/3                12466964   1031.6   3.1
+nf_r:nf_add_case/9                  12288189   1281.7   3.8
+dif:dif/2                           12136374   1156.7   3.5
+system: ?= / 2                      12136374    719.0   2.2
+nf_r:nf/2                            6440898   7143.1  21.4
+nf_r:{}/1                            6440898   1359.8   4.1
+nf_r:submit_eq/2                     6096854    406.4   1.2
+bv_r:export_binding/2                6096854    297.0   0.9
+nf_r:submit_eq/1                     6096854    265.7   0.8
+nf_r:submit_eq_c1/3                  6051083   4407.8  13.2
+nf_r:submit_eq_c/3                   6051083    531.4   1.6
+user:r_sub/3                         6025746    406.4   1.2
+user:'dungeon_autoplay::lst_get'/3   4464061      0.0   0.0
+system:(@<)/2                        2256761     78.2   0.2
+user:'dungeon_autoplay::lst_put'/4   1583736      0.0   0.0
+assoc:balance/2                       958428     15.6   0.0
+system:arg/3                          516405      0.0   0.0
+system:'$btree_find_node'/5           513148    140.7   0.4
+assoc:get_assoc/3                     513148     62.5   0.2
+user:cosmos_object_wrapper/1          181459     15.6   0.0
+ ... and 309 more

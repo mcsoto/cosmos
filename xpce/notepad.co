@@ -1,0 +1,72 @@
+// Cosmos XPCE notepad: a frame with a File menu (Save/Load/Quit) and a
+// text editor area.  Run it with:
+//
+//   cosmos -l xpce/notepad.co --xpce
+//
+// --xpce runs the file's top-level goals (no main involved), which is what
+// makes the top-level requires legal.  Callback relations take exactly one
+// argument (their source handle) and must not mention any top-level
+// binding -- that would capture it into an extra parameter and miss the
+// call.  Shared state lives in xp.set_data/get_data, so every callback
+// below requires what it uses inside its own body.
+require('xpce', xp)
+require('io', io)
+
+// ---- window ----
+xp.create('frame', ['Cosmos Notepad'], win)
+xp.size(660, 480, winsize)
+xp.send(win, 'size', [winsize])
+
+xp.create('dialog', [], mbardlg)
+xp.send(win, 'append', [mbardlg])
+xp.create('menu_bar', [], mbar)
+xp.send(mbardlg, 'append', [mbar])
+xp.create('popup', ['File'], filemenu)
+xp.send(mbar, 'append', [filemenu])
+
+xp.create('menu_item', ['Save'], saveitem)
+xp.on_select(saveitem, do_save)
+xp.send(filemenu, 'append', [saveitem])
+
+xp.create('menu_item', ['Load'], loaditem)
+xp.on_select(loaditem, do_load)
+xp.send(filemenu, 'append', [loaditem])
+
+xp.create('menu_item', ['Quit'], quititem)
+xp.on_select(quititem, do_quit)
+xp.send(filemenu, 'append', [quititem])
+
+xp.create('view', [], vw)
+xp.send(win, 'append', [vw])
+xp.send(vw, 'below', [mbardlg])
+
+xp.send(win, 'open', [])
+// The opened view carries its own editor (attaching ours would print
+// XPCE's harmless @nil placeholder warning), so fetch it and its buffer.
+xp.get(vw, 'editor', ed)
+xp.get(ed, 'text_buffer', tb)
+xp.send(tb, 'contents', ['Welcome to Cosmos Notepad.\nType here, then File > Save.\n'])
+xp.set_data('buffer', tb)
+
+xp.loop()
+
+rel do_save(_item)
+    require('xpce', xp)
+    require('io', io)
+    xp.get_data('buffer', tb)
+    xp.get(tb, 'contents', text)
+    io.writeToFile('notepad.txt', text)
+    print('saved notepad.txt')
+
+rel do_load(_item)
+    require('xpce', xp)
+    require('io', io)
+    io.readFile('notepad.txt', text)
+    xp.get_data('buffer', tb)
+    xp.send(tb, 'contents', [text])
+    print('loaded notepad.txt')
+
+rel do_quit(_item)
+    require('xpce', xp)
+    print('quit selected')
+    xp.quit()

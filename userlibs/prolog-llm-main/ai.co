@@ -1,0 +1,10 @@
+rel local()
+	//[bootstrap],['config'],['message'],['llm'],['llm/ollama'].
+	pl::ensure_loaded('bootstrap')
+	pl::ensure_loaded('config')
+	pl::ensure_loaded('message')
+	pl::ensure_loaded('llm')
+	//pl::ensure_loaded('message'),['llm'],['llm/ollama'].
+local()
+pl::send('hi',x)
+print(x)

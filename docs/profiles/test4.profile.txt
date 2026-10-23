@@ -1,0 +1,77 @@
+================================================================
+ Cosmos profile -- test4
+----------------------------------------------------------------
+ program     : test4
+ module      : test4
+ source      : 
+ generated   : 
+ compiled in : 0 ms
+ profiled    : 1200 frames, 21.08 s wall, 4283375 inferences
+ sampler     : 2080 samples, 4111 ticks, 4281.25 ms sampled (1.04 ms/tick, 3.57 ms/frame)
+ report      : frame(1200)
+----------------------------------------------------------------
+ Time by category
+------------------------------------------------------------------------
+category          calls  self ms     %
+swi system      1802724   1140.3  80.2
+space backend    143926    157.3  11.1
+swi library      764673    125.0   8.8
+cosmos library    57560      0.0   0.0
+ Hot predicates (self time)
+------------------------------------------------------------------------
+predicate                          calls  self ms     %
+system:catch/3                     44234   1031.0  72.5
+user:space_xpce_print/4             1199    126.0   8.9
+assoc:is_assoc/4                   46765     46.9   3.3
+system:(@<)/2                     887307     31.2   2.2
+'$attvar':freeze/2                 47045     31.2   2.2
+system:(is)/2                      55017     15.6   1.1
+system:compound_name_arguments/3   26523     15.6   1.1
+system:assertz/1                    4261     15.6   1.1
+user:space_show_shape/6             2398     15.6   1.1
+pce_main:existing_frames/2          1817     15.6   1.1
+'$expand':call_term_expansion/5      444     15.6   1.1
+system:open/4                         36     15.6   1.1
+apply:foldl_/4                         8     15.6   1.1
+system:'$qlf_load'/2                   7     15.6   1.1
+system:compare/3                  411234      0.0   0.0
+assoc:balance/2                   380104      0.0   0.0
+system:arg/3                       52980      0.0   0.0
+assoc:get_assoc/3                  51013      0.0   0.0
+system:'$btree_find_node'/5        51011      0.0   0.0
+system:'$freeze'/2                 47045      0.0   0.0
+assoc:is_assoc/1                   46765      0.0   0.0
+lists:append/3                     27589      0.0   0.0
+user:cosmos_object_wrapper/1       23984      0.0   0.0
+'$apply':apply/2                   22785      0.0   0.0
+user:cosmos_get/3                  22781      0.0   0.0
+ ... and 222 more
+ Most called predicates
+------------------------------------------------------------------------
+predicate                          calls  self ms     %
+system:(@<)/2                     887307     31.2   2.2
+system:compare/3                  411234      0.0   0.0
+assoc:balance/2                   380104      0.0   0.0
+system:(is)/2                      55017     15.6   1.1
+system:arg/3                       52980      0.0   0.0
+assoc:get_assoc/3                  51013      0.0   0.0
+system:'$btree_find_node'/5        51011      0.0   0.0
+'$attvar':freeze/2                 47045     31.2   2.2
+system:'$freeze'/2                 47045      0.0   0.0
+assoc:is_assoc/4                   46765     46.9   3.3
+assoc:is_assoc/1                   46765      0.0   0.0
+system:catch/3                     44234   1031.0  72.5
+lists:append/3                     27589      0.0   0.0
+system:compound_name_arguments/3   26523     15.6   1.1
+user:cosmos_object_wrapper/1       23984      0.0   0.0
+'$apply':apply/2                   22785      0.0   0.0
+user:cosmos_get/3                  22781      0.0   0.0
+assoc:insert/5                     21340      0.0   0.0
+system:sub_string/5                19322      0.0   0.0
+user:space_key/3                   16792      0.0   0.0
+user:space_prefix/2                16789      0.0   0.0
+system:string_concat/3             15536      0.0   0.0
+system:number_codes/2              14388      0.0   0.0
+system:nb_getval/2                 14127      0.0   0.0
+assoc:adjust/5                     13371      0.0   0.0
+ ... and 222 more

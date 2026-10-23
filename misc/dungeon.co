@@ -1,0 +1,1006 @@
+// Dungeon - a turn-based tile crawler built on Space (Cosmos/XPCE).
+//
+//   cosmos -l misc/dungeon.co --xpce
+//
+// Collect every gem, then reach the exit.
+//
+// Enemies smell you out.  Once per turn the game builds a breadth-first flow
+// field rooted at the player's tile: the number in each cell is how many steps
+// that cell is from the player, and -1 where the player cannot reach it.  Every
+// enemy inside its notice radius descends that gradient one step, so a single
+// search drives the whole pack.  Walk far enough away and the scent goes cold,
+// which is the whole tactic.  Press G to tint the cells the enemies can
+// currently smell.
+//
+//   arrows / WASD  move        .  or space  wait a turn
+//   G  scent overlay           P  hand over to autoplay
+//   R  restart                 Q  quit
+//
+// The file is in the `--xpce` header-only shape: `require` and the sp.init /
+// sp.start calls sit at the top level and there is no `main` relation.
+//
+// Setting autoplayFlag to 1 makes the player play itself, using the same
+// breadth-first sweep with the objective as the root.  That exercises the turn
+// loop, the search, the gem and exit logic and the win condition with no
+// keyboard attached, which is how this file is regression tested.  See
+// DUNGEON_TESTING.md.
+
+require('space', sp)
+require('string', str)
+
+// ---------------------------------------------------------------- constants
+
+rel mapWidth(w)
+    w = 28
+
+rel mapHeight(h)
+    h = 19
+
+rel tileSize(t)
+    t = 24
+
+rel hudHeight(h)
+    h = 66
+
+rel autoplayFlag(f)
+    f = 0
+
+// Write a line per turn to dungeon_log.  Off by default; the file is the only
+// way to see what the game is doing, because the loop never returns and stdout
+// is lost when the process is stopped.
+rel traceFlag(f)
+    f = 0
+
+// ------------------------------------------------------------------- the map
+// '#' wall   '.' floor   '@' player start   'E' exit   '*' gem
+// 'a' grunt (notice 7)   'b' hunter (notice 14)
+//
+// Every row is exactly mapWidth characters wide; the renderer and both
+// searches index the rows positionally, so that is the invariant to preserve
+// when editing the level.
+
+rel dungeonMap(map)
+    map = [
+        '############################',
+        '#....#.........#..........E#',
+        '#.##..#....##..#...#####...#',
+        '#.#...#....##..#...#...*.#...#',
+        '#.#...#....##..#...#...#...#',
+        '#.#...#########...#...#...##',
+        '#.#....*..........#.b.#...##',
+        '#.#.#########.#...#...#...##',
+        '#.#.#...*...#.#...#...#...##',
+        '#*#.#a#####.#.#...#...#...##',
+        '#.#.#.#...#.#.#.a.#...#...##',
+        '#...#.#...#.#.#...#...#...##',
+        '#####.#...#.#.##########...#',
+        '#......b...#*..#*........b.#',
+        '#.####.#####...#...#######.#',
+        '#.#..#.......#...#.......#.#',
+        '#@#..#####...#...#####...#.#',
+        '#............#.............#',
+        '############################'
+    ]
+
+// ------------------------------------------------------------- list helpers
+// Cosmos relations are nondeterministic and there is no cut, so every recursive
+// clause carries its own guard.  The `if` heads in this file are those guards.
+
+rel lst_cons(a, l, out)
+    out = [a|l]
+
+// Indexed read.  `l[i]` is NOT a list read: it lowers to cosmos_get/3, which
+// is the accessor for a *table*, so on a plain list it answers something else
+// entirely.  Lists are therefore walked by hand.
+rel lst_get(l, i, v)
+    if(l = [])
+        v = 0
+    else
+        l = [h|t]
+        if(i = 0)
+            v = h
+        else
+            i1 = i - 1
+            lst_get(t, i1, v)
+
+rel elem_at(l, i, v)
+    lst_get(l, i, v)
+
+// A relation with more than one clause whose head contains a literal is
+// miscompiled by the current compiler: the literal clause is dropped and its
+// body is appended to the other clause, so the parameters after the literal end
+// up shifted.  Every list-walking relation below is therefore a single clause
+// that tests the list with an `if`.
+rel lst_put(l, i, v, out)
+    if(l = [])
+        out = []
+    else
+        l = [h|t]
+        if(i = 0)
+            out = [v|t]
+        else
+            i1 = i - 1
+            lst_put(t, i1, v, out2)
+            out = [h|out2]
+
+rel lst_len([], n)
+    n = 0
+rel lst_len([_|t], n)
+    lst_len(t, n1)
+    n = n1 + 1
+
+rel lst_concat([], b, out)
+    out = b
+rel lst_concat([h|t], b, out)
+    lst_concat(t, b, out2)
+    out = [h|out2]
+
+rel same_cell(ax, ay, bx, by, flag)
+    if(ax = bx)
+        if(ay = by)
+            flag = 1
+        else
+            flag = 0
+    else
+        flag = 0
+
+rel cell_in(l, x, y, flag)
+    if(l = [])
+        flag = 0
+    else
+        l = [p|t]
+        p = [px, py]
+        same_cell(px, py, x, y, hit)
+        if(hit = 1)
+            flag = 1
+        else
+            cell_in(t, x, y, flag)
+
+rel num_text(n, s)
+    s = str(n)
+
+// ------------------------------------------------------------------- the grid
+
+rel in_grid(w, h, x, y, flag)
+    if(x < 0 or y < 0 or x >= w or y >= h)
+        flag = 0
+    else
+        flag = 1
+
+// The cell under (x, y).  `ok` is 0 when the cell is off the grid: the body
+// never fails, because a relation whose body is `false` has that `false`
+// hoisted into the end of the *caller's* body by the current compiler, which
+// makes the caller always fail.
+rel tile_at(grid, w, h, x, y, ch, ok)
+    in_grid(w, h, x, y, flag)
+    if(flag = 1)
+        lst_get(grid, y, row)
+        str.at(row, x, ch)
+        ok = 1
+    else
+        ch = ''
+        ok = 0
+
+rel walkable(grid, w, h, x, y, ok)
+    tile_at(grid, w, h, x, y, ch, found)
+    if(found = 1)
+        if(ch != '#')
+            ok = 1
+        else
+            ok = 0
+    else
+        ok = 0
+
+// ------------------------------------------------------- scanning the level
+// One row-major walk that collects every cell matching a character.  Row by row
+// rather than by linear index, so no integer division is involved anywhere.
+
+rel scan_grid(grid, w, h, y, x, wanted, acc, out)
+    if(y >= h)
+        reverse_list(acc, [], out)
+    else
+        if(x >= w)
+            scan_grid(grid, w, h, y + 1, 0, wanted, acc, out)
+        else
+            lst_get(grid, y, row)
+            str.at(row, x, ch)
+            if(ch = wanted)
+                lst_cons([x, y], acc, acc2)
+            else
+                acc2 = acc
+            scan_grid(grid, w, h, y, x + 1, wanted, acc2, out)
+
+rel reverse_list([], acc, out)
+    out = acc
+rel reverse_list([h|t], acc, out)
+    reverse_list(t, [h|acc], out)
+
+rel scan_chars(grid, w, h, wanted, cells)
+    scan_grid(grid, w, h, 0, 0, wanted, [], cells)
+
+rel enemy_of(ch, px, py, enemy, flag)
+    if(ch = 'a')
+        enemy = {x = px and y = py and kind = 'grunt' and notice = 7}
+        flag = 1
+    elseif(ch = 'b')
+        enemy = {x = px and y = py and kind = 'hunter' and notice = 14}
+        flag = 1
+    else
+        flag = 0
+
+rel scan_enemies_row(grid, w, y, x, acc, out)
+    if(x >= w)
+        reverse_list(acc, [], out)
+    else
+        lst_get(grid, y, row)
+        str.at(row, x, ch)
+        enemy_of(ch, x, y, enemy, flag)
+        if(flag = 1)
+            lst_cons(enemy, acc, acc2)
+        else
+            acc2 = acc
+        scan_enemies_row(grid, w, y, x + 1, acc2, out)
+
+rel scan_enemies(grid, w, h, y, acc, out)
+    if(y >= h)
+        reverse_list(acc, [], out)
+    else
+        scan_enemies_row(grid, w, y, 0, [], rowEnemies)
+        lst_concat(rowEnemies, acc, acc2)
+        scan_enemies(grid, w, h, y + 1, acc2, out)
+
+rel spawn_enemies(grid, w, h, enemies)
+    scan_enemies(grid, w, h, 0, [], enemies)
+
+// --------------------------------------------------------------- flow field
+// One breadth-first search per turn, rooted at the player's tile.  `field` is a
+// row-major list of step counts, -1 anywhere the root cannot reach.
+
+rel cell_index(w, x, y, i)
+    i = y * w + x
+
+rel dist_at(field, w, h, x, y, v)
+    in_grid(w, h, x, y, flag)
+    if(flag = 1)
+        cell_index(w, x, y, i)
+        lst_get(field, i, v)
+    else
+        v = -1
+
+rel dist_put(field, w, x, y, v, out)
+    cell_index(w, x, y, i)
+    lst_put(field, i, v, out)
+
+rel neighbours(x, y, nbs)
+    nbs = [[x+1, y], [x-1, y], [x, y+1], [x, y-1]]
+
+rel fill_field(n, v, l)
+    if(n = 0)
+        l = []
+    else
+        fill_field(n - 1, v, tail)
+        l = [v|tail]
+
+// Mark every not-yet-visited walkable neighbour of one cell at depth d.
+// `out` collects the newly reached cells and `fieldOut` carries the updated
+// field back out.
+rel open_scan(nbs, grid, w, h, field, d, acc, out, fieldIn, fieldOut)
+    if(nbs = [])
+        out = acc
+        fieldOut = fieldIn
+    else
+        nbs = [p|t]
+        p = [cx, cy]
+        walkable(grid, w, h, cx, cy, walkOk)
+        if(walkOk = 1)
+            dist_at(field, w, h, cx, cy, cd)
+            if(cd < 0)
+                dist_put(field, w, cx, cy, d, field2)
+                lst_cons([cx, cy], acc, acc2)
+                open_scan(t, grid, w, h, field2, d, acc2, out, field2, fieldOut)
+            else
+                open_scan(t, grid, w, h, field, d, acc, out, field, fieldOut)
+        else
+            open_scan(t, grid, w, h, field, d, acc, out, field, fieldOut)
+
+// A relation whose clauses disagree about whether a parameter is a literal or
+// a variable is miscompiled - the predicate is given a different arity and the
+// argument that follows the mismatched parameter is silently shifted.  Every
+// multi-clause relation in this file therefore spells its result parameter as
+// a variable in *both* clauses and binds it in the body.
+rel expand(grid, w, h, frontier, fieldIn, d, frontOut, fieldOut)
+    if(frontier = [])
+        frontOut = []
+        fieldOut = fieldIn
+    else
+        frontier = [p|rest]
+        p = [x, y]
+        neighbours(x, y, nbs)
+        open_scan(nbs, grid, w, h, fieldIn, d, [], nextFront, fieldIn, fieldMid)
+        expand(grid, w, h, rest, fieldMid, d, restFront, fieldOut)
+        lst_concat(nextFront, restFront, frontOut)
+
+// Drain frontier rings until nothing new opens.
+rel drain(grid, w, h, frontier, fieldIn, d, fieldOut)
+    if(frontier = [])
+        fieldOut = fieldIn
+    else
+        expand(grid, w, h, frontier, fieldIn, d, front, fieldMid)
+        d1 = d + 1
+        drain(grid, w, h, front, fieldMid, d1, fieldOut)
+
+rel flow_field(grid, w, h, sx, sy, field)
+    fill_field(w * h, -1, blank)
+    dist_put(blank, w, sx, sy, 0, seeded)
+    drain(grid, w, h, [[sx, sy]], seeded, 1, field)
+
+// Is the cell one step closer than the best so far?  The best so far is a
+// [distance, cell] pair, so the distance is unpacked before it is compared.
+// Non-recursive on purpose: this is the innermost step of every enemy turn.
+rel cand_move(grid, w, h, field, cx, cy, best, out)
+    best = [bd, _]
+    walkable(grid, w, h, cx, cy, walkOk)
+    if(walkOk = 1)
+        dist_at(field, w, h, cx, cy, cd)
+        if(cd >= 0)
+            if(cd < bd)
+                out = [cd, [cx, cy]]
+            else
+                out = best
+        else
+            out = best
+    else
+        out = best
+
+rel pick2(m1, m2, best)
+    m1 = [d1, _]
+    m2 = [d2, _]
+    if(d2 < d1)
+        best = m2
+    else
+        best = m1
+
+// One step down the gradient, unrolled over the four neighbours so the choice
+// needs no recursion of its own.
+rel flow_step(grid, w, h, field, x, y, step)
+    dist_at(field, w, h, x, y, d0)
+    here = [d0, [x, y]]
+    cand_move(grid, w, h, field, x + 1, y, here, m1)
+    cand_move(grid, w, h, field, x - 1, y, m1, m2)
+    cand_move(grid, w, h, field, x, y + 1, m2, m3)
+    cand_move(grid, w, h, field, x, y - 1, m3, m4)
+    pick2(m1, m2, b1)
+    pick2(b1, m3, b2)
+    pick2(b2, m4, best)
+    best = [_, step]
+
+// ---------------------------------------------------------------- game rules
+
+rel hunting(d, notice, flag)
+    if(d >= 0)
+        if(d <= notice)
+            flag = 1
+        else
+            flag = 0
+    else
+        flag = 0
+
+rel dir_from_index(0, d)
+    d = [1, 0]
+rel dir_from_index(1, d)
+    d = [-1, 0]
+rel dir_from_index(2, d)
+    d = [0, 1]
+rel dir_from_index(3, d)
+    d = [0, -1]
+
+// pl::random/3 answers a float in [0,4).  Mixing in the seed and taking it
+// modulo four keeps the index inside the four directions however big the seed
+// grows.  `%` is a floating-point modulus, so the fraction has to be taken
+// off first: 5.5 % 4 is 1.5, not 1.
+rel rand_dir(seed, d)
+    pl::random(0, 4, r)
+    mix = r + seed * 0.0137
+    whole = mix - (mix % 1)
+    ri = whole % 4
+    dir_from_index(ri, d)
+
+// An enemy that cannot take its chosen step stays exactly where it is.
+rel settle(grid, w, h, ex, ey, sx, sy, occupied, kindOf, noticeOf, out)
+    walkable(grid, w, h, sx, sy, walkOk)
+    if(walkOk = 1)
+        cell_in(occupied, sx, sy, blocked)
+        if(blocked = 1)
+            out = {x = ex and y = ey and kind = kindOf and notice = noticeOf}
+        else
+            out = {x = sx and y = sy and kind = kindOf and notice = noticeOf}
+    else
+        out = {x = ex and y = ey and kind = kindOf and notice = noticeOf}
+
+rel add_occupied(m, occ, out)
+    m = {x = mx and y = my and kind = _ and notice = _}
+    lst_cons([mx, my], occ, out)
+
+// Accumulator order, recursive call last.  Occupancy grows as enemies move so
+// two of them never share a tile.
+rel move_enemies(enemies, grid, w, h, field, turn, occupied, out)
+    if(enemies = [])
+        out = []
+    else
+        enemies = [e|t]
+        move_enemies_step(enemies, grid, w, h, field, turn, occupied, [], out)
+
+rel move_enemies_step(list, grid, w, h, field, turn, occupied, acc, out)
+    if(list = [])
+        out = acc
+    else
+        list = [e|t]
+        e = {x = ex and y = ey and kind = kindOf and notice = noticeOf}
+        dist_at(field, w, h, ex, ey, here)
+        hunting(here, noticeOf, hunt)
+        if(hunt = 1)
+            flow_step(grid, w, h, field, ex, ey, step)
+            step = [tx, ty]
+            settle(grid, w, h, ex, ey, tx, ty, occupied, kindOf, noticeOf, moved)
+        else
+            rand_dir(ex * 7 + ey * 13 + turn, dir)
+            dir = [dx, dy]
+            settle(grid, w, h, ex, ey, ex + dx, ey + dy, occupied, kindOf, noticeOf, moved)
+        add_occupied(moved, occupied, occ2)
+        lst_cons(moved, acc, acc2)
+        move_enemies_step(t, grid, w, h, field, turn, occ2, acc2, out)
+
+rel caught(list, px, py, flag)
+    if(list = [])
+        flag = 0
+    else
+        list = [e|t]
+        e = {x = ex and y = ey and kind = _ and notice = _}
+        same_cell(ex, ey, px, py, hit)
+        if(hit = 1)
+            flag = 1
+        else
+            caught(t, px, py, flag)
+
+rel enemy_cells([], acc, out)
+    out = acc
+rel enemy_cells([e|t], acc, out)
+    e = {x = ex and y = ey and kind = _ and notice = _}
+    lst_cons([ex, ey], acc, acc2)
+    enemy_cells(t, acc2, out)
+
+// Remove the gem under the player, keeping the rest in order.  The recursion
+// carries the head back on, so gems that do not match survive - and the list
+// stays in the order the level was scanned in.
+rel collect_gem(gems, px, py, gems2, took)
+    if(gems = [])
+        gems2 = gems
+        took = 0
+    else
+        gems = [g|t]
+        g = [gx, gy]
+        same_cell(gx, gy, px, py, hit)
+        if(hit = 1)
+            gems2 = t
+            took = 1
+        else
+            collect_gem(t, px, py, rest, took2)
+            lst_cons(g, rest, gems2)
+            took = took2
+
+rel nearest_gem(list, px, py, gx, gy)
+    if(list = [])
+        gx = 0
+        gy = 0
+    else
+        list = [g|t]
+        g = [cgx, cgy]
+        if(t = [])
+            gx = cgx
+            gy = cgy
+        else
+            nearest_gem(t, px, py, bx, by)
+            manhattan(cgx, cgy, px, py, d0)
+            manhattan(bx, by, px, py, d1)
+            if(d0 <= d1)
+                gx = cgx
+                gy = cgy
+            else
+                gx = bx
+                gy = by
+
+rel manhattan(x, y, gx, gy, f)
+    pl::abs(x - gx, ax)
+    pl::abs(y - gy, ay)
+    f = ax + ay
+
+// ------------------------------------------------------------------- state
+// Comparing a table field inside a condition compiles to a table *write*
+// (`s.demo = 1` becomes cosmos_set_or_unify/3), which quietly rewrites the
+// state - and `s.gems = []` wipes the gems out of it.  Reading the field into
+// a local first keeps the test a test.
+rel field_is(s, name, value, flag)
+    if(name = 'demo')
+        v = s.demo
+    elseif(name = 'over')
+        v = s.over
+    elseif(name = 'dirty')
+        v = s.dirty
+    elseif(name = 'scent')
+        v = s.scent
+    else
+        v = s.gems
+    if(v = value)
+        flag = 1
+    else
+        flag = 0
+
+rel newGame(state)
+    buildMap(grid)
+    mapWidth(mw)
+    mapHeight(mh)
+    scan_chars(grid, mw, mh, '@', startCells)
+    lst_get(startCells, 0, startCell)
+    startCell = [sx, sy]
+    scan_chars(grid, mw, mh, 'E', exitCells)
+    lst_get(exitCells, 0, exitCell)
+    exitCell = [ex, ey]
+    scan_chars(grid, mw, mh, '*', gemList)
+    spawn_enemies(grid, mw, mh, foeList)
+    autoplayFlag(playMode)
+    num_text(lst_len(gemList), n)
+    msg = 'Collect the ' + n + ' gems'
+    flow_field(grid, mw, mh, sx, sy, fieldVal)
+    state = {
+        map = grid and w = mw and h = mh and
+        px = sx and py = sy and ex = ex and ey = ey and
+        gems = gemList and enemies = foeList and field = fieldVal and
+        turn = 0 and status = msg and over = 0 and won = 0 and
+        queue = [] and scent = 0 and demo = playMode and
+        tick = 0 and dirty = 1
+    }
+
+rel buildMap(grid)
+    dungeonMap(grid)
+
+rel put(s, dirty, out)
+    out = s.dirty:dirty
+
+rel set_flag(s, name, value, out)
+    if(name = 'scent')
+        out = s.scent:value
+    else
+        out = s.demo:value
+
+rel idle(s, out)
+    put(s, 1, out)
+
+// ---------------------------------------------------------------- the turn
+
+rel no_gems(s, flag)
+    field_is(s, 'gems', [], flag)
+
+rel next_objective(s, gx, gy)
+    no_gems(s, empty)
+    if(empty = 1)
+        gx = s.ex
+        gy = s.ey
+    else
+        nearest_gem(s.gems, s.px, s.py, gx, gy)
+
+rel turn_status(s, gems, px, py, turn, status, won, over)
+    num_text(lst_len(gems), n)
+    same_cell(s.ex, s.ey, px, py, atExit)
+    if(gems = [])
+        if(atExit = 1)
+            num_text(turn, tn)
+            status = 'Escaped in ' + tn + ' turns'
+            won = 1
+            over = 1
+        else
+            status = 'The exit is open - get there'
+            won = 0
+            over = 0
+    else
+        status = 'Gems left: ' + n
+        won = 0
+        over = 0
+
+// Advance the world one turn: move the player, move the pack, see who died.
+rel advance(s, px, py, gems, turn, foes, s2)
+    flow_field(s.map, s.w, s.h, px, py, field)
+    enemy_cells(foes, [], occ0)
+    lst_cons([px, py], occ0, occ)
+    move_enemies(foes, s.map, s.w, s.h, field, turn, occ, foes2)
+    caught(foes2, px, py, dead)
+    a = s.px:px
+    b = a.py:py
+    c = b.gems:gems
+    d = c.enemies:foes2
+    e = d.turn:turn
+    f = e.field:field
+    if(dead = 1)
+        g = f.status:'Caught. Press R to try again.'
+        h = g.over:1
+        i = h.won:0
+        put(i, 1, s2)
+    else
+        turn_status(s, gems, px, py, turn, status, won, over)
+        g = f.status:status
+        h = g.over:over
+        i = h.won:won
+        put(i, 1, s2)
+
+rel do_turn(s, dx, dy, s2)
+    nx = s.px + dx
+    ny = s.py + dy
+    turn = s.turn + 1
+    walkable(s.map, s.w, s.h, nx, ny, walkOk)
+    if(walkOk = 1)
+        collect_gem(s.gems, nx, ny, gems2, took)
+        advance(s, nx, ny, gems2, turn, s.enemies, s2)
+    else
+        g = s.status:'A wall. They still move.'
+        h = g.turn:turn
+        advance(s, s.px, s.py, s.gems, turn, s.enemies, s2)
+
+rel wait_turn(s, s2)
+    advance(s, s.px, s.py, s.gems, s.turn + 1, s.enemies, s2)
+
+// Is there an enemy within one step of (x, y)?  Autoplay uses this to stay
+// out of the pack's reach instead of walking straight into it.
+rel near_enemy(enemies, x, y, flag)
+    if(enemies = [])
+        flag = 0
+    else
+        enemies = [e|t]
+        e = {x = ex and y = ey and kind = _ and notice = _}
+        pl::abs(ex - x, dx)
+        pl::abs(ey - y, dy)
+        near = dx + dy
+        if(near <= 1)
+            flag = 1
+        else
+            near_enemy(t, x, y, flag)
+
+// Autoplay drives the player with the same breadth-first sweep the enemies
+// use, rooted at the objective instead of at the player: build a field that
+// measures the distance to the next gem, then step down it.  It refuses to
+// step into a cell an enemy can reach, and waits instead.
+rel autoplay_move(s, s2)
+    next_objective(s, gx, gy)
+    flow_field(s.map, s.w, s.h, gx, gy, target)
+    flow_step(s.map, s.w, s.h, target, s.px, s.py, step)
+    step = [tx, ty]
+    near_enemy(s.enemies, tx, ty, near)
+    near_enemy(s.enemies, s.px, s.py, here)
+    if(near = 1)
+        if(here = 1)
+            do_turn(s, tx - s.px, ty - s.py, s2)
+        else
+            wait_turn(s, s2)
+    else
+        do_turn(s, tx - s.px, ty - s.py, s2)
+
+rel move_key(key, flag, dx, dy)
+    if(key = 'left')
+        flag = 1
+        dx = -1
+        dy = 0
+    elseif(key = 'right')
+        flag = 1
+        dx = 1
+        dy = 0
+    elseif(key = 'up')
+        flag = 1
+        dx = 0
+        dy = -1
+    elseif(key = 'down')
+        flag = 1
+        dx = 0
+        dy = 1
+    elseif(key = 'a')
+        flag = 1
+        dx = -1
+        dy = 0
+    elseif(key = 'd')
+        flag = 1
+        dx = 1
+        dy = 0
+    elseif(key = 'w')
+        flag = 1
+        dx = 0
+        dy = -1
+    elseif(key = 's')
+        flag = 1
+        dx = 0
+        dy = 1
+    else
+        flag = 0
+        dx = 0
+        dy = 0
+
+rel try_key(s, key, s2)
+    move_key(key, flag, dx, dy)
+    if(flag = 1)
+        do_turn(s, dx, dy, s2)
+    elseif(key = '.' or key = 'space')
+        wait_turn(s, s2)
+    else
+        idle(s, s2)
+
+rel handle_key(s, key, s2)
+    field_is(s, 'over', 1, isOver)
+    if(isOver = 1)
+        if(key = 'r')
+            newGame(s2)
+        else
+            idle(s, s2)
+    elseif(key = 'r')
+        newGame(s2)
+    elseif(key = 'q')
+        sp.quit()
+        idle(s, s2)
+    elseif(key = 'g')
+        set_flag(s, 'scent', 1 - s.scent, t1)
+        put(t1, 1, s2)
+    elseif(key = 'p')
+        set_flag(s, 'demo', 1 - s.demo, t1)
+        put(t1, 1, s2)
+    else
+        try_key(s, key, s2)
+
+rel enqueue([], [], out)
+    out = []
+rel enqueue(q, [], out)
+    out = q
+rel enqueue(q, [k|t], out)
+    lst_cons(k, q, q2)
+    enqueue(q2, t, out)
+
+// ---------------------------------------------------------------- the loop
+// The game is turn based, so draw only repaints when a turn resolved.  A frame
+// that changes nothing is skipped entirely, which keeps the XPCE box churn at
+// one screenful per keypress instead of sixty per second.  Every 45th frame is
+// forced so a window expose or resize repaints on its own.
+//
+// The `dirty` field says the next draw has to repaint.  The update clears it,
+// because by the time the update runs the draw of the frame before it has
+// already happened.  Two frames keep it set: the first one, because nothing
+// has been painted yet, and every 45th one.  Clearing it is what makes the
+// repaint cheap: a full repaint is about 760 XPCE objects, and doing that
+// sixty times a second is what made the game crawl.
+
+// A trace of the turn, written to a file: the game loop never returns, so
+// buffered stdout is lost when the process is stopped.  open/4 wants Prolog
+// atoms for the file name and the mode, and Cosmos strings are Prolog strings,
+// so both are converted with atom_string/2 first.  The message is forced
+// through atom_string/2 as well: `+` on strings builds a frozen term, and a
+// host call that needs it instantiated rejects the frozen form.
+rel diag_write(msg)
+    pl::atom_string(text, msg)
+    pl::atom_string(fname, 'dungeon_log')
+    pl::atom_string(mode, 'append')
+    pl::open(fname, mode, st, [])
+    pl::write(st, text)
+    pl::nl(st)
+    pl::close(st)
+
+rel diag(s)
+    traceFlag(on)
+    if(on = 1)
+        msg = 'turn=' + str(s.turn) + ' gems=' + str(lst_len(s.gems)) + ' pos=' + str(s.px) + ',' + str(s.py) + ' over=' + str(s.over) + ' won=' + str(s.won) + ' status=' + s.status
+        diag_write(msg)
+    else
+        true
+
+rel update(dt, s, s2)
+    diag(s)
+    sp.event.getType('keydown', keys)
+    a = s.queue:s.queue
+    b = a.tick:s.tick + 1
+    enqueue(b.queue, keys, queue2)
+    c = b.queue:queue2
+    if(queue2 = [])
+        field_is(s, 'demo', 1, demo)
+        if(demo = 1)
+            field_is(s, 'over', 0, alive)
+            if(alive = 1)
+                autoplay_move(c, d)
+                e = d.queue:queue2
+                f = e.tick:b.tick
+                put(f, 1, s2)
+            else
+                put(c, 0, s2)
+        else
+            imod_tick = b.tick % 45
+            if(imod_tick = 0)
+                put(c, 1, s2)
+            else
+                first_tick = b.tick
+                if(first_tick = 1)
+                    put(c, 1, s2)
+                else
+                    put(c, 0, s2)
+    else
+        lst_get(queue2, 0, key)
+        drop_head(queue2, queue3, gotKey)
+        d = c.queue:queue3
+        handle_key(d, key, e)
+        f = e.queue:queue3
+        g = f.tick:b.tick
+        put(g, 1, s2)
+
+// Pop the head of the key queue.  The body never fails: a relation whose body
+// is `false` has that `false` hoisted into the end of the *caller's* body by
+// the current compiler, which makes the caller always fail.  So the empty case
+// answers a flag instead.
+rel drop_head(l, out, ok)
+    if(l = [])
+        out = []
+        ok = 0
+    else
+        l = [_|t]
+        out = t
+        ok = 1
+
+// ---------------------------------------------------------------- rendering
+
+rel draw(s)
+    field_is(s, 'dirty', 1, dirty)
+    if(dirty = 1)
+        g = sp.graphics
+        g.clear('#0b0d14')
+        draw_map(s)
+        draw_scent(s)
+        draw_gems(s.gems)
+        draw_exit(s)
+        draw_enemies(s.enemies)
+        draw_player(s)
+        draw_hud(s)
+        g.setFont(g.newFont(12, 'sans', 'normal'))
+
+rel draw_map(s)
+    tileSize(t)
+    mapWidth(w)
+    draw_rows(s.map, 0, t, w)
+
+rel draw_rows(list, y, size, w)
+    if(list = [])
+        true
+    else
+        list = [row|t]
+        draw_row_cells(row, 0, y, size, w)
+        draw_rows(t, y + size, size, w)
+
+rel draw_row_cells(row, x, y, size, w)
+    if(x >= w)
+        true
+    else
+        str.at(row, x, ch)
+        draw_cell(ch, x * size, y, size)
+        draw_row_cells(row, x + 1, y, size, w)
+
+rel draw_cell('#', px, py, size)
+    sp.graphics.setColor('#39405a')
+    sp.graphics.rectangle('fill', px, py, size, size)
+    sp.graphics.setColor('#4b5474')
+    sp.graphics.rectangle('fill', px, py, size, 3)
+rel draw_cell(ch, px, py, size)
+    if(ch = '.')
+        checker_light(px, py, light)
+        if(light = 1)
+            sp.graphics.setColor('#1a2030')
+        else
+            sp.graphics.setColor('#161c2a')
+        sp.graphics.rectangle('fill', px, py, size, size)
+    else
+        true
+
+rel checker_light(px, py, light)
+    k = (px + py) % 48
+    if(k = 0)
+        light = 1
+    else
+        light = 0
+
+rel draw_scent(s)
+    field_is(s, 'scent', 1, on)
+    if(on = 1)
+        tileSize(size)
+        scent_rows(s.field, s.w, s.h, size, 0)
+    else
+        true
+
+rel scent_rows(field, w, h, size, y)
+    if(y < h)
+        scent_cells(field, w, size, y, 0)
+        scent_rows(field, w, h, size, y + 1)
+
+rel scent_cells(field, w, size, y, x)
+    if(x < w)
+        cell_index(w, x, y, i)
+        lst_get(field, i, d)
+        if(d >= 0)
+            if(d <= 12)
+                sp.graphics.setColor('#212d40')
+                sp.graphics.rectangle('fill', x * size, y * size, size, size)
+        scent_cells(field, w, size, y, x + 1)
+
+rel draw_gems(gems)
+    if(gems = [])
+        true
+    else
+        gems = [g|t]
+        g = [gx, gy]
+        tileSize(size)
+        cx = gx * size + size / 2
+        cy = gy * size + size / 2
+        sp.graphics.setColor('#ffd166')
+        sp.graphics.polygon('fill', [cx, cy-7, cx+6, cy, cx, cy+7, cx-6, cy])
+        draw_gems(t)
+
+rel draw_exit(s)
+    tileSize(size)
+    cx = s.ex * size + size / 2
+    cy = s.ey * size + size / 2
+    no_gems(s, empty)
+    if(empty = 1)
+        sp.graphics.setColor('#4ade80')
+    else
+        sp.graphics.setColor('#3f4a5f')
+    sp.graphics.rectangle('line', cx - 7, cy - 7, 14, 14)
+
+rel draw_enemies([])
+    true
+rel draw_enemies([e|t])
+    e = {x = ex and y = ey and kind = kindOf and notice = _}
+    tileSize(size)
+    cx = ex * size + size / 2
+    cy = ey * size + size / 2
+    if(kindOf = 'hunter')
+        sp.graphics.setColor('#c084fc')
+    else
+        sp.graphics.setColor('#f87171')
+    sp.graphics.circle('fill', cx, cy, size / 2 - 6)
+    sp.graphics.setColor('#0b0d14')
+    sp.graphics.rectangle('fill', cx - 4, cy - 1, 8, 2)
+    draw_enemies(t)
+
+rel draw_player(s)
+    tileSize(size)
+    cx = s.px * size + size / 2
+    cy = s.py * size + size / 2
+    sp.graphics.setColor('#60a5fa')
+    sp.graphics.circle('fill', cx, cy, size / 2 - 4)
+    sp.graphics.setColor('#0b0d14')
+    sp.graphics.circle('fill', cx - 4, cy - 2, 2)
+    sp.graphics.circle('fill', cx + 4, cy - 2, 2)
+
+rel draw_hud(s)
+    mapWidth(w)
+    mapHeight(h)
+    tileSize(t)
+    hudHeight(hud)
+    top = h * t
+    sp.graphics.setColor('#141926')
+    sp.graphics.rectangle('fill', 0, top, w * t, hud)
+    sp.graphics.setColor('#60a5fa')
+    sp.graphics.rectangle('fill', 0, top, w * t, 2)
+    sp.graphics.setColor('#c9d1e1')
+    num_text(lst_len(s.gems), gn)
+    num_text(s.turn, tn)
+    sp.graphics.print('Gems ' + gn + '    Turn ' + tn, 12, top + 10)
+    sp.graphics.print(s.status, 12, top + 28)
+    sp.graphics.setColor('#6b7793')
+    sp.graphics.print('arrows/WASD move   . wait   G scent   P autoplay   R restart   Q quit', 12, top + 46)
+
+// -------------------------------------------------------------------- run
+// The entry is deliberately only sp.init plus sp.start: the first state is
+// built before the loop, so the --xpce entry keeps the shape the other Space
+// programs use.
+
+newGame(gameState)
+
+sp.init(672, 522)
+sp.start(16, {update=update and draw=draw}, gameState)

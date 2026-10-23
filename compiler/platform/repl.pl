@@ -114,7 +114,43 @@ cosmos_runtime_options(['-t'|Rest],Options) :- !,
     cosmos_runtime_options(Rest,Options).
 cosmos_runtime_options(['-d'|Rest],Options) :- !,
     nb_setval(cosmos_debug_contracts,true),cosmos_runtime_options(Rest,Options).
+% The profiler switches are runtime switches like -t and -d: they are
+% consumed here, so they never reach the compiler's option parser (which
+% would read an unknown option as a module name).
+cosmos_runtime_options(['--profile'|Rest],Options) :- !,
+    nb_setval(cosmos_profile_requested,true),
+    cosmos_runtime_options(Rest,Options).
+cosmos_runtime_options(['--profile-out',File|Rest],Options) :- !,
+    nb_setval(cosmos_profile_out,File),
+    cosmos_runtime_options(Rest,Options).
+cosmos_runtime_options(['--profile-frames',Frames|Rest],Options) :- !,
+    cosmos_profile_number(Frames,Count),
+    nb_setval(cosmos_profile_dump_frames,Count),
+    cosmos_runtime_options(Rest,Options).
+cosmos_runtime_options(['--profile-seconds',Seconds|Rest],Options) :- !,
+    cosmos_profile_number(Seconds,Count),
+    nb_setval(cosmos_profile_seconds,Count),
+    cosmos_runtime_options(Rest,Options).
+cosmos_runtime_options(['--profile-top',Top|Rest],Options) :- !,
+    cosmos_profile_number(Top,Count),
+    nb_setval(cosmos_profile_top,Count),
+    cosmos_runtime_options(Rest,Options).
 cosmos_runtime_options([Arg|Rest],[Arg|Options]) :- cosmos_runtime_options(Rest,Options).
+
+% A count given on the command line is a number; a bad one is worth a
+% complaint rather than a silent zero.
+cosmos_profile_number(Text,Count) :-
+    (   atom(Text)
+    ->  atom_number(Text, Number)
+    ;   number(Text)
+    ->  Number = Text
+    ;   Number = 0
+    ),
+    (   integer(Number), Number >= 0
+    ->  Count = Number
+    ;   format(user_error,'Cosmos: --profile-frames/--profile-top want a number, got ~w~n',[Text]),
+        Count = 0
+    ).
 
 :- meta_predicate cosmos_execute(0).
 cosmos_execute(Goal) :-
@@ -147,6 +183,12 @@ cosmos_output_file(Input, Output) :-
 
 cosmos_module_argument(['--main'], _, main) :- !.
 cosmos_module_argument(['--module', Module], _, Module) :- !.
+% The entry kind is not a module name: `cosmos -r program.pl --xpce'
+% names the module `program', not `--xpce'.
+cosmos_module_argument(['--xpce'|Rest], Path, Module) :- !,
+    cosmos_module_argument(Rest, Path, Module).
+cosmos_module_argument(['--main'|Rest], Path, Module) :- !,
+    cosmos_module_argument(Rest, Path, Module).
 cosmos_module_argument([Module], _, Module) :- !.
 cosmos_module_argument([], Path, Module) :-
     file_base_name(Path, Base),
@@ -161,7 +203,44 @@ cosmos_compile(Input, Output, Module) :-
 cosmos_compile(Input, Output, Module, Entry, Executable) :-
     compiler_platform(Here),
     directory_file_path(Here, '../generated', Stage),
-    compiler_compile_application(Stage, Input, Output, Module, Entry, Executable).
+    get_time(Start),
+    compiler_compile_application(Stage, Input, Output, Module, Entry, Executable),
+    get_time(End),
+    Milliseconds is round((End - Start) * 1000),
+    % Kept for the profiler report: the compile is part of the pipeline
+    % a Space program travels, and it is worth seeing next to the run.
+    nb_setval(cosmos_profile_compile_ms, Milliseconds),
+    nb_setval(cosmos_profile_source, Input),
+    nb_setval(cosmos_profile_target, Output).
+
+% What the profiler report should call this program.
+cosmos_profile_note(File, Module) :-
+    % file_base_name/2 does not split on a backslash on Windows, so the
+    % last path component is taken here instead.
+    split_string(File, '/\\', '', Parts),
+    last(Parts, Base),
+    file_name_extension(Name, _, Base),
+    nb_setval(cosmos_profile_program, Name),
+    nb_setval(cosmos_profile_module, Module).
+
+% Load the profiler when the run asked for one and start the sampler.
+%
+% The generated entry point loads the profiler as well, so a program run
+% directly with `swipl -s program.pl' is covered too.  Doing it here as
+% well means `cosmos -r program.pl --profile' works with a program that
+% was generated before the profiler existed.
+cosmos_profile_prepare :-
+    (   nb_current(cosmos_profile_prepared, true)
+    ->  true
+    ;   nb_setval(cosmos_profile_prepared, true),
+        compiler_platform(Here),
+        directory_file_path(Here, 'profile.pl', Profiler),
+        (   exists_file(Profiler)
+        ->  ensure_loaded(Profiler),
+            cosmos_profile:cosmos_profile_start()
+        ;   format(user_error,'Cosmos: no profiler at ~w~n',[Profiler])
+        )
+    ).
 
 cosmos_run(File, Module) :-
     compiler_platform(Here),
@@ -181,11 +260,19 @@ cosmos_run(File, Module) :-
     % generated stub (moving_rect([]) :- true) and print [] instead of
     % starting the program.  Prefer the entry when the file defines one.
     ( current_predicate(cosmos_entry_main/0) -> Goal = cosmos_entry_main ; Goal =.. [Module, Output] ),
+    cosmos_profile_note(File, Module),
+    (   nb_current(cosmos_profile_requested, true)
+    ->  cosmos_profile_prepare
+    ;   true
+    ),
     % An entry-driven run binds nothing here (the entry called main/the module
     % goal itself), so only report a result when the module goal produced one.
-    (   once(cosmos_execute(Goal)), nonvar(Output)
+    % The cleanup closes a profiling run: a program without an entry point
+    % (a plain -l compile) has no entry of its own to do it.
+    (   setup_call_cleanup(true, once(cosmos_execute(Goal)), cosmos_profile_finish),
+        nonvar(Output)
     ->  repl_print_result(Output)
-    ;   true
+    ;   throw(error(cosmos_program_failed, cosmos_run/2))
     ).
 
 repl :- repl(none).

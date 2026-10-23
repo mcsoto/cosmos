@@ -1,0 +1,22 @@
+error message when program returns false, currently nothing is said, do try-catch on main/1 
+
+check types/how functors apply when def. in different files
+
+add syntax | t[i]:i
+
+native try-catch?
+
+//Full floating normalization is viable with CLP(R)—SWI itself turns {X=1} into 1.0—but it is not free. Every runtime boundary that produces counters, sizes, iterator status, or host indices must normalize deliberately, while host predicates such as sub_string/5, nth0/3, and random_between/3 still require temporary integers. Tic-tac-toe now runs, but incorrectly declares “X won!” on the empty board, so I’m tracing that separately from representation policy.
+>Whole-number normalization should mean 0 → 0.0, ... An all-real Cosmos numeric domain fits CLP(R), which itself returns integral solutions such as 1.0.
+>Keep int(...) as an explicit host-integer conversion.
+
+Recommended split:
+- Public int(2.9) → 2.0, if it remains a language cast.
+- Private host_int(2.9) → 2, used only around nth0, sub_string, random_between, byte I/O, etc.
+
+Tables are different: table[0.9] retains 0.9 as the actual key. Thus lists/strings silently floor numeric keys while tables preserve them.
+The clean choices are:
+- Require integer-valued floats at index/boundary APIs, rejecting 0.9; or
+- Explicitly specify floor semantics.
+
+File f...defines type?

@@ -1,0 +1,82 @@
+require('io',io)
+require('table',table)
+require('list',list)
+require('math',math)
+require('object', object)
+range=math.range
+set_=table.set
+
+debug=rel(x) true;
+
+_board={' ',' ',' ',' ',' ',' ',' ',' ',' '}
+
+Board={
+	_initialBoard=_board
+	curBoard=_board
+	//initialBoard={' ',' ',' ',' ',' ',' ',' ',' ',' '}todo
+	
+	rel set(o,x,y,e,o2)
+		i=x+(y*3)
+		//o2=o.curBoard.i:e
+		table.set(o.curBoard,i,e,newBoard)
+		object.update(o,{'curBoard'=newBoard},o2)//object.set(o,'curBoard',newBoard,o2)
+	
+	rel get(o,x,y,e)
+		i=x+(y*3)
+		table.get(o.curBoard,i,e)
+	
+	rel empty(board,x,y)
+		board.get(x,y,' ')
+	
+	rel move(board, p, board2)
+		p.ai(board, x, y)
+		debug([x,y,p.piece])
+		board.set(x,y,p.piece,board2)
+		
+	rel win(board,piece)
+		case
+			some(col in range(0,2))
+				debug('col'+col)
+				board.get(0,col,piece)
+				board.get(1,col,piece)
+				board.get(2,col,piece)
+				debug('piece'+piece)
+		case
+			some(line in range(0,2))
+				debug('line'+line)
+				board.get(line,0,piece)
+				board.get(line,1,piece)
+				board.get(line,2,piece)
+				debug(piece)
+		case
+			for(pos in range(0,2))
+				debug('line'+line)
+				board.get(pos,pos,piece)
+				debug(piece)
+		case
+			board.get(2,0,piece)
+			board.get(1,1,piece)
+			board.get(0,2,piece)
+		piece!=' '
+		
+	rel full(board)
+		for(x in board.curBoard)
+			x!=' '
+		
+}
+
+write=io.write
+rel draw(board)
+	init i=0
+	while(i<3)
+		init j=0
+		write('|')
+		while(j<3)
+			tile=board.get(j,i)
+			write(tile)
+			write('|')
+			next j=j+1
+		write('\n')
+		next i=i+1
+
+export(Board)

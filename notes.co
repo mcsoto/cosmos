@@ -1,0 +1,100 @@
+//The tiger is not a bird
+not bird(tiger)
+forall(x in bird(x))
+	x != tiger
+	
+//seq.
+forall x...
+	prompt(x)?
+branch forall(x)
+	_(x)
+
+next t = t:{i=0}
+//next t = set(t,i,_)
+//t[i]:i //next t = t.i : i /// t:i?i
+	
+//To address these limitations, we turn to symbolic logic languages that support more structured and interpretable reasoning. Among them, Prolog [12] stands out as a high-level declarative programming language designed for logic-based inference. It represents knowledge through facts and rules and, with its strict syntactic structure and built-in backtracking mechanism, enables efficient symbolic reasoning. These features make it particularly suitable for tasks such as logical inference, knowledge representation, and rule-based problem solving. However, Prolog’s rigid syntax and limited expressive power pose challenges for directly representing certain logical structures inherent in NL. For example, Prolog cannot directly express the existential quantifier commonly found in NL. A sentence like There exists a bird that is black cannot be directly encoded in Prolog, which only supports universally applicable facts or rules. Similarly, Prolog has fundamental limitations in expressing classical negation. A statement such as The tiger is not a bird cannot be directly asserted as a fact in Prolog. These limitations significantly reduce the expressiveness of Prolog in capturing the logical structures of NL, and in turn, constrain its effectiveness as a reasoning engine for NL-derived logical representations.
+
+//The strongest immediate candidates for improving Cosmos are wheel rotation, reliable pointer coordinates, focus-loss handling, and event-driven held-button tracking.	
+	//For example, Prolog cannot directly express the existential quantifier commonly found in NL. A sentence like There exists a bird that is black cannot be directly encoded in Prolog, which only supports universally applicable facts or rules. Similarly, Prolog has fundamental limitations in expressing classical negation. A statement such as The tiger is not a bird cannot be directly asserted as a fact in Prolog.
+	
+	/*
+	You read statements, Cosmos or simply pseudo-code and translate it to a [Cosmos] logic program.
+	
+	
+	*/
+	
+	/*
+	You are an expert in translating natural-language logical reasoning problems into correct SWI-Prolog code.
+
+Task:
+1. Extract facts and rules from the problem.
+2. Translate them into valid Prolog (facts + clauses). Use the extended Prolog style that supports richer first-order logic constructs when needed (Skolem functions, proper negation handling, etc.).
+3. Write a clear query that answers the original question.
+4. Output ONLY the complete, runnable Prolog program (no extra commentary unless asked).
+
+Problem:
+[PASTE YOUR PROBLEM HERE]*/
+
+rel () 
+	ai:tl(nl,pl)
+	//validation
+	check_syntax(pl)
+	//prove
+	run(pl,answers)
+	//vote
+	ai:vote(answers,answer) //3-vote
+	
+	
+delay(x)
+	print(x)
+	
+//The current LLM AI era evolved along a different trajectory that began with the perceptron, progressing 
+//through neural networks, backpropagation, and multi-layered neural networks, to CNNs/RNNs, and beyond. 
+
+//iot:Solve the problem by first extracting all logical propositions, expanding them with propositional logic rules, translating the expanded logic back into natural language, and then reasoning with the augmented context. Show each phase clearly.
+/*
+ “Marvin cannot be from Earth and from Mars.” into “Not(And(FromEarth(marvin), From-Mars(marvin)))”, xor?
+
+# Context:
+1. Books contain tons of knowledge .
+2. When a person reads a book , that
+person gains knowledge .
+3. If a person gains knowledge , they
+become smarter .
+4. Harry read the book " Walden " by Henry
+Thoreau .
+
+# Whether this inference is correct:
+Harry is smarter than before .
+-------------------------------------
+# LoT:
+## Logic Extraction:
+2. When a person reads a book , that
+person gains knowledge .
+3. If a person gains knowledge , they
+become smarter .
+----
+A: a person reads a book , B: person
+gains knowledge , C : become smarter
+A → B, B → C
+## Logic Extension:
+A → C
+## Logic Translation:
+If a person reads a book , that person
+become smarter 
+
+## Extended context:
+...
+(5. If a person reads a book , that person
+become smarter .)
+
+## LLM Answer:
+Correct
+-------------------------------------
+# CoT:
+Let 's think step by step :
+Given that Harry read the book " Walden "
+by Henry Thoreau , it can be concluded
+that he gained knowledge from reading
+the book 

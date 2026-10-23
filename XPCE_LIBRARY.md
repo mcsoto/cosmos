@@ -56,6 +56,7 @@ cannot overload, so there are no optional arguments.
 | `size(w, h, handle)` | Same. |
 | `font(family, style, size, handle)` | Same, e.g. `font('helvetica', 'roman', 14, f)`. |
 | `on_click(handle, callback)` | Fires a 1-argument relation per button click (arg: the button). |
+| `on_select(handle, callback)` | Same mechanism for menu items (their `message` slot). |
 | `timer(seconds, callback, handle)` | Repeating timer; the callback gets the timer's handle, so a one-shot frees itself. |
 | `set_data(key, value)` / `get_data(key, value)` | Named shared slots; values stored untouched. |
 | `loop()` | Pumps the display until the process ends. Never returns. |
@@ -109,13 +110,41 @@ A throwing callback prints a warning and the loop continues — except
 Unlike `pce_main_loop/1`, windows may be created *before* the loop starts:
 nothing is tracked, the display is just pumped.
 
+## Menus and text editing: `xpce/notepad.co`
+
+The `xpce/` folder holds full GUI programs built on this library. The
+notepad is a frame with a menu bar (`File`: Save/Load/Quit) above an
+editor area, run with:
+
+```powershell
+cosmos -l xpce/notepad.co --xpce
+```
+
+Its assembly is the canonical XPCE one (frame → dialog → menu_bar →
+popup → menu_items; frame → view, view below the dialog, with the view's
+own lazily created editor). Save/Load move the buffer's `contents`
+through `io.readFile` / `io.writeToFile` on `notepad.txt` in the working
+directory. There is no built-in file dialog (`finder` does not exist in
+this XPCE build), so the path is fixed and documented in the app.
+
+One environment note, handled in `libs/xpce_prolog.pl`: labelled popups
+die in `initialise` converting the submenu-arrow program default, because
+this install keeps its bitmaps outside XPCE's built-in image path. The
+bridge preloads `ms_left_arrow.png` from the toolkit home (`@pce` →
+`home`) once at load; harmless where bitmaps resolve already.
+
+Views create their own editor lazily: fetch it with `get` *after* opening
+the window (`xp.get(vw, 'editor', ed)` then `xp.get(ed, 'text_buffer',
+tb)`). Do not attach an editor explicitly — replacing the placeholder
+prints XPCE's harmless `@nil →destroy` chatter on stderr.
+
 ## Limits
 
 - **No raw keyboard events.** Buttons, text fields (`text_item`, read via
   `selection` on Enter) and timers cover GUI input; XPCE key recognisers
   are not bridged yet.
-- **No generic message construction.** Callbacks attach through `on_click`
-  and `timer` only; anything fancier needs a bridge addition.
+- **No generic message construction.** Callbacks attach through `on_click`,
+  `on_select` and `timer` only; anything fancier needs a bridge addition.
 - **No window titles after creation**, no multiple displays, no z-order
   control beyond XPCE's own layout (dialog appends stack vertically;
   picture needs explicit `display` positions).

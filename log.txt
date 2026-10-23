@@ -1,0 +1,75 @@
+
+refs
+:- pred sort/2 : list(num) * var => list(num) * list(num) + is det.
+:- pred sort/2 : var * list(num) => list(num) * list(num) + non det.
+
+protocol(_, {
+	sort(X,Y)
+		case list(In X), list(Out Y) //det
+		case list(Out X), list(In Y) //non_det
+
+})
+
+	$(SWIPL) -q -s compiler/platform/repl.pl -g "use_module(library(dif)),use_module(library(lists)),compiler_load('compiler/generated'),qsave_program('$(COSMOS_EXE)',[goal(main),stand_alone(true),autoload(false),toplevel(halt)]),compiler_stage_exe('$(COSMOS_EXE)',false)" -t halt -- -v
+
+One consequence worth stating plainly, since it's a behaviour change beyond "stop creating files": cosmos.exe no longer ships its own kernel DLLs, so it needs SWI reachable at runtime. Verified both ways — in the repo root it runs (exit=0, prints the version banner) because C:\Program Files\swipl\bin is on the machine PATH; copied to an isolated directory with PATH cleared it exits 0xC0000135. That matches every previous release, since none of them staged either.
+
+compiler_stage_exe/2 remains in driver.pl, unused by any build target, for packaging a tree that must run without SWI installed.
+
+checkers:
+telingo
+apalache / tlc
+==
+In TLA+ you define a state machine. There is an initial state, which is a choice of values for each variable declared. You also define the transitions allowed in the system.
+
+We model 4 pieces of state: Alice’s outbox, the messages in the network, Bob’s mood and Bob’s inbox.
+
+VARIABLES
+    alices_outbox,
+    network,
+    bobs_mood,
+    bobs_inbox
+
+==
+
+NetworkLoss ==
+    /\ \E e \in network: network' = network \ {e}
+    /\ UNCHANGED <<bobs_mood, bobs_inbox, alices_outbox>>
+
+some(e in network)
+
+--
+0.86+ xpce
+
+Confirmed — the backend is live end-to-end (the large counts are the probe peeking without draining, plus OS key auto-repeat).
+
+**Final state of all three tasks:**
+
+| Task | Status |
+|---|---|
+| `--xpce` flag — run XPCE code with no `main`, so a top-level `require('space', sp)` works | Done, tested through the shipped `cosmos.exe` |
+| `rel main()` and `rel main(args)`, `main` callable as a closure with upvalues | Done (arity-0 entry, arity-1 unchanged, closure path already existed) |
+| PyGame-style `event.get()` + Love2D-style callbacks | Done, both verified with real mouse and keyboard input |
+
+**Delivered API**
+
+```cosmos
+// polling
+sp.event.get(events)          // drains
+sp.event.getType(type, evs)   // drains one kind
+sp.event.peek(events)         // does not drain (frame tick uses this)
+
+// callbacks — fired before update, per frame
+sp.start(33, {update=u and draw=d and on={keydown=on_key and mousedown=on_mouse}}, s)
+```
+
+Events are Cosmos tables with string keys: `type`, `posx/posy/x/y`, `button`, `clicks`, `wheel`, `mod`, and `key/char` for keys. Shift is folded in, so shift+A arrives as `key='a' char='A' mod='s'`.
+
+**Verified:** `mousemotion`, `mousedown`, `mouseup`, `keydown`; `space`/`escape`/`left`/`a`; `button=1 clicks=single`; no modal dialogs; clean exit 0; **29/29** compiler tests; `cosmos.exe` rebuilt; `build.mjs` verifies all 6 modules rebuild identically.
+
+**Two constraints I had to design around** — both are now documented in `XPCE_BACKEND.md` so they don't get rediscovered the hard way:
+
+1. An XPCE error during dispatch opens a **modal** dialog that kills the event loop, and `catch/3` cannot intercept it (raised in C++). So the capture uses only verified calls — `get/3` and `send/2,3`, never `?/2`, which doesn't exist in this build even with `library(yall)`.
+2. A *failing* relation inside the frame tick freezes the app silently — one frame, then nothing. `list.each/3` on an empty queue did exactly that.
+
+**Left open, deliberately:** no `keyup` (this build's event tree has no release events under `keyboard/`), and `wheel` is pinned to `0` because I couldn't verify the `->attribute` accessor without risking the dialog above — both would need a probe run that survives the failure.
