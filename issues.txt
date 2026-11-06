@@ -1,9 +1,4 @@
 
-rel close(File f) 
-
-//functor(_, File)
-Compile error at 1:1: Unknown functor subtype: File
-
 x={
 	rel win(board)
 		case
@@ -12,10 +7,21 @@ x={
 		case
 			true
 		piece!=' '
-		
+
 }
 //Parse error at 4:4: Unexpected token (expected NEWLINE)
 //only occur on case+table container
+
+
+sp.start(16,{
+	update=update
+	draw=draw
+},state)
+//Parse error at 28:6: Expected term
+
+in tree.ls: [Tree] still written [fc_Tree]
+
+
 
 ---solved---
 
@@ -64,3 +70,5 @@ keyword for `new Type(...)`, at the offending token. Quoted 'new' field keys
 and named constructor methods remain valid.
 
 - dependency on src/ and canvas/
+
+error message when program returns false, currently nothing is said, do try-catch on main/1

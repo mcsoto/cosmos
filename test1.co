@@ -33,7 +33,7 @@ init loop=1
 while(loop=1)
 	io.write('> ')
 	s = io.read()
-	if (s='random')
+	if(s='random')
 		for(x in math.range(1,20))
 			print(x+'='+math.random(1,10))
 	elseif(string.find(s,s2,i) and (s2 in ['+', '-', '=']))//

@@ -1,0 +1,9 @@
+class(Ship,{
+	x=1
+	y=1
+	rel move(this,x,y,next this)
+		true
+})
+ship = new(Ship)
+
+for x.p(x) x!=y

@@ -1,0 +1,210 @@
+<!doctype html>
+<!-- The Time Machine GitHub pages theme was designed and developed by Jon Rohan, on Feb 7, 2012. -->
+<!-- Follow him for fun. http://twitter.com/jonrohan. Tail his code on https://github.com/jonrohan -->
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <link rel="stylesheet" href="/assets/css/style.css?v=4d0b6382f2b7ecdb00cf590ef94caff461ee4358">
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+  <script src="/assets/js/script.js"></script>
+
+<!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>A tutorial | cosmos-lang.github.io</title>
+<meta name="generator" content="Jekyll v3.9.3" />
+<meta property="og:title" content="A tutorial" />
+<meta property="og:locale" content="en_US" />
+<link rel="canonical" href="https://cosmos-lang.github.io/space/quickstart.html" />
+<meta property="og:url" content="https://cosmos-lang.github.io/space/quickstart.html" />
+<meta property="og:site_name" content="cosmos-lang.github.io" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="A tutorial" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","headline":"A tutorial","url":"https://cosmos-lang.github.io/space/quickstart.html"}</script>
+<!-- End Jekyll SEO tag -->
+
+
+  <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+</head>
+
+<body>
+
+  <div class="wrapper">
+    <header>
+      <h1 class="title">cosmos-lang.github.io</h1>
+    </header>
+    <div id="container">
+      <p class="tagline"></p>
+      <div id="main" role="main">
+        <div class="download-bar">
+        <div class="inner">
+          
+          <a href="https://github.com/cosmos-lang/cosmos-lang.github.io" class="code">View cosmos-lang.github.io on GitHub</a>
+        </div>
+        <span class="blc"></span><span class="trc"></span>
+        </div>
+        <article class="markdown-body">
+          <h1 id="a-tutorial">A tutorial</h1>
+
+<h2 id="starting">Starting</h2>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">space</span><span class="dl">'</span><span class="p">,</span><span class="nx">sp</span><span class="p">)</span>
+<span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">logic</span><span class="dl">'</span><span class="p">,</span><span class="nx">logic</span><span class="p">)</span>
+
+<span class="nx">sp</span><span class="p">.</span><span class="nx">init</span><span class="p">()</span>
+<span class="nx">sp</span><span class="p">.</span><span class="nx">start</span><span class="p">(</span><span class="mi">500</span><span class="p">,{</span>
+	<span class="nx">rel</span> <span class="nx">update</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span><span class="nx">y</span><span class="p">)</span>
+		<span class="c1">//draw</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">rect</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">50</span><span class="p">,</span><span class="mi">50</span><span class="p">)</span>
+		<span class="c1">//refresh screen</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">refresh</span><span class="p">()</span>
+<span class="p">},</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Here we make use of <em>callbacks</em>. Callbacks are relations/functions that will be called by the framework itself when the program runs.</p>
+
+<p>We start by initializing the library with <em>init</em> and calling a relation <em>start</em> with <em>update</em> as a callback. <em>start</em> takes a time in milliseconds and an <em>update</em> relation. We’ve set <em>update</em> to be called every 500 milliseconds.</p>
+
+<p>In <em>update</em>, we use <em>sp.rect(10,0,50,50)</em> to draw a rectangle and then refresh the screen.</p>
+
+<p>See: <a href="../quickstart.html">what is a relation?</a></p>
+
+<h2 id="moving-a-rectangle">Moving a Rectangle</h2>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">space</span><span class="dl">'</span><span class="p">,</span><span class="nx">sp</span><span class="p">)</span>
+
+<span class="nx">rel</span> <span class="nx">clear</span><span class="p">()</span>
+	<span class="nx">sp</span><span class="p">.</span><span class="nx">setRGB</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span><span class="mi">255</span><span class="p">,</span><span class="mi">255</span><span class="p">)</span> <span class="nx">and</span> <span class="nx">sp</span><span class="p">.</span><span class="nx">clear</span><span class="p">()</span>
+<span class="nx">sp</span><span class="p">.</span><span class="nx">start</span><span class="p">(</span><span class="mi">500</span><span class="p">,{</span>
+	<span class="nx">rel</span> <span class="nx">update</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span><span class="nx">y</span><span class="p">)</span>
+		<span class="nx">y</span><span class="o">=</span><span class="nx">x</span><span class="o">+</span><span class="mi">1</span>
+		<span class="c1">//clear</span>
+		<span class="nx">clear</span><span class="p">()</span>
+		<span class="c1">//draw</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">setRGB</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">rect</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">50</span><span class="p">,</span><span class="mi">50</span><span class="p">)</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">test</span><span class="p">(</span><span class="nx">a</span><span class="p">)</span>
+		<span class="c1">//end loop</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">refresh</span><span class="p">()</span>
+<span class="p">},</span><span class="mi">10</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Now, we set the rectangle to move by 1 pixel each call. It’s important to <em>clear</em> the area to be drawn and then <em>refresh</em> to get the result in the screen. We also set the RGB value of the rectangle.</p>
+
+<p>The start relation takes a parameter <em>x</em>, 10, and passes it as the argument to update.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>update(x,y)
+</code></pre></div></div>
+
+<p>Then we use the value passed to update as <em>x</em> in <em>sp.rect(x,0,50,50)</em> and increase it by 1 every time in <em>y=x+1</em>.</p>
+
+<h2 id="declarative-vs-destructive">Declarative vs Destructive</h2>
+
+<p>Our update relation is very declarative. It simply passes state around. The value 10 is used as the parameter <em>x</em> which we pass to <em>y</em>, and <em>y</em> is used as the next parameter.</p>
+
+<p>In general, a declarative language (either logic or functional) tries to keep destructive behavior to a minimum. Destructive behavior includes updating the screen.</p>
+
+<p>The programmer may interpret <em>rect(x,0,50,50)</em> as a declarative statement that “a rectangle will be drawn…”. However, it’s more akin to a direct command to the computer telling it to make a rectangle. Although similar, there’s a subtle difference.</p>
+
+<p>Either way, most of the program logic is kept declarative up to ocasionally calling the drawing interface.</p>
+
+<h2 id="input">Input</h2>
+
+<p>Let’s go a bit further and accept input. If the user presses a key, this changes the direction an image will move.</p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">...</span>
+<span class="nx">world</span><span class="o">=</span><span class="p">{</span><span class="nx">x</span><span class="o">=</span><span class="mi">10</span> <span class="nx">and</span> <span class="nx">dir</span><span class="o">=</span><span class="dl">'</span><span class="s1">right</span><span class="dl">'</span><span class="p">}</span>
+<span class="nx">img</span><span class="o">=</span><span class="nx">sp</span><span class="p">.</span><span class="nx">loadImage</span><span class="p">(</span><span class="dl">'</span><span class="s1">b1.png</span><span class="dl">'</span><span class="p">)</span>
+<span class="nx">sp</span><span class="p">.</span><span class="nx">start</span><span class="p">(</span><span class="mi">500</span><span class="p">,{</span>	
+	<span class="nx">rel</span> <span class="nx">mouseup</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span><span class="nx">y</span><span class="p">,</span><span class="nx">state</span><span class="p">,</span><span class="nx">state</span><span class="p">)</span>
+		<span class="nx">print</span><span class="p">([</span><span class="nx">x</span><span class="p">,</span><span class="nx">y</span><span class="p">])</span>
+	<span class="nx">rel</span> <span class="nx">keypressed</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span><span class="nx">initialState</span><span class="p">,</span><span class="nx">followupState</span><span class="p">)</span>
+		<span class="nx">print</span><span class="p">(</span><span class="nx">key</span><span class="p">)</span>
+		<span class="k">if</span><span class="p">(</span><span class="nx">key</span><span class="o">=</span><span class="dl">'</span><span class="s1">right</span><span class="dl">'</span><span class="p">)</span>
+			<span class="kd">set</span><span class="p">(</span><span class="nx">initialState</span><span class="p">,</span><span class="dl">'</span><span class="s1">dir</span><span class="dl">'</span><span class="p">,</span><span class="nx">key</span><span class="p">,</span><span class="nx">followupState</span><span class="p">)</span>
+			<span class="kc">true</span>
+		<span class="nx">elseif</span><span class="p">(</span><span class="nx">key</span><span class="o">=</span><span class="dl">'</span><span class="s1">left</span><span class="dl">'</span><span class="p">)</span>
+			<span class="kd">set</span><span class="p">(</span><span class="nx">initialState</span><span class="p">,</span><span class="dl">'</span><span class="s1">dir</span><span class="dl">'</span><span class="p">,</span><span class="nx">key</span><span class="p">,</span><span class="nx">followupState</span><span class="p">)</span>
+		<span class="nx">elseif</span><span class="p">(</span><span class="nx">key</span><span class="o">=</span><span class="dl">'</span><span class="s1">escape</span><span class="dl">'</span><span class="p">)</span>
+			<span class="nx">logic</span><span class="p">.</span><span class="nx">halt</span><span class="p">()</span>
+		<span class="k">else</span>
+			<span class="kc">true</span>
+			<span class="nx">followupState</span><span class="o">=</span><span class="nx">initialState</span>
+	<span class="nx">rel</span> <span class="nx">update</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span><span class="nx">w2</span><span class="p">)</span>
+		<span class="nx">w</span><span class="p">.</span><span class="nx">x</span><span class="o">=</span><span class="nx">x</span>
+		<span class="nx">w</span><span class="p">.</span><span class="nx">dir</span><span class="o">=</span><span class="nx">dir</span>
+		<span class="k">if</span><span class="p">(</span><span class="nx">dir</span><span class="o">=</span><span class="dl">'</span><span class="s1">left</span><span class="dl">'</span><span class="p">)</span>
+			<span class="nx">nx</span><span class="o">=</span><span class="nx">o</span><span class="p">.</span><span class="nx">x</span><span class="o">-</span><span class="mi">1</span>
+		<span class="k">else</span>
+			<span class="nx">nx</span><span class="o">=</span><span class="nx">o</span><span class="p">.</span><span class="nx">x</span><span class="o">+</span><span class="mi">1</span>
+		<span class="c1">//clear</span>
+		<span class="nx">clear</span><span class="p">()</span>
+		<span class="c1">//draw</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">setRGB</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">drawImage</span><span class="p">(</span><span class="nx">img</span><span class="p">,</span><span class="nx">o</span><span class="p">.</span><span class="nx">x</span><span class="p">,</span><span class="mi">100</span><span class="p">)</span>
+		<span class="c1">//end loop</span>
+		<span class="nx">sp</span><span class="p">.</span><span class="nx">refresh</span><span class="p">()</span>
+		<span class="kd">set</span><span class="p">(</span><span class="nx">o</span><span class="p">,</span><span class="dl">'</span><span class="s1">x</span><span class="dl">'</span><span class="p">,</span><span class="nx">nx</span><span class="p">,</span><span class="nx">o2</span><span class="p">)</span><span class="c1">//!o.x=nx</span>
+		<span class="kc">true</span>
+<span class="p">},</span><span class="nx">world</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>We now add other callback relations and draw an image <em>img</em> instead of a rectangle.</p>
+
+<p>The callback <em>keypressed(key,initialState,followupState)</em> gives the key, which we use to update the state (note that by leaving <em>mouseup</em> as <em>mouseup(x,y,state,state)</em> we’re asserting through the parameters that state stays the same, i.e. we’re not updating the state of <em>mouseup</em>). Furthermore, the program ends if the user presses the escape key.</p>
+
+<p>We use a table as the state, with <em>{x=10 and dir=’right’}</em> being the initial state.</p>
+
+<p>It’s important not to load the image in the <em>update</em> relation, as it’ll be called multiple times.</p>
+
+<p>Be sure to include an image <em>b1.png</em> in the folder, of course.</p>
+
+<h2 id="world">World</h2>
+
+<p>A good way to represent our game world (or the world of our simulation, UI, etc.) is by using a table.</p>
+
+<p>We then simply pass it to update and other callbacks.</p>
+
+<p>If the user wishes for non-declarative state, they can use the <em>mutable</em> libraries, though we won’t cover this in this tutorial. It’s then possible to hold global variables and have a more traditional loop.</p>
+
+<h2 id="about">About</h2>
+
+<p>Cosmos and Space is open-source. If you feel like it, you can contribute to the project. It’s given without any warranty.</p>
+
+        </article>
+      </div>
+    </div>
+    <footer>
+      <div class="owner">
+      
+
+       
+      <p><a href="https://github.com/cosmos-lang" class="avatar"><img src="https://github.com/cosmos-lang.png" width="48" height="48"></a>View <a href="https://github.com/cosmos-lang">cosmos-lang</a> on <a href="https://www.github.com">GitHub</a></p>
+      
+
+      </div>
+      <div class="creds">
+        <small>This page generated using <a href="https://pages.github.com/">GitHub Pages</a><br>theme by <a href="https://twitter.com/jonrohan/">Jon Rohan</a></small>
+      </div>
+    </footer>
+  </div>
+  <div class="current-section">
+    <a href="#top">Scroll to top</a>
+    
+    <p class="name"></p>
+  </div>
+</body>
+</html>

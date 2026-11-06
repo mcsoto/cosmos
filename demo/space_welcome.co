@@ -1,0 +1,43 @@
+require('space', sp)
+
+width=640
+height=360
+tick=16
+state={x=320 and y=180 and dx=2 and hue=0}
+
+rel mouseup(x,y,s,s2)
+    s2={x=x and y=y and dx=s.dx and hue=s.hue}
+
+-- The native backend has no "app table" export: the window is opened with
+-- sp.init/sp.start, and the mouse is read by polling the event queue
+-- inside update instead of by a named "mouseup" callback.
+--
+-- The queue is taken in one go and sorted out here.  getType/2 would keep
+-- the events it was not asked for, and this demo never looks at them, so
+-- they would pile up for ever.
+rel apply_events(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[e|tail]
+        kind=e.type
+        if(kind='mouseup')
+            mouseup(e.x,e.y,s,after_event)
+        else
+            after_event=s
+        apply_events(tail,after_event,s2)
+
+rel update(s,s2)
+    moved={x=(s.x+s.dx)%width and y=s.y and dx=s.dx and hue=s.hue+1}
+    sp.event.get(events)
+    apply_events(events,moved,s2)
+
+rel draw(s)
+    sp.graphics.clear('#07111f')
+    sp.graphics.setColor('#7cf4cb')
+    sp.graphics.rectangle('fill', s.x-28, s.y-28, 56, 56)
+
+sp.init(width, height)
+sp.start(16,{
+    update=update and draw=draw
+},state)

@@ -517,9 +517,16 @@ fread_char(F,S) :- read_string(F,1,S).
 fread_custom(F,A,B,C,S) :- read_string(F,A,B,C,S).
 
 fopen(Filename,Mode,File) :-
-	(Mode="read" -> open(Filename,read,File) ;
-		(Mode="write" -> open(Filename,write,File) ;
-			(Mode="update" -> open(Filename,update,File) ; throw("not a correct mode for 'open'.")))).
+	fopen_mode(Mode,ReadWrite),
+	open(Filename,ReadWrite,File).
+
+% Accept both the strings Cosmos literals compile to and plain atoms, so
+% the same predicate works from compiled code and from Prolog callers.
+fopen_mode(Mode,read) :- ( Mode=="read" ; Mode==read ), !.
+fopen_mode(Mode,write) :- ( Mode=="write" ; Mode==write ), !.
+fopen_mode(Mode,update) :- ( Mode=="update" ; Mode==update ), !.
+fopen_mode(Mode,append) :- ( Mode=="append" ; Mode==append ), !.
+fopen_mode(_,_) :- throw("not a correct mode for 'open'.").
 	
 fopen_binary(Filename,Mode,File) :-
 	(Mode="read" -> open(Filename,read,File,[type(binary)]) ;

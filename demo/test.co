@@ -1,0 +1,59 @@
+require('space', sp)
+--640x360
+width=800 and height=600
+tick=16
+state={x=320 and y=180 and dx=2 and hue=0}
+
+/*
+start x=0
+do update()
+next_state x=x+1
+	
+rel main()
+	start x=0
+	do update()
+		next_state x=x+1
+	rel draw()
+		x:draw()
+	run update() 
+	draw()
+*/
+
+rel draw(s)
+	-- canvas.rect is dead under the native backend: the Space library
+	-- draws a filled rectangle with setColor + rectangle('fill',...).
+	sp.graphics.setColor('#07111f')
+	sp.graphics.rectangle('fill', 0, 0, width, height)
+	sp.graphics.setColor('#7cf4cb')
+	sp.graphics.rectangle('fill', s.x-28, s.y-28, 56, 56)
+
+rel mouseup(x,y,s,s2)
+	s2={x=x and y=y and dx=s.dx and hue=s.hue}
+
+-- The native backend has no "app table" export: the window is opened with
+-- sp.init/sp.start, and the mouse is read by polling the event queue
+-- inside update instead of by a named "mouseup" callback.
+--
+-- The queue is taken in one go and sorted out here.  getType/2 would keep
+-- the events it was not asked for, and this demo never looks at them, so
+-- they would pile up for ever.
+rel apply_events(events,s,s2)
+	if(events=[])
+		s2=s
+	else
+		events=[e|tail]
+		kind=e.type
+		if(kind='mouseup')
+			mouseup(e.x,e.y,s,after_event)
+		else
+			after_event=s
+		apply_events(tail,after_event,s2)
+
+rel update(s,s2)
+	sp.event.get(events)
+	apply_events(events,s,s2)
+
+sp.init(width,height)
+sp.start(tick,{
+	update=update and draw=draw
+},state)

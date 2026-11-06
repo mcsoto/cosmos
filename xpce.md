@@ -20,7 +20,13 @@ Supporting fixes in `compiler/platform/driver.pl` + `compiler/swi.pl`: absolute 
 
 ## Limits (documented in XPCE_BACKEND.md)
 
-Input polling stubs return "up"; scissor is recorded-not-enforced; `shear`/line-style are no-ops; one `rel` per table name (no overloading); `require` must stay inside rels for `--main` programs; value-position calls need the out-param last (e.g. `newFont(size,family,style,font)`).
+Scissor is recorded-not-enforced; line style is remembered but XPCE has no rough/smooth switch; one `rel` per table name (no overloading); `require` must stay inside rels for `--main` programs; value-position calls need the out-param last (e.g. `newFont(size,family,style,font)`).
+
+Keyboard polling and key releases are no longer stubs: XPCE 10.0.0 exposes the
+keyboard as the input device `@keyboard_device`, and `get(@keyboard_device,
+key_down, Key, @on)` answers whether a key is held down right now. Key
+releases arrive as the `key_up` event, which sits under `any` in
+`@event_tree` rather than under `keyboard/`.
 
 ## Verification
 

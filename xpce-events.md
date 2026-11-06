@@ -26,10 +26,41 @@ SWI-Prolog
 | Keyboard input                            | Yes                                            | Bind keys or handle keyboard events         |
 | Mouse movement and drag                   | Yes                                            | Update pointer coordinates                  |
 | Event position (`x`, `y`)                 | Yes                                            | Read coordinates from events                |
+| Polling “is key held?” every frame        | Yes, since XPCE 10.0.0                        | `get(@keyboard_device, key_down, Key, @on)` |
 | Polling “is button held?” every frame     | Not the main event model                       | Maintain state from press/release events    |
 | Current pointer position without an event | Requires a separate query or tracking approach | Verify the relevant XPCE window/display API |
 
-Sources: [XPCE recognisers](https://www.swi-prolog.org/packages/xpce/UserGuide/recogniser.html) and [XPCE event attributes](https://www.swi-prolog.org/pldoc/doc_for?object=xpce%28event%2Civar%2Cid%29).&#x20;
+**Key polling is available.** XPCE 10.0.0 added the `keyboard` input device
+class, reachable as `@keyboard_device`, and it answers whether a key is
+held down right now:
+
+```prolog
+get(@keyboard_device, key_down, Key, @on)    % held
+get(@keyboard_device, key_down, Key, @off)   % not held
+```
+
+`Key` is a name XPCE understands: `RET`, `ESC`, `TAB`, `BS`, `DEL`, `space`,
+`insert`, `pause`, `cursor_home`, `end`, `page_up`, `page_down`,
+`cursor_left`, `cursor_right`, `cursor_up`, `cursor_down`, `f1`..`f24`, a
+single character, or the name SDL uses for the key (`"Left Shift"`). A name
+XPCE does not know makes the get fail with `Unknown key`, so the name has to
+be checked against that list before it is polled.
+
+This is the call XPCE's own games use — `prolog/demo/asteroids.pl` in the
+XPCE package does exactly this:
+
+```prolog
+key_down(Key) :- get(@keyboard_device, key_down, Key, @on).
+```
+
+**Key releases exist as well.** The release event is `key_up`, and it sits
+under `any` in `@event_tree` rather than under `keyboard/` — which is why
+looking only under `keyboard/` makes it look like the build has no releases
+at all. Its id is the atom `key_up`; the key it releases comes from
+`event <-key`, which answers the Emacs-style name of the matching key-down
+(`"a"`, `"A"`, `"RET"`, `"<f1>"`).
+
+Sources: [XPCE recognisers](https://www.swi-prolog.org/packages/xpce/UserGuide/recogniser.html), [XPCE event attributes](https://www.swi-prolog.org/pldoc/doc_for?object=xpce%28event%2Civar%2Cid%29) and the XPCE 10.0.0 source (`src/evt/inputdevice.c`, `src/sdl/sdlevent.c`).&#x20;
 
 [image](https://www.google.com/s2/favicons?domain=https://eu.swi-prolog.org\&sz=32)
 

@@ -45,6 +45,18 @@ rel quit()
 rel dispose()
     xpce.dispose()
 
+// End the program the way quit does.
+rel stop()
+    xpce.stop()
+
+// Frame markers.  XPCE presents every drawing call at once, so these have
+// nothing to do.
+rel beginFrame()
+    xpce.beginFrame()
+
+rel endFrame()
+    xpce.endFrame()
+
 rel loadImage(source, name)
     xpce.loadImage(source, name)
 
@@ -70,6 +82,12 @@ rel rectangle(mode, x, y, width, height)
 
 rel line(points)
     xpce.graphics.line(points)
+
+rel point(x, y)
+    xpce.graphics.point(x, y)
+
+rel points(points)
+    xpce.graphics.points(points)
 
 rel circle(mode, x, y, radius)
     xpce.graphics.circle(mode, x, y, radius)
@@ -138,6 +156,9 @@ rel getLineWidth(w)
 rel setLineStyle(style)
     xpce.graphics.setLineStyle(style)
 
+rel getLineStyle(style)
+    xpce.graphics.getLineStyle(style)
+
 rel setScissor(x, y, width, height)
     xpce.graphics.setScissor(x, y, width, height)
 
@@ -153,10 +174,18 @@ rel draw(image, x, y)
 rel refresh()
     xpce.graphics.refresh()
 
-// ---- Input (one table, reachable as input / keyboard / mouse) ----
+// ---- Input ----
+//
+// The keyboard and the mouse are separate tables, so `isDown' can mean the
+// keyboard under sp.keyboard and the mouse under sp.mouse.  The combined
+// sp.input carries both: isDown/1 there is the keyboard, isMouseDown/1 and
+// buttonDown/1 are the mouse.
 
 rel isDown(key)
     xpce.input.isDown(key)
+
+rel isMouseDown(button)
+    xpce.input.isMouseDown(button)
 
 rel getX(x)
     xpce.input.getX(x)
@@ -183,9 +212,13 @@ rel getFPS(fps)
 
 // ---- Events (PyGame-style queue) ----
 // get/1 drains everything XPCE delivered since the last call.  getType/2
-// drains only one kind.  peek/1 does not drain, and is what the frame tick
-// uses to fire callbacks; a polling program normally wants get/1, because
-// two frames can see the same event otherwise.
+// drains only one kind and leaves the other kinds queued.  peek/1 does not
+// drain, and is what the frame tick uses to fire callbacks; a polling
+// program normally wants get/1, because two frames can see the same event
+// otherwise.
+//
+// The event types are: mousemotion, mousedown, mouseup, mousewheel,
+// keydown, keyup, textinput, focus, blur and resize.
 
 rel getEvents(events)
     xpce.event.get(events)
@@ -204,6 +237,9 @@ export({
     startCanvas = startCanvas,
     quit = quit,
     dispose = dispose,
+    stop = stop,
+    beginFrame = beginFrame,
+    endFrame = endFrame,
     loadImage = loadImage,
     graphics = {
         setBackgroundColor = setBackgroundColor,
@@ -213,6 +249,8 @@ export({
         clear = clear,
         rectangle = rectangle,
         line = line,
+        point = point,
+        points = points,
         circle = circle,
         ellipse = ellipse,
         arc = arc,
@@ -235,6 +273,7 @@ export({
         setLineWidth = setLineWidth,
         getLineWidth = getLineWidth,
         setLineStyle = setLineStyle,
+        getLineStyle = getLineStyle,
         setScissor = setScissor,
         clearScissor = clearScissor,
         getScissor = getScissor,
@@ -243,6 +282,7 @@ export({
     },
     input = {
         isDown = isDown,
+        isMouseDown = isMouseDown,
         getX = getX,
         getY = getY,
         getPosition = getPosition,
@@ -256,7 +296,7 @@ export({
         buttonDown = buttonDown
     },
     mouse = {
-        isDown = isDown,
+        isDown = isMouseDown,
         getX = getX,
         getY = getY,
         getPosition = getPosition,

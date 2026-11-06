@@ -1,0 +1,145 @@
+require('space', sp)
+require('list', list)
+require('string', str)
+functor(Playing, Functor)
+functor(Won, Functor)
+
+cols=10
+rows=8
+cell=48
+width=cols*cell
+height=rows*cell+40
+tick_ms=80
+
+initial={
+    revealed=[] and moves=0 and game_over=0 and win=Playing
+}
+
+rel mine(x,y)
+    (x=2 and y=2) or (x=5 and y=1) or (x=8 and y=1) or
+    (x=4 and y=3) or (x=7 and y=3) or (x=1 and y=5) or
+    (x=6 and y=5) or (x=9 and y=6) or (x=3 and y=7) or
+    (x=8 and y=8)
+
+rel cell_id(x,y,id)
+    id=x+y*100
+
+rel mine_value(x,y,value)
+    if(mine(x,y))
+        value=1
+    else
+        value=0
+
+rel adjacent_mines(x,y,count)
+    mine_value(x-1,y-1,a)
+    mine_value(x,y-1,b)
+    mine_value(x+1,y-1,c)
+    mine_value(x-1,y,d)
+    mine_value(x+1,y,e)
+    mine_value(x-1,y+1,f)
+    mine_value(x,y+1,g)
+    mine_value(x+1,y+1,h)
+    count=a+b+c+d+e+f+g+h
+
+rel copy_state(s,s2,revealed,moves,game_over,win)
+    s2={revealed=revealed and moves=moves and game_over=game_over and win=win}
+
+rel reset(s,s2)
+    s2=initial
+
+// The XPCE backend has no `mouseup`/`keypressed` callback names: input is
+// polled from the event queue inside update, and the handlers below are fed
+// from it, one event at a time, threading the state through them.
+//
+// The queue is read ONCE per frame.  Every read clears the whole queue, so
+// asking for the clicks and the keys separately would throw the keys away.
+rel update(s,s2)
+    sp.event.get(events)
+    apply_events(events,s,s2)
+
+// Sort the events of this frame out by type and hand them to the handlers.
+rel apply_events(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[ev|rest]
+        kind=ev.type
+        if(kind='mouseup')
+            mouseup(ev.x,ev.y,s,s1)
+        elseif(kind='keydown')
+            keypressed(ev.key,s,s1)
+        else
+            s1=s
+        apply_events(rest,s1,s2)
+
+rel reveal(x,y,s,s2)
+    cell_id(x,y,id)
+    if(list.has(s.revealed,id))
+        s2=s
+    elseif(mine(x,y))
+        copy_state(s,s2,s.revealed,s.moves+1,1,s.win)
+    else
+        list.concat(s.revealed,[id],next_revealed)
+        if(s.moves>=69)
+            copy_state(s,s2,next_revealed,s.moves+1,s.game_over,Won)
+        else
+            copy_state(s,s2,next_revealed,s.moves+1,s.game_over,s.win)
+
+rel mouseup(mx,my,s,s2)
+    x=int(mx/cell)+1
+    y=int((my-40)/cell)+1
+    if(s.game_over=1 or s.win=Won)
+        s2=s
+    elseif(x<1 or x>cols or y<1 or y>rows)
+        s2=s
+    else
+        reveal(x,y,s,s2)
+
+rel keypressed(key,s,s2)
+    if(key='r')
+        reset(s,s2)
+    else
+        s2=s
+
+rel draw_cell(x,y,s)
+    cell_id(x,y,id)
+    px=(x-1)*cell
+    py=40+(y-1)*cell
+    if(list.has(s.revealed,id))
+        sp.graphics.setColor('#8ca58c')
+        sp.graphics.rectangle('fill',px+2,py+2,cell-4,cell-4)
+        adjacent_mines(x,y,count)
+        if(count>0)
+            sp.graphics.setColor('#11283a')
+            sp.graphics.print(str(count),px+18,py+10)
+    elseif(s.game_over=1 and mine(x,y))
+        sp.graphics.setColor('#d65b50')
+        sp.graphics.rectangle('fill',px+2,py+2,cell-4,cell-4)
+    else
+        sp.graphics.setColor('#38556a')
+        sp.graphics.rectangle('fill',px+2,py+2,cell-4,cell-4)
+
+rel draw(s)
+    sp.graphics.setFont(sp.graphics.newFont(16,'sans','normal'))
+    sp.graphics.setColor('#0d1720')
+    sp.graphics.rectangle('fill',0,0,width,height)
+    sp.graphics.setColor('#182c38')
+    sp.graphics.rectangle('fill',0,0,width,36)
+    sp.graphics.setColor('#2a4654')
+    sp.graphics.rectangle('fill',8,8,112,20)
+    sp.graphics.rectangle('fill',132,8,112,20)
+    sp.graphics.rectangle('fill',256,8,112,20)
+    for(init y=1;y<=rows;next y=y+1;)
+        for(init x=1;x<=cols;next x=x+1;)
+            draw_cell(x,y,s)
+    if(s.game_over=1)
+        sp.graphics.setColor('#4a211f')
+        sp.graphics.rectangle('fill',120,190,240,52)
+    elseif(s.win=Won)
+        sp.graphics.setColor('#315137')
+        sp.graphics.rectangle('fill',120,190,240,52)
+
+sp.init(width,height)
+sp.start(tick_ms,{
+    update=update and draw=draw
+},initial)

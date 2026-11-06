@@ -56,11 +56,13 @@ test-canvas:
 	node --test tests/canvas/canvas.test.mjs
 
 clean:
-	$(RM) test/*.pl
+	-$(RM) test/*.pl
 	$(RM) test/*.cif
 	#$(RM) libs/*.pl
 	$(RM) misc/*.pl
 	$(RM) misc/*.cif
+	$(RM) test*.pl
+	$(RM) test*.cif
 	
 cleandos:
 	del test\*.pl

@@ -1,0 +1,12 @@
+
+s=io.readFile('readme.txt')
+print(s)
+print(22)
+//f=io.open('tempfile.txt','write')
+io.writeToFile('tempfile.txt','asd')
+
+//files
+f=io.open('tempfile2.txt','write')
+io.fwrite(f,1)
+io.fwrite(f,2)
+io.close(f)

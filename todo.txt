@@ -1,10 +1,14 @@
-error message when program returns false, currently nothing is said, do try-catch on main/1 
 
 check types/how functors apply when def. in different files
 
 add syntax | t[i]:i
 
+0.87
+--profile changes in commit
+
 native try-catch?
+
+table/string addition? this2=this+{'x'=x and 'y'=y}
 
 //Full floating normalization is viable with CLP(R)—SWI itself turns {X=1} into 1.0—but it is not free. Every runtime boundary that produces counters, sizes, iterator status, or host indices must normalize deliberately, while host predicates such as sub_string/5, nth0/3, and random_between/3 still require temporary integers. Tic-tac-toe now runs, but incorrectly declares “X won!” on the empty board, so I’m tracing that separately from representation policy.
 >Whole-number normalization should mean 0 → 0.0, ... An all-real Cosmos numeric domain fits CLP(R), which itself returns integral solutions such as 1.0.
@@ -19,4 +23,22 @@ The clean choices are:
 - Require integer-valued floats at index/boundary APIs, rejecting 0.9; or
 - Explicitly specify floor semantics.
 
-File f...defines type?
+test nth0(int(x))
+
+rel close(File f) //File f...defines type?
+
+//functor(_, File)
+Compile error at 1:1: Unknown functor subtype: File
+
+:- op(1200, xfx, :->).
+:- op(1200, xfx, :<-).
+?
+
+* **`l[i]` is a table read.**  It is `cosmos_get/3`, and on a plain list it
+  answers something else.  Lists are read with `lst_get/3` and characters with
+  `string.at/3`.
+check
+* **No consecutive `_` parameters** in a relation head - the compiler shortens
+  that clause by one parameter.
+* **The last parameter of a relation is its result.**  `rel f(a, out)` answers
+  through `out`. => IR error on rel f(a, [])

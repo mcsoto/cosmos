@@ -188,7 +188,8 @@ rel join2(l, String sep, s,String s2)
 	else
 		l=Cons
 		s=s2
-	//todo check the type of join better
+
+//todo check the type of join better
 rel join_string(l, String sep, s,String s2)
 	if(l=[b|tail])
 		string.concat(s,sep,sa)//s1=s+sep+b//((s+b)+c)

@@ -22,6 +22,7 @@ xpce_prolog(_).
 :- dynamic xpce_callback/2. % xpce_callback(Id, Cosmos clos term)
 :- dynamic xpce_next_id/1.
 :- dynamic xpce_data/2.     % xpce_data(Key, Cosmos value as received)
+:- dynamic xpce_event_cb/2. % xpce_event_cb(Handle, Cosmos clos term)
 
 % --- value conversion ----------------------------------------------------
 % Cosmos only speaks numbers, strings, lists, tables and closures, so the
@@ -40,14 +41,60 @@ xpce_in(Value, Value).
 % Outgoing: numbers and strings pass through, atoms become strings so
 % Cosmos string operations work on them, live objects become fresh
 % handles, and empty (@nil) becomes Cosmos null.
+%
+% XPCE 10 hands an object back in one of two shapes:
+%
+%   * a NAMED object -- @display, @off, @(nil) -- as the compound
+%     @(Name): functor @, arity 1.
+%   * an UNNAMED object -- the editor of a view, a text buffer -- as a
+%     SWI pce_reference term, which prints as "<pce>(0xADDRESS,CLASS)".
+%
+% The older bridge only recognised the first shape, so every unnamed
+% object came out of get/3 as a raw reference instead of a handle, and
+% the next call with it died with
+%
+%   xpce_handle '<pce>(0x21bacaae210,editor)' does not exist
+%
+% which is what stopped xpce/notepad.co from running at all.
+%
+% The object test therefore has to come BEFORE the atom clause: an
+% object reference is not an atom, but it is not a compound either, so
+% the older `compound(Ref), functor(Ref, F, 1), F == '@'' test never
+% matched it either.
 xpce_out(Value, Value) :- var(Value), !.
+xpce_out(Ref, fc_null) :- xpce_null_ref(Ref), !.
+xpce_out(Ref, Handle) :- xpce_object_ref(Ref), !,
+    xpce_remember(Ref, Handle).
 xpce_out(Value, Value) :- number(Value), !.
 xpce_out(Value, Value) :- string(Value), !.
-xpce_out(Atom, String) :- atom(Atom), !, atom_string(Atom, String).
-xpce_out(Ref, fc_null) :- compound(Ref), functor(Ref, F, 1), F == '@', arg(1, Ref, nil), !.
-xpce_out(Ref, Handle) :- compound(Ref), functor(Ref, F, 1), F == '@', !,
-    xpce_remember(Ref, Handle).
+xpce_out(Atom, String) :- xpce_plain_atom(Atom), !, atom_string(Atom, String).
 xpce_out(Value, Value).
+
+% The nil object, which Cosmos sees as null.
+xpce_null_ref(Value) :-
+    functor(Value, '@', 1),
+    arg(1, Value, nil).
+
+% Is this an XPCE object reference?
+%
+% XPCE's own object/1 recognises both shapes.  The shape test below is
+% the fallback for a build whose object/1 does not: it cannot look inside
+% a pce_reference with sub_string/5 (that rejects it outright), but
+% term_to_atom/2 can, and the printed form is distinctive.
+xpce_object_ref(Value) :-
+    (   object(Value)
+    ->  true
+    ;   functor(Value, '@', 1)
+    ->  true
+    ;   functor(Value, _, 0),
+        term_to_atom(Value, Atom),
+        sub_string(Atom, 0, 5, _, "<pce>(")
+    ).
+
+% A plain atom: an ordinary value, not an object reference.
+xpce_plain_atom(Value) :-
+    functor(Value, _, 0),
+    \+ xpce_object_ref(Value).
 
 xpce_remember(Ref, Handle) :-
     xpce_next_handle(Handle),
@@ -116,11 +163,15 @@ xpce_get(Handle, AttrString, Value) :-
     xpce_out_value(Raw, Value).
 
 % get/3 on a string object yields another string object; unwrap those to
-% plain text instead of handing out handles to them.
+% plain text instead of handing out handles to them.  Everything else that
+% is a live XPCE object becomes a handle, so the caller can use it again.
+%
+% The object test is the shape test of xpce_object_ref/1, for the reason
+% given there.
 xpce_out_value(Raw, Value) :-
-    compound(Raw), functor(Raw, F, 1), F == '@', arg(1, Raw, Arg), number(Arg), !,
+    xpce_object_ref(Raw), !,
     (   catch((get(Raw, class, C), get(C, name, string)), _, fail)
-    ->  (   catch(get(Raw, value, V), _, fail), atom(V)
+    ->  (   catch(get(Raw, value, V), _, fail), xpce_plain_atom(V)
         ->  atom_string(V, Value)
         ;   xpce_remember(Raw, Value)
         )
@@ -219,6 +270,240 @@ xpce_cosmos_fire(Id, Handle) :-
     ;   print_message(warning, unknown_xpce_callback(Id))
     ).
 
+% --- keyboard ----------------------------------------------------------------
+%
+% XPCE 10.0.0 exposes the keyboard as an INPUT DEVICE, @keyboard_device, and
+% it answers whether a key is held down right now:
+%
+%   get(@keyboard_device, key_down, Key, @on)    % held
+%   get(@keyboard_device, key_down, Key, @off)   % not held
+%
+% `Key' is a name XPCE understands: one of its own event names (RET, ESC,
+% TAB, BS, DEL, space, insert, pause, cursor_home, end, page_up, page_down,
+% cursor_left, cursor_right, cursor_up, cursor_down), f1..f24, a single
+% character, or the name SDL uses for the key ("Left Shift").
+%
+% This is the same call XPCE's own games use -- see prolog/demo/asteroids.pl:
+%
+%   key_down(Key) :- get(@keyboard_device, key_down, Key, @on).
+%
+% A name XPCE does not know makes the get fail with "Unknown key".  That is
+% an error raised in C++, and an XPCE error during the event loop opens a
+% modal dialog that freezes the app, so the name is checked against the
+% list XPCE accepts BEFORE it is polled.
+%
+% The names are QUOTED on purpose: RET, ESC, TAB, BS and DEL start with a
+% capital, so unquoted they are Prolog VARIABLES -- and a fact with a
+% variable in it matches every name at all.
+xpce_device_named('RET').
+xpce_device_named('ESC').
+xpce_device_named('TAB').
+xpce_device_named('BS').
+xpce_device_named('DEL').
+xpce_device_named(space).
+xpce_device_named(insert).
+xpce_device_named(pause).
+xpce_device_named(cursor_home).
+xpce_device_named(end).
+xpce_device_named(page_up).
+xpce_device_named(page_down).
+xpce_device_named(cursor_left).
+xpce_device_named(cursor_right).
+xpce_device_named(cursor_up).
+xpce_device_named(cursor_down).
+% The SDL names of the modifier keys.
+xpce_device_named('Left Shift').
+xpce_device_named('Right Shift').
+xpce_device_named('Left Ctrl').
+xpce_device_named('Right Ctrl').
+xpce_device_named('Left Alt').
+xpce_device_named('Right Alt').
+xpce_device_named('Left GUI').
+xpce_device_named('Right GUI').
+
+% f1 .. f24.
+xpce_function_key(F) :-
+    atom_length(F, L),
+    L >= 2, L =< 3,
+    sub_atom(F, 0, 1, _, "f"),
+    sub_atom(F, 1, _, 0, Digits),
+    atom_number(Digits, N),
+    between(1, 24, N).
+
+% Is this a name the keyboard device is guaranteed to know?
+xpce_device_key_known(Key) :-
+    (   xpce_device_named(Key)
+    ->  true
+    ;   atom_length(Key, 1)
+    ->  true
+    ;   xpce_function_key(Key)
+    ).
+
+% xpce_key_down(+Key, -Down): is the key held down?  Down is 1 or 0.
+%
+% The key is a name XPCE understands; see the note above.  A name XPCE does
+% not know is reported as "not down" rather than as an error.
+xpce_key_down(Key0, Down) :-
+    (   atom(Key0)
+    ->  Key = Key0
+    ;   atom_string(Key0, Key)
+    ),
+    (   xpce_device_key_known(Key),
+        catch(get(@keyboard_device, key_down, Key, @on), _, fail)
+    ->  Down = 1
+    ;   Down = 0
+    ).
+
+% --- keyboard and mouse events -----------------------------------------------
+%
+% XPCE delivers key and mouse events to the graphical that has the keyboard
+% or pointer focus, and the documented hook is the ->event method of class
+% graphical.  That method is a CLASS-level method, so it cannot be attached
+% to a plain picture from Prolog; it has to be redefined on a subclass.  That
+% is what xpce_canvas is: a picture that hands its events to Cosmos.
+%
+% Create one with
+%
+%   xp.create('xpce_canvas', ['Title'], Handle)
+%
+% and attach a callback with xp.on_event/2.
+
+% XPCE pushes these operators into its own compilation units rather than
+% exporting them, so this file has to declare them itself.
+% XPCE pushes these operators into its own compilation units rather than
+% exporting them, so this file has to declare them itself.
+:- op(1200, xfx, :->).
+:- op(1200, xfx, :<-).
+
+:- pce_begin_class(xpce_canvas, picture,
+                   "A picture that hands its XPCE events to Cosmos").
+
+event(G, Ev:event) :->
+    (   xpce_capture(G, Ev)
+    ->  true
+    ;   true
+    ),
+    (   send_super(G, event, Ev)
+    ->  true
+    ;   true
+    ).
+
+:- pce_end_class.
+
+% Hand the event to the Cosmos callback registered for this object, if any.
+% Nothing here may raise: an error inside the XPCE dispatch opens a modal
+% dialog and freezes the application.
+xpce_capture(G, Ev) :-
+    (   xpce_event_callback(G, Closure)
+    ->  (   catch(xpce_event_table(Ev, Fields), _, fail)
+        ->  list_to_assoc(Fields, Table),
+            % The table is built inside XPCE's event dispatch, and the cells
+            % of that dispatch do not survive it.  A callback that keeps the
+            % event (in the program state, say) would then find a half-built
+            % table, so hand it a copy that owns its cells.
+            copy_term(Table, Owned),
+            catch(call_cl(Closure, [Owned]), Error,
+                  print_message(warning, Error))
+        ;   true
+        )
+    ;   true
+    ).
+
+xpce_event_callback(Ref, Closure) :-
+    xpce_obj(Handle, Ref),
+    xpce_event_cb(Handle, Closure).
+
+% The XPCE event as a Cosmos table.  The keys are STRINGS, because a Cosmos
+% table is an assoc and every lookup goes through cosmos_get/3 with a
+% string key.
+%
+% Verified accessors for this build:
+%   get(Ev, id, Id)          integer (ASCII) or atom (named key / event)
+%   get(Ev, key, K)          the Emacs-style name of a key event; for a
+%                             key_up it is the name of the key released
+%   get(Ev, position, Pt)    a point object; the coordinates come from
+%   get(Pt, x, X), get(Pt, y, Y)
+%   get(Ev, button, B)       left | middle | right
+%   get(Ev, multiclick, Mc)  single | double | triple
+%   send(Ev, is_a, mouse)    type test
+%   send(Ev, is_a, key_up)   type test: a key release
+%   send(Ev, has_modifier, s|c|m)
+xpce_event_table(Ev, Fields) :-
+    get(Ev, id, Id),
+    (   catch(send(Ev, is_a, mouse), _, fail)
+    ->  xpce_mouse_table(Ev, Id, Fields)
+    ;   xpce_key_table(Ev, Id, Fields)
+    ).
+
+xpce_mouse_table(Ev, Id, Fields) :-
+    (   catch(get(Ev, position, Pt), _, fail),
+        catch(get(Pt, x, X), _, fail),
+        catch(get(Pt, y, Y), _, fail)
+    ->  true
+    ;   X = 0, Y = 0
+    ),
+    (   catch(send(Ev, is_down), _, fail) -> Type = "mousedown"
+    ;   catch(send(Ev, is_up), _, fail)   -> Type = "mouseup"
+    ;   xpce_mouse_id(Id, Type)
+    ),
+    (   catch(get(Ev, button, Button), _, fail) -> true ; Button = none ),
+    (   catch(get(Ev, multiclick, Clicks), _, fail) -> true ; Clicks = none ),
+    Fields = [ "type"-Type, "x"-X, "y"-Y, "posx"-X, "posy"-Y,
+               "button"-Button, "clicks"-Clicks ].
+
+xpce_mouse_id(loc_move, Type) :- !, Type = "mousemotion".
+xpce_mouse_id(loc_still, Type) :- !, Type = "mousemotion".
+xpce_mouse_id(wheel, Type) :- !, Type = "mousewheel".
+xpce_mouse_id(_, Type) :- Type = "mousemotion".
+
+% A key press is identified by its id: an integer for a printable character
+% (the code of the character as typed, so shift is folded in) or an atom for
+% a named key.  A key RELEASE is an event of its own: the id is the atom
+% key_up and the key it releases comes from `event <-key', which answers the
+% Emacs-style name of the matching key-down ("a", "A", "RET", "<f1>").
+xpce_key_table(Ev, Id, Fields) :-
+    (   catch(send(Ev, is_a, key_up), _, fail)
+    ->  Type = "keyup",
+        (   catch(get(Ev, key, Released), _, fail)
+        ->  Key = Released
+        ;   Key = ""
+        )
+    ;   Type = "keydown",
+        xpce_key_id(Id, Key, Char)
+    ),
+    Fields = [ "type"-Type, "key"-Key, "char"-Char ].
+
+xpce_key_id(Id, Key, Char) :-
+    (   integer(Id)
+    ->  char_code(C, Id),
+        (   xpce_control_key(C, Name)
+        ->  Key = Name, Char = ""
+        ;   atom_chars(Atom, [C]),
+            atom_string(Atom, Key),
+            atom_chars(CharAtom, [C]),
+            atom_string(CharAtom, Char)
+        )
+    ;   atom(Id)
+    ->  atom_string(Id, Key), Char = ""
+    ;   Key = "", Char = ""
+    ).
+
+% The control characters, which have names rather than characters.
+xpce_control_key(8, "backspace").
+xpce_control_key(9, "tab").
+xpce_control_key(10, "return").
+xpce_control_key(13, "return").
+xpce_control_key(27, "escape").
+xpce_control_key(32, "space").
+
+% xpce_on_event(+Handle, +Closure): hand every XPCE event of this object to
+% the Cosmos relation.  The relation gets one argument: a table with the
+% event fields.
+xpce_on_event(Handle, Closure) :-
+    xpce_resolve(Handle, Ref),
+    retractall(xpce_event_cb(Handle, _)),
+    assertz(xpce_event_cb(Handle, Closure)).
+
 % --- shared slots -------------------------------------------------------------
 % Callbacks take exactly one argument (their source handle), so they
 % cannot see top-level bindings -- a 1-argument rel capturing anything
@@ -239,7 +524,7 @@ xpce_get_data(Key, Value) :-
 % silent no-op when the file is absent.
 xpce_prime_menu_bitmaps :-
     (   get(@pce, home, Home),
-        atom_concat(Home, '/bitmaps/ms_left_arrow.png', Path),
+        atom_concat(Home, '/bitmaps/left_arrow.png', Path),
         catch(new(_, image(Path)), _, fail)
     ->  true
     ;   true

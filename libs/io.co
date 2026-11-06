@@ -32,7 +32,9 @@ t={
 
 	rel read(String x)
 		c::ioread(x)
-		
+
+	open=open
+	close=close		
 
 	rel pause()
 		c::ioread(x)

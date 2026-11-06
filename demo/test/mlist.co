@@ -1,0 +1,20 @@
+require('mutable',mutable)
+require('list',list)
+require('table', table)
+set=table.set
+mtable={
+	rel new(self,o)
+		set(self,'_x',x,o)
+		mutable.new(x)
+		mutable.set(x,list.new())
+		
+	rel push(self, x, self2)
+		get(self,'_x',l)
+		l2=[x|l]
+		set(self,'_x',x,self2)
+
+	rel find(self,o,o2)
+		mutable.get(e,t)
+		list.get(t,o,o2)
+}
+export(mtable)

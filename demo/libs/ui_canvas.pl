@@ -1,0 +1,11 @@
+:- style_check(-singleton).
+'ui_canvas::$impl_draw'(A,B):-cosmos_get(A,"kind",C),if_(C="panel",((cosmos_get(A,"color",D),cosmos_get(B,"graphics",E),cosmos_method(E,"setColor",[D])),cosmos_get(A,"x",F),cosmos_get(A,"y",G),cosmos_get(A,"width",H),cosmos_get(A,"height",I),cosmos_get(B,"graphics",J),cosmos_method(J,"rectangle",["fill",F,G,H,I])),(cosmos_get(A,"kind",K),if_(K="rect",((cosmos_get(A,"color",L),cosmos_get(B,"graphics",M),cosmos_method(M,"setColor",[L])),cosmos_get(A,"x",N),cosmos_get(A,"y",O),cosmos_get(A,"width",P),cosmos_get(A,"height",Q),cosmos_get(B,"graphics",R),cosmos_method(R,"rectangle",["fill",N,O,P,Q])),(cosmos_get(A,"kind",S),if_(S="label",((cosmos_get(A,"color",T),cosmos_get(B,"graphics",U),cosmos_method(U,"setColor",[T])),cosmos_get(A,"text",V),cosmos_get(A,"x",W),cosmos_get(A,"y",X),cosmos_get(B,"graphics",Y),cosmos_method(Y,"print",[V,W,X])),(cosmos_get(A,"kind",Z),if_(Z="button",'ui_canvas::draw_button'(A,B),true))))))).
+'ui_canvas::$impl_draw_button'(A,B):-(cosmos_get(A,"hovered",C),if_(C=1.0,D="#3a675b",D="#263f4a")),(cosmos_get(B,"graphics",E),cosmos_method(E,"setColor",[D])),(cosmos_get(A,"x",F),cosmos_get(A,"y",G),cosmos_get(A,"width",H),cosmos_get(A,"height",I),cosmos_get(B,"graphics",J),cosmos_method(J,"rectangle",["fill",F,G,H,I])),(cosmos_get(B,"graphics",K),cosmos_method(K,"setColor",["#e6edf7"])),cosmos_get(A,"text",L),cosmos_get(A,"x",M),add_(M,10.0,N),cosmos_get(A,"y",O),add_(O,8.0,P),cosmos_get(B,"graphics",Q),cosmos_method(Q,"print",[L,N,P]).
+'ui_canvas::$impl_draw_all'(A,B):-if_(A=[],true,(A=[C|D],'ui_canvas::draw'(C,B),'ui_canvas::draw_all'(D,B))).
+ui_canvas(A):-cosmos_require("ui",B),cosmos_require("space",C),new(D),set_(D,"draw",clos(upvals([C]),'ui_canvas::$value_draw'),E),set_(E,"drawAll",clos(upvals([C]),'ui_canvas::$value_draw_all'),F),A=F.
+'ui_canvas::draw'(A,B):-'ui_canvas::$impl_draw'(A,B).
+'ui_canvas::$value_draw'(A,upvals([B])):-'ui_canvas::draw'(A,B).
+'ui_canvas::draw_button'(A,B):-'ui_canvas::$impl_draw_button'(A,B).
+'ui_canvas::$value_draw_button'(A,upvals([B])):-'ui_canvas::draw_button'(A,B).
+'ui_canvas::draw_all'(A,B):-'ui_canvas::$impl_draw_all'(A,B).
+'ui_canvas::$value_draw_all'(A,upvals([B])):-'ui_canvas::draw_all'(A,B).

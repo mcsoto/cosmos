@@ -1,0 +1,142 @@
+Cosmos Space API
+=================
+
+Version 2 / Canvas backend
+--------------------------
+
+The maintained Canvas2D backend is `space-canvas-host.js`. Its complete API,
+direct Canvas escape hatch, input conventions, and compiled-host ABI are
+documented in `../docs/space-canvas-api.md`.
+
+New applications should use `space.graphics` for portable drawing. They may use
+`space.canvas`, `space.context`, or `js::canvas` when native Canvas2D behavior is
+needed. `canvas.rect(...)` remains available for relation-oriented programs.
+
+The definitions below describe the version-1 compatibility surface.
+
+Desktop app modules
+-------------------
+
+The HTML5 desktop lists each top-level `.co` file. A runnable desktop app
+exports a table. Width, height, tick, and state are optional:
+
+    --app
+    app={
+        title='My app' and width=320 and height=160 and tick=500
+        state=state and init=init and update=update
+        draw=draw and mouseup=mouseup and keypressed=keypressed
+    }
+    export(app)
+
+Space treats omitted width and height as 320 by 160 and an omitted tick as
+500 milliseconds. Conceptually, the host invokes the export like this:
+
+    app.init(app.width, app.height)
+    sp.start(app.tick, {
+        rel update(s, s2)
+            app.update(s, s2)
+        rel draw(s)
+            app.draw(s)
+        rel mouseup(x, y, s, s2)
+            app.mouseup(x, y, s, s2)
+    }, app.state)
+
+Legacy files that call `sp.start` directly are also recognized by the HTML5
+desktop. Files without a draw callback still appear, but open with a library
+notice instead of being mislabeled as executable applications.
+
+Load the library with:
+
+    require('space', sp)
+
+##v0.1:
+#guideline: write newly made desktop apps or games with prefaced by a comment,
+
+	--app
+	app = {...}
+	export(app)
+
+Lifecycle
+---------
+
+sp.start(interval, callbacks, initial_state)
+    Starts the Space loop. `interval` is milliseconds. `callbacks` may define:
+    update(state, next_state), draw(state), keypressed(key, state, next_state),
+    and mouseup(x, y, state, next_state).
+
+    Minimal loop:
+
+        sp.start(16, {
+            rel update(s, s2)
+                game_update(s, s2)
+            rel draw(s)
+                game_draw(s)
+        }, state)
+
+    `update` advances the state; `draw` renders the current state each frame.
+
+sp.init(width, height)
+    Sets the drawing surface size for native Space hosts.
+
+Drawing
+-------
+
+canvas.rect(x, y, width, height, color)
+    Fills a rectangle. Colors are CSS-style strings such as '#64d7b0'.
+
+sp.rect(x, y, width, height)
+    Draws a filled rectangle in the native Space host.
+
+sp.rectBorder(x, y, width, height)
+    Draws a rectangle outline.
+
+sp.setRGB(red, green, blue)
+    Sets the current drawing color using 0-255 RGB values.
+
+sp.setRGBA(red, green, blue, alpha)
+    Sets the current drawing color using 0-255 RGBA values.
+
+sp.clear()
+    Clears the drawing surface using the current background behavior.
+
+sp.refresh()
+    Flushes or refreshes the drawing surface in native Space hosts.
+
+Images
+------
+
+sp.loadImage(path, image)
+    Loads an image and binds it to `image`.
+
+sp.drawImage(image, x, y)
+    Draws a loaded image at the given position.
+
+Timing and host helpers
+-----------------------
+
+sp.delay(milliseconds)
+    Delays execution in hosts that implement blocking delay support.
+
+sp.test(...)
+    Host-specific test hook used by legacy Space examples.
+
+Input callback shapes
+---------------------
+
+rel keypressed(key, state, next_state)
+    Receives keyboard input. Examples use keys such as 'up', 'down', 'left',
+    'right', 'r', and 'escape'.
+
+rel mouseup(x, y, state, next_state)
+    Receives a mouse-release position in canvas coordinates.
+
+Editor canvas host
+------------------
+
+The browser editor currently provides the simplified canvas API used by
+basic.co, square.co, and snake.co:
+
+    canvas.rect(x, y, width, height, color)
+
+The editor also recognizes the native drawing calls used by the existing
+tic-tac-toe examples and maps their Space drawing loop to the preview canvas.

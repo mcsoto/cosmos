@@ -1,1 +1,0 @@
-t("module","test6",<,t("fields",t,-,t("exports",t,-,t,t),t("format",1.0,-,t,t)),t("schemas",t("$state_0.0",t("kind","constructor",-,t("fields",[],-,t,t),t("location",fc_Loc(38.0,1.0),-,t,t)),>,t,t("t1",t("kind","constructor",-,t("fields",[],-,t,t),t("location",fc_Loc(15.0,1.0),-,t,t)),-,t,t)),-,t,t)).

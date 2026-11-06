@@ -20,21 +20,43 @@ SWI-Prolog's XPCE toolkit (`library(pce)` + `library(pce_main)`).
 ## API covered
 
 `sp.init(w,h)`, `sp.start(ms,callbacks,state)`, `sp.startCanvas(fps,callbacks,state)`,
-`sp.quit/dispose/loadImage`, `graphics.clear/setColor/rectangle/line/circle/ellipse/arc/polygon/print/printf/push/pop/origin/translate/rotate/scale/setLineWidth/setScissor/clearScissor/draw/refresh`,
+`sp.quit/dispose/stop/loadImage`, `sp.beginFrame/sp.endFrame`,
+`graphics.clear/setColor/setBackgroundColor/getColor/getBackgroundColor/rectangle/line/point/points/circle/ellipse/arc/polygon/print/printf/push/pop/origin/translate/rotate/scale/shear/setLineWidth/getLineWidth/setLineStyle/getLineStyle/setScissor/clearScissor/getScissor/draw/refresh`,
 plus `newFont/setFont/getFont`, `getDimensions/getWidth/getHeight`, timer (`getTime/getDelta/getFPS`),
-input (`isDown/getX/getY/getPosition/buttonDown`) and the event queue
+input (`isDown/isMouseDown/getX/getY/getPosition/buttonDown`) and the event queue
 (`event.get/getType/peek`, plus the `on` callback table passed to `sp.start`).
+
+Event types delivered: `mousemotion`, `mousedown`, `mouseup`, `mousewheel`
+(with a real wheel amount), `keydown`, `keyup`, `textinput`, `focus`, `blur`
+and `resize`.
 
 ## Input
 
-XPCE has no polling API in this build. There is no `push_event/4`,
-`push_global_event/4`, `get_event/3` or `key_name/2` — neither
-`library(pce)` nor the Prolog layer under `C:\Program Files\swipl\xpce`
-defines them, and calling them raises `existence_error`. Input therefore
-arrives as callbacks.
+XPCE 10.0.0 has two ways to see the keyboard, and the backend uses both.
 
-The hook is the `->event` method of class `graphical`, redefined on a
-subclass of `picture`:
+**Polling.** The `keyboard` INPUT DEVICE class is reachable as
+`@keyboard_device` and answers whether a key is held down right now:
+
+```prolog
+get(@keyboard_device, key_down, Key, @on)    % held
+get(@keyboard_device, key_down, Key, @off)   % not held
+```
+
+`Key` is a name XPCE understands: one of its own event names (`RET`, `ESC`,
+`TAB`, `BS`, `DEL`, `space`, `insert`, `pause`, `cursor_home`, `end`,
+`page_up`, `page_down`, `cursor_left`, `cursor_right`, `cursor_up`,
+`cursor_down`), `f1`..`f24`, a single character, or the name SDL uses for
+the key (`"Left Shift"`). A name XPCE does not know makes the get fail with
+`Unknown key`, so the name is checked against the list XPCE accepts before
+it is polled. This is the same call XPCE's own games use — see
+`prolog/demo/asteroids.pl` in the XPCE package.
+
+There is still no `push_event/4`, `push_global_event/4`, `get_event/3` or
+`key_name/2`; those do not exist in this build. But the keyboard device
+covers the one thing they would have been used for.
+
+**Events.** The hook is the `->event` method of class `graphical`, redefined
+on a subclass of `picture`:
 
 ```prolog
 :- op(1200, xfx, :->).
@@ -63,10 +85,12 @@ rediscover:
 
 Verified accessors: `get(Ev, id, _)`, `get(Ev, position, _)` followed by
 `get(Pt, x, _)`, `get(Pt, y, _)`, `get(Ev, button, _)`,
-`get(Ev, multiclick, _)`, `send(Ev, is_a, mouse)`,
-`send(Ev, is_down|is_up|is_drag)` (zero-argument behaviours, so `send/2`), and
+`get(Ev, multiclick, _)`, `get(Ev, key, _)`,
+`get(Ev, rotation, _)`, `send(Ev, is_a, mouse)`,
+`send(Ev, is_a, key_up)`, `send(Ev, is_down|is_up|is_drag)`
+(zero-argument behaviours, so `send/2`), and
 `send(Ev, has_modifier, s|c|m)` — bare atoms; `e` is not accepted. Absent:
-`event <-modifiers`, `event <-click_time`.
+`event <-modifiers`, `event <-click_time`, `event <-dy`.
 
 Event ids come from `@event_tree`: mouse press/release/drag as
 `ms_left_down` and friends, `loc_move`, `loc_still`, `wheel`, `area_enter`;
@@ -74,15 +98,57 @@ keys as the **ASCII code** (an integer) or a named atom (`f1`,
 `cursor_left`, `'ESC'`). Shift is already folded into the code, so shift+A
 arrives as `65` with modifier `s`.
 
-Two consequences: there is no `'keyup'` (the tree has no release events under
-`keyboard/`), and the wheel *rotation amount* is left at `0` because the
-`->attribute` accessor could not be verified without risking the dialog.
+**Key releases exist.** The release event is `key_up`, and it sits under
+`any` in `@event_tree` rather than under `keyboard/` — which is why looking
+only under `keyboard/` makes it look like the build has no releases at all.
+Its id is the atom `key_up`; the key it releases comes from `event <-key`,
+which answers the Emacs-style name of the matching key-down (`"a"`, `"A"`,
+`"RET"`, `"<f1>"`). The backend turns that into the same Love2D name a key
+press reports, so a press and its release agree.
+
+The wheel *rotation amount* is read from `event <-rotation`, which is an
+ordinary get method: it answers the rotation in fifteenths of a notch and a
+non-number for every event that is not a wheel.
+
+**The event queue is copied, not linked.** The queue is a Cosmos table per
+event (a Prolog assoc), and an event table is built *inside* XPCE's event
+dispatch. The cells of that dispatch do not survive it, so a queue that only
+*refers* to those tables comes back as half-built trees: assocs whose keys and
+values have turned into unbound variables. A half-built table is not an assoc
+any more, so `get_assoc/3` fails on it, the type filter drops the event, and
+the program never sees it. The queue is therefore stored with `nb_setval/2`
+(which copies into the protected area of the global variable space) and read
+back through a `copy_term/2`, so no caller ever holds cells that the next
+event can free.
+
+The symptom was confusing, because it only hit the *newest* event: the tables
+that had been in the queue for a few frames were still intact, and a program
+that reads the whole queue still saw most of it. A program that asks for one
+kind of event (`sp.event.getType('keydown', Keys)`) always asks for the
+newest one, so it always got nothing — which is why the keyboard looked dead
+while the mouse still worked. `test/space_xpce_events.pl` reproduces the whole
+path (inject an event with `frame->sdl_test_event`, read it back on the next
+frame) and fails without the copy.
+
+**Synthetic events.** `graphical->generate_event/1` posts an event with the
+given id to a graphical, which is the same path a real key press takes:
+
+```prolog
+send(Window, generate_event, 119)    % the key 'w'
+```
+
+XPCE dispatches it, the `->event` method captures it, and it lands in the
+Space queue like any other event. `test/space_xpce_events.pl` uses it to
+check the keyboard path without a keyboard.
 
 Deliberate limits:
 
 - `setScissor` only records the rect; clipping is not enforced.
-- `shear` / `setLineStyle` / `get*` accessors are stubs.
+- `setLineStyle` only remembers the style: XPCE has no rough/smooth switch of
+  its own, so the style is answered back unchanged.
 - Rotation of ellipses only moves the centre (shape stays axis-aligned).
+- `getFont` reports the font that was set, but the family and style are
+  XPCE's own (`sans`, `serif`, `mono`; `normal`, `bold`, `italic`).
 
 ## Compile-time checking
 

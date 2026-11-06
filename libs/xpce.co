@@ -70,6 +70,32 @@ xp = {
     rel on_select(handle, callback)
         pl::xpce_on_click(handle, callback)
 
+    // Hand every XPCE event of an object to a Cosmos relation: a key
+    // press, a key release, a mouse click.  The relation gets ONE
+    // argument, a table with the event fields:
+    //   type   'keydown' | 'keyup' | 'mousedown' | 'mouseup' |
+    //          'mousemotion' | 'mousewheel'
+    //   key    the key, for a key event
+    //   char   the character as typed, for a key press
+    //   x, y, posx, posy, button, clicks   for a mouse event
+    //
+    // The object has to be one that reports its events, so create it as
+    //   xp.create('xpce_canvas', ['Title'], handle)
+    // rather than as a plain 'picture'.
+    rel on_event(handle, callback)
+        pl::xpce_on_event(handle, callback)
+
+    // Is the key held down right now?  The answer is 1 or 0.  The key is
+    // a name XPCE understands: 'RET', 'ESC', 'TAB', 'cursor_left',
+    // 'cursor_right', 'cursor_up', 'cursor_down', 'space', 'f1'..'f24',
+    // a single character, or the SDL name of a modifier key such as
+    // 'Left Shift'.
+    //
+    // This asks the keyboard itself rather than following the events, so
+    // it is right even when the program missed a press or a release.
+    rel key_down(key, down)
+        pl::xpce_key_down(key, down)
+
     // Repeating timer, interval in seconds; the callback gets the timer's
     // own handle, so a one-shot frees itself.  Free the handle to stop it.
     rel timer(seconds, callback, handle)

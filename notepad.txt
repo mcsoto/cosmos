@@ -1,0 +1,3 @@
+Welcome to Cosmos Notepad.
+Type here, then File > Save.
+----

@@ -1,3 +1,43 @@
+//Input never arrived. The demos registered mouseup/keypressed/mousereleased directly in the sp.start map; the XPCE backend only fires handlers under an "on" map keyed by event type.
+//api-
+rel keypressed_events(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[e|tail]
+        e.key=key
+        keypressed(key,s,next_state)
+        keypressed_events(tail,next_state,s2)
+		
+rel mouseup_events(events,s,s2)
+	e.x=mx
+	e.y=my
+	e.button=button
+	mousereleased(mx,my,button,state,next_state)
+	mousereleased_events(tail,next_state,state2)...
+//->
+
+-- The native backend has no named input callbacks: the mouse and the
+-- keyboard are read by polling the event queue inside update, and the
+-- handlers above are fed from it.
+--
+-- The queue is read ONCE per frame.  Every read clears the whole queue, so
+-- asking for the keys and the clicks separately would throw one of them
+-- away: the second read always answers an empty list.
+rel apply_events(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[e|tail]
+        kind=e.type
+        if(kind='keydown')
+            keypressed(e.key,s,after_event)
+        elseif(kind='mouseup')
+            mouseup(e.x,e.y,s,after_event)
+        else
+            after_event=s
+        apply_events(tail,after_event,s2)
+
 //The tiger is not a bird
 not bird(tiger)
 forall(x in bird(x))
@@ -13,6 +53,20 @@ next t = t:{i=0}
 //next t = set(t,i,_)
 //t[i]:i //next t = t.i : i /// t:i?i
 	
+//LP
+function update(_dt, s, s2)
+	s2 = {x = (s.x + 2) % 520 and y=0}
+//
+rel update(_dt, s, s2)
+	s2 = {x = (s.x + 2) % 520}
+	for (e in events)
+		if(e.type='keyup')
+			move(e.key,o,o2)//Out key
+//TLP
+update(_dt, start s)
+	...
+	move(e.key,s,next s)
+
 //To address these limitations, we turn to symbolic logic languages that support more structured and interpretable reasoning. Among them, Prolog [12] stands out as a high-level declarative programming language designed for logic-based inference. It represents knowledge through facts and rules and, with its strict syntactic structure and built-in backtracking mechanism, enables efficient symbolic reasoning. These features make it particularly suitable for tasks such as logical inference, knowledge representation, and rule-based problem solving. However, Prolog’s rigid syntax and limited expressive power pose challenges for directly representing certain logical structures inherent in NL. For example, Prolog cannot directly express the existential quantifier commonly found in NL. A sentence like There exists a bird that is black cannot be directly encoded in Prolog, which only supports universally applicable facts or rules. Similarly, Prolog has fundamental limitations in expressing classical negation. A statement such as The tiger is not a bird cannot be directly asserted as a fact in Prolog. These limitations significantly reduce the expressiveness of Prolog in capturing the logical structures of NL, and in turn, constrain its effectiveness as a reasoning engine for NL-derived logical representations.
 
 //The strongest immediate candidates for improving Cosmos are wheel rotation, reliable pointer coordinates, focus-loss handling, and event-driven held-button tracking.	

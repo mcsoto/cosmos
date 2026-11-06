@@ -49,7 +49,7 @@ cannot overload, so there are no optional arguments.
 | --- | --- |
 | `create(cls, args, handle)` | `cls` is a class name string, `args` a flat list. Answers an integer **handle**, never the raw reference. |
 | `send(handle, method, args)` | `method` is a string; handles inside `args` resolve back to objects. Builds `method(args...)` and sends it. |
-| `get(handle, attr, value)` | Reads an attribute into `value`. |
+| `get(handle, attr, value)` | Reads an attribute into `value`. A live object comes back as an integer **handle**, never as a raw reference, so the value can be used again straight away. |
 | `free(handle)` | Destroys the object, forgets the handle. Never on an open window outside the event loop — close it instead. |
 | `color(spec, handle)` | `'#rrggbb'` or a colour name. For XPCE compounds Cosmos cannot spell. |
 | `point(x, y, handle)` | Same. |
@@ -57,6 +57,8 @@ cannot overload, so there are no optional arguments.
 | `font(family, style, size, handle)` | Same, e.g. `font('helvetica', 'roman', 14, f)`. |
 | `on_click(handle, callback)` | Fires a 1-argument relation per button click (arg: the button). |
 | `on_select(handle, callback)` | Same mechanism for menu items (their `message` slot). |
+| `on_event(handle, callback)` | Fires a 1-argument relation per XPCE event of the object: a key press, a key release, a mouse click. The argument is a table with the event fields (`type`, `key`, `char`, `x`, `y`, `button`, `clicks`). The object has to be one that reports its events, so create it as `xp.create('xpce_canvas', ['Title'], handle)` rather than as a plain `'picture'`. |
+| `key_down(key, down)` | Is the key held down right now? Answers 1 or 0. The key is a name XPCE understands: `'RET'`, `'ESC'`, `'TAB'`, `'cursor_left'`, `'f1'`..`'f24'`, a single character, or the SDL name of a modifier key such as `'Left Shift'`. Asks the keyboard itself, so it is right even when the program missed a press or a release. |
 | `timer(seconds, callback, handle)` | Repeating timer; the callback gets the timer's handle, so a one-shot frees itself. |
 | `set_data(key, value)` / `get_data(key, value)` | Named shared slots; values stored untouched. |
 | `loop()` | Pumps the display until the process ends. Never returns. |
@@ -140,9 +142,13 @@ prints XPCE's harmless `@nil →destroy` chatter on stderr.
 
 ## Limits
 
-- **No raw keyboard events.** Buttons, text fields (`text_item`, read via
-  `selection` on Enter) and timers cover GUI input; XPCE key recognisers
-  are not bridged yet.
+- **Keyboard input is bridged, but thinly.** `on_event` reports key presses
+  and key releases, and `key_down/2` polls the keyboard device. Both need an
+  object that reports its events — create it as `'xpce_canvas'`, not as a
+  plain `'picture'`. Key names are **XPCE's own** (`'RET'`, `'cursor_left'`,
+  `'f1'`, `'Left Shift'`), not the lowercase Love2D names the Space library
+  uses. Buttons, text fields (`text_item`, read via `selection` on Enter) and
+  timers cover the rest of the GUI input.
 - **No generic message construction.** Callbacks attach through `on_click`,
   `on_select` and `timer` only; anything fancier needs a bridge addition.
 - **No window titles after creation**, no multiple displays, no z-order

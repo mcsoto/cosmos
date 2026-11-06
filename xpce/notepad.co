@@ -36,6 +36,8 @@ xp.create('menu_item', ['Quit'], quititem)
 xp.on_select(quititem, do_quit)
 xp.send(filemenu, 'append', [quititem])
 
+// The opened view carries its own editor (attaching ours would print
+// XPCE's harmless @nil placeholder warning), so fetch it and its buffer.
 xp.create('view', [], vw)
 xp.send(win, 'append', [vw])
 xp.send(vw, 'below', [mbardlg])
@@ -51,22 +53,17 @@ xp.set_data('buffer', tb)
 xp.loop()
 
 rel do_save(_item)
-    require('xpce', xp)
-    require('io', io)
-    xp.get_data('buffer', tb)
-    xp.get(tb, 'contents', text)
-    io.writeToFile('notepad.txt', text)
-    print('saved notepad.txt')
+	xp.get_data('buffer', tb) and    xp.get(tb, 'contents', text)
+	//text='asd'
+	io.writeToFile('notepad.txt', text)
+	print('saved notepad.txt')
 
 rel do_load(_item)
-    require('xpce', xp)
-    require('io', io)
     io.readFile('notepad.txt', text)
     xp.get_data('buffer', tb)
     xp.send(tb, 'contents', [text])
     print('loaded notepad.txt')
 
 rel do_quit(_item)
-    require('xpce', xp)
     print('quit selected')
     xp.quit()

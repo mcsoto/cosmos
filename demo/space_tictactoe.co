@@ -1,0 +1,113 @@
+// Tic-tac-toe built only on the provisional Space facade.
+require('space', sp)
+
+width=600
+height=450
+cell=120
+initial={a=' ' and b=' ' and c=' ' and d=' ' and e=' ' and f=' ' and g=' ' and h=' ' and i=' ' and turn='o'}
+
+rel cell_at(state,index,value)
+    if(index=0) value=state.a
+    elseif(index=1) value=state.b
+    elseif(index=2) value=state.c
+    elseif(index=3) value=state.d
+    elseif(index=4) value=state.e
+    elseif(index=5) value=state.f
+    elseif(index=6) value=state.g
+    elseif(index=7) value=state.h
+    else value=state.i
+
+rel put_cell(state,index,value,state2)
+    if(index=0) state2={a=value and b=state.b and c=state.c and d=state.d and e=state.e and f=state.f and g=state.g and h=state.h and i=state.i and turn=state.turn}
+    elseif(index=1) state2={a=state.a and b=value and c=state.c and d=state.d and e=state.e and f=state.f and g=state.g and h=state.h and i=state.i and turn=state.turn}
+    elseif(index=2) state2={a=state.a and b=state.b and c=value and d=state.d and e=state.e and f=state.f and g=state.g and h=state.h and i=state.i and turn=state.turn}
+    elseif(index=3) state2={a=state.a and b=state.b and c=state.c and d=value and e=state.e and f=state.f and g=state.g and h=state.h and i=state.i and turn=state.turn}
+    elseif(index=4) state2={a=state.a and b=state.b and c=state.c and d=state.d and e=value and f=state.f and g=state.g and h=state.h and i=state.i and turn=state.turn}
+    elseif(index=5) state2={a=state.a and b=state.b and c=state.c and d=state.d and e=state.e and f=value and g=state.g and h=state.h and i=state.i and turn=state.turn}
+    elseif(index=6) state2={a=state.a and b=state.b and c=state.c and d=state.d and e=state.e and f=state.f and g=value and h=state.h and i=state.i and turn=state.turn}
+    elseif(index=7) state2={a=state.a and b=state.b and c=state.c and d=state.d and e=state.e and f=state.f and g=state.g and h=value and i=state.i and turn=state.turn}
+    else state2={a=state.a and b=state.b and c=state.c and d=state.d and e=state.e and f=state.f and g=state.g and h=state.h and i=value and turn=state.turn}
+
+rel set_turn(state,turn,state2)
+    state2={a=state.a and b=state.b and c=state.c and d=state.d and e=state.e and f=state.f and g=state.g and h=state.h and i=state.i and turn=turn}
+
+rel draw_mark(mark,x,y)
+    left=x*cell+24
+    top=y*cell+24
+    if(mark='x')
+        -- canvas.label is dead under the native backend: the Space library
+        -- draws text with setColor + print.
+        sp.graphics.setColor('#7cf4cb')
+        sp.graphics.print('X',left+24,top+8)
+    elseif(mark='o')
+        sp.graphics.setColor('#f3c969')
+        sp.graphics.print('O',left+24,top+8)
+    else
+        true
+
+rel draw_cell(state,x,y)
+    -- canvas.rect_border is dead under the native backend: a border is a
+    -- 'line' rectangle drawn with the wanted line width.
+    sp.graphics.setColor('#36516c')
+    sp.graphics.setLineWidth(4)
+    sp.graphics.rectangle('line', x*cell, y*cell, cell, cell)
+    cell_at(state,x+y*3,mark)
+    draw_mark(mark,x,y)
+
+rel draw(state)
+    sp.graphics.setColor('#07111f')
+    sp.graphics.rectangle('fill', 0, 0, width, height)
+    for(init y=0;y<3;next y=y+1;)
+        for(init x=0;x<3;next x=x+1;)
+            draw_cell(state,x,y)
+    sp.graphics.setColor('#dcebea')
+    sp.graphics.print('Tic-tac-toe - click a square; R restarts', 16, 390)
+
+rel play(mx,my,state,state2)
+    x=int(mx/cell)
+    y=int(my/cell)
+    if(x>=0 and x<3 and y>=0 and y<3)
+        index=x+y*3
+        if(cell_at(state,index,' '))
+            put_cell(state,index,state.turn,placed)
+            if(state.turn='o') set_turn(placed,'x',state2) else set_turn(placed,'o',state2)
+        else
+            state2=state
+    else
+        state2=state
+
+rel mousereleased(mx,my,button,state,state2)
+    if(button=1) play(mx,my,state,state2) else state2=state
+
+rel keypressed(key,state,state2)
+    if(key='r') state2=initial else state2=state
+
+-- The native backend has no "app table" export and no named input
+-- callbacks: the mouse and the keyboard are read by polling the event
+-- queue inside update, and the handlers above are fed from it.
+--
+-- The queue is read ONCE per frame.  Every read clears the whole queue, so
+-- asking for the keys and the clicks separately would throw one of them
+-- away: the second read always answers an empty list.
+rel apply_events(events,state,state2)
+    if(events=[])
+        state2=state
+    else
+        events=[e|tail]
+        kind=e.type
+        if(kind='keydown')
+            keypressed(e.key,state,after_event)
+        elseif(kind='mouseup')
+            mousereleased(e.x,e.y,e.button,state,after_event)
+        else
+            after_event=state
+        apply_events(tail,after_event,state2)
+
+rel update(dt,state,state2)
+    sp.event.get(events)
+    apply_events(events,state,state2)
+
+sp.init(width,height)
+sp.start(16,{
+    update=update and draw=draw
+},initial)

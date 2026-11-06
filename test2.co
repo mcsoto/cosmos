@@ -6,7 +6,7 @@ for(x in [1,2,3])
 for(c in '[1,2,3]')
 	print(c)
 /* */
-
+/*
 print(''+#s3)
 x=1+z
 y=''+2	
@@ -27,3 +27,5 @@ out=1
 
 print('-')
 require('test3',_)
+*/
+io.writeToFile('tempfile.txt','asd')

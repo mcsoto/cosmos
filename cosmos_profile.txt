@@ -1,0 +1,75 @@
+================================================================
+ Cosmos profile -- test
+----------------------------------------------------------------
+ program     : test
+ module      : test
+ source      : test.co
+ generated   : test.pl
+ compiled in : 377 ms
+ profiled    : 0 frames, 0.21 s wall, 2234420 inferences
+ sampler     : 9 samples, 60 ticks, 78.12 ms sampled (1.30 ms/tick, 0.00 ms/frame)
+ report      : stop(done)
+----------------------------------------------------------------
+ Time by category
+------------------------------------------------------------------------
+category        calls  self ms      %
+swi system      96276     58.6  100.0
+cosmos runtime    228      0.0    0.0
+ Hot predicates (self time)
+------------------------------------------------------------------------
+predicate                           calls  self ms     %
+system:skip/2                        6835     19.5  33.3
+system:read_clause/3                  446     19.5  33.3
+system:access_file/2                   98     19.5  33.3
+system:arg/3                         6590      0.0   0.0
+system:'$member'/2                   4766      0.0   0.0
+system:'$member_'/3                  4754      0.0   0.0
+system:current_prolog_flag/2         4537      0.0   0.0
+system:get_attr/3                    4248      0.0   0.0
+system:'$stream_property'/2          3538      0.0   0.0
+'$syspreds':stream_position_data/3   3461      0.0   0.0
+system:(>)/2                         3401      0.0   0.0
+'$expand':function/2                 2787      0.0   0.0
+'$expand':replace_functions/7        2691      0.0   0.0
+system:(==)/2                        2599      0.0   0.0
+'$expand':contains_functions2/1      2414      0.0   0.0
+'$expand':conj/6                     2379      0.0   0.0
+'$expand':pos_list/6                 2254      0.0   0.0
+system:term_variables/2              2150      0.0   0.0
+system:del_attr/2                    2104      0.0   0.0
+system:get_dict/3                    2096      0.0   0.0
+'$expand':expand_goal/8              2070      0.0   0.0
+system:put_attr/3                    2058      0.0   0.0
+'$expand':already_expanded/3         2044      0.0   0.0
+system:b_setval/2                    1872      0.0   0.0
+system:compound_name_arity/3         1856      0.0   0.0
+ ... and 136 more
+ Most called predicates
+------------------------------------------------------------------------
+predicate                           calls  self ms     %
+system:skip/2                        6835     19.5  33.3
+system:arg/3                         6590      0.0   0.0
+system:'$member'/2                   4766      0.0   0.0
+system:'$member_'/3                  4754      0.0   0.0
+system:current_prolog_flag/2         4537      0.0   0.0
+system:get_attr/3                    4248      0.0   0.0
+system:'$stream_property'/2          3538      0.0   0.0
+'$syspreds':stream_position_data/3   3461      0.0   0.0
+system:(>)/2                         3401      0.0   0.0
+'$expand':function/2                 2787      0.0   0.0
+'$expand':replace_functions/7        2691      0.0   0.0
+system:(==)/2                        2599      0.0   0.0
+'$expand':contains_functions2/1      2414      0.0   0.0
+'$expand':conj/6                     2379      0.0   0.0
+'$expand':pos_list/6                 2254      0.0   0.0
+system:term_variables/2              2150      0.0   0.0
+system:del_attr/2                    2104      0.0   0.0
+system:get_dict/3                    2096      0.0   0.0
+'$expand':expand_goal/8              2070      0.0   0.0
+system:put_attr/3                    2058      0.0   0.0
+'$expand':already_expanded/3         2044      0.0   0.0
+system:b_setval/2                    1872      0.0   0.0
+system:compound_name_arity/3         1856      0.0   0.0
+system:'$c_current_predicate'/2      1779      0.0   0.0
+'$expand':mark_vars_non_fresh/1      1574      0.0   0.0
+ ... and 136 more

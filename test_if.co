@@ -1,0 +1,12 @@
+
+if(x = 1)
+	print(x)
+else
+	print(x)
+
+o={gems=[]}
+if(o.gems = [])
+	print(o.gems)
+	print('-')
+else
+	print(o.gems)

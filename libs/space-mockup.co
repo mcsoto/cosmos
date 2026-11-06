@@ -1,0 +1,290 @@
+require('space_xpce', xpce)
+
+// ---- Window lifecycle ----
+
+rel init(width, height)
+    xpce.init(width, height)
+
+rel start(intervalMs, callbacks, initialState)
+    xpce.start(intervalMs, callbacks, initialState)
+
+rel startCanvas(fps, callbacks, initialState)
+    xpce.startCanvas(fps, callbacks, initialState)
+
+rel quit()
+    xpce.quit()
+
+rel dispose()
+    xpce.dispose()
+
+// End the program the way quit does.
+rel stop()
+    xpce.stop()
+
+// Frame markers.  XPCE presents every drawing call at once, so these have
+// nothing to do.
+rel beginFrame()
+    xpce.beginFrame()
+
+rel endFrame()
+    xpce.endFrame()
+
+rel loadImage(source, name)
+    xpce.loadImage(source, name)
+
+// ---- Graphics ----
+
+rel setBackgroundColor(color)
+    xpce.graphics.setBackgroundColor(color)
+
+rel getBackgroundColor(color)
+    xpce.graphics.getBackgroundColor(color)
+
+rel setColor(color)
+    xpce.graphics.setColor(color)
+
+rel getColor(color)
+    xpce.graphics.getColor(color)
+
+rel clear(color)
+    xpce.graphics.clear(color)
+
+rel rectangle(mode, x, y, width, height)
+    xpce.graphics.rectangle(mode, x, y, width, height)
+
+rel line(points)
+    xpce.graphics.line(points)
+
+rel point(x, y)
+    xpce.graphics.point(x, y)
+
+rel points(points)
+    xpce.graphics.points(points)
+
+rel circle(mode, x, y, radius)
+    xpce.graphics.circle(mode, x, y, radius)
+
+rel ellipse(mode, x, y, radiusX, radiusY)
+    xpce.graphics.ellipse(mode, x, y, radiusX, radiusY)
+
+rel arc(mode, arcType, x, y, radius, angle1, angle2)
+    xpce.graphics.arc(mode, arcType, x, y, radius, angle1, angle2)
+
+rel polygon(mode, points)
+    xpce.graphics.polygon(mode, points)
+
+rel print(text, x, y)
+    xpce.graphics.print(text, x, y)
+
+rel printf(text, x, y, width, align)
+    xpce.graphics.printf(text, x, y, width, align)
+
+// Result last, so newFont(...) also works nested in value position.
+rel newFont(size, family, style, font)
+    xpce.graphics.newFont(size, family, style, font)
+
+rel setFont(font)
+    xpce.graphics.setFont(font)
+
+rel getFont(font)
+    xpce.graphics.getFont(font)
+
+rel getDimensions(size)
+    xpce.graphics.getDimensions(size)
+
+rel getWidth(w)
+    xpce.graphics.getWidth(w)
+
+rel getHeight(h)
+    xpce.graphics.getHeight(h)
+
+rel push()
+    xpce.graphics.push()
+
+rel pop()
+    xpce.graphics.pop()
+
+rel origin()
+    xpce.graphics.origin()
+
+rel translate(x, y)
+    xpce.graphics.translate(x, y)
+
+rel rotate(angle)
+    xpce.graphics.rotate(angle)
+
+rel scale(x, y)
+    xpce.graphics.scale(x, y)
+
+rel shear(x, y)
+    xpce.graphics.shear(x, y)
+
+rel setLineWidth(width)
+    xpce.graphics.setLineWidth(width)
+
+rel getLineWidth(w)
+    xpce.graphics.getLineWidth(w)
+
+rel setLineStyle(style)
+    xpce.graphics.setLineStyle(style)
+
+rel getLineStyle(style)
+    xpce.graphics.getLineStyle(style)
+
+rel setScissor(x, y, width, height)
+    xpce.graphics.setScissor(x, y, width, height)
+
+rel clearScissor()
+    xpce.graphics.clearScissor()
+
+rel getScissor(scissor)
+    xpce.graphics.getScissor(scissor)
+
+rel draw(image, x, y)
+    xpce.graphics.draw(image, x, y)
+
+rel refresh()
+    xpce.graphics.refresh()
+
+// ---- Input ----
+//
+// The keyboard and the mouse are separate tables, so `isDown' can mean the
+// keyboard under sp.keyboard and the mouse under sp.mouse.  The combined
+// sp.input carries both: isDown/1 there is the keyboard, isMouseDown/1 and
+// buttonDown/1 are the mouse.
+
+rel isDown(key)
+    xpce.input.isDown(key)
+
+rel isMouseDown(button)
+    xpce.input.isMouseDown(button)
+
+rel getX(x)
+    xpce.input.getX(x)
+
+rel getY(y)
+    xpce.input.getY(y)
+
+rel getPosition(pos)
+    xpce.input.getPosition(pos)
+
+rel buttonDown(button)
+    xpce.input.buttonDown(button)
+
+// ---- Timer ----
+
+rel getTime(time)
+    xpce.timer.getTime(time)
+
+rel getDelta(delta)
+    xpce.timer.getDelta(delta)
+
+rel getFPS(fps)
+    xpce.timer.getFPS(fps)
+
+// ---- Events (PyGame-style queue) ----
+// get/1 drains everything XPCE delivered since the last call.  getType/2
+// drains only one kind.  peek/1 does not drain, and is what the frame tick
+// uses to fire callbacks; a polling program normally wants get/1, because
+// two frames can see the same event otherwise.
+//
+// The event types are: mousemotion, mousedown, mouseup, mousewheel,
+// keydown, keyup, textinput, focus, blur and resize.
+
+rel getEvents(events)
+    xpce.event.get(events)
+
+rel getEventsOf(type, events)
+    xpce.event.getType(type, events)
+
+rel peekEvents(events)
+    xpce.event.peek(events)
+
+// The nested tables mirror the shape of space_xpce's own export, so consumer
+// call sites are unchanged: sp.init, sp.graphics.clear, sp.keyboard.isDown.
+export({
+    init = init,
+    start = start,
+    startCanvas = startCanvas,
+    quit = quit,
+    dispose = dispose,
+    stop = stop,
+    beginFrame = beginFrame,
+    endFrame = endFrame,
+    loadImage = loadImage,
+    graphics = {
+        setBackgroundColor = setBackgroundColor,
+        getBackgroundColor = getBackgroundColor,
+        setColor = setColor,
+        getColor = getColor,
+        clear = clear,
+        rectangle = rectangle,
+        line = line,
+        point = point,
+        points = points,
+        circle = circle,
+        ellipse = ellipse,
+        arc = arc,
+        polygon = polygon,
+        print = print,
+        printf = printf,
+        newFont = newFont,
+        setFont = setFont,
+        getFont = getFont,
+        getDimensions = getDimensions,
+        getWidth = getWidth,
+        getHeight = getHeight,
+        push = push,
+        pop = pop,
+        origin = origin,
+        translate = translate,
+        rotate = rotate,
+        scale = scale,
+        shear = shear,
+        setLineWidth = setLineWidth,
+        getLineWidth = getLineWidth,
+        setLineStyle = setLineStyle,
+        getLineStyle = getLineStyle,
+        setScissor = setScissor,
+        clearScissor = clearScissor,
+        getScissor = getScissor,
+        draw = draw,
+        refresh = refresh
+    },
+    input = {
+        isDown = isDown,
+        isMouseDown = isMouseDown,
+        getX = getX,
+        getY = getY,
+        getPosition = getPosition,
+        buttonDown = buttonDown
+    },
+    keyboard = {
+        isDown = isDown,
+        getX = getX,
+        getY = getY,
+        getPosition = getPosition,
+        buttonDown = buttonDown
+    },
+    mouse = {
+        isDown = isMouseDown,
+        getX = getX,
+        getY = getY,
+        getPosition = getPosition,
+        buttonDown = buttonDown
+    },
+    timer = {
+        getTime = getTime,
+        getDelta = getDelta,
+        getFPS = getFPS
+    },
+    event = {
+        get = getEvents,
+        getType = getEventsOf,
+        peek = peekEvents
+    }
+})
+
+    get_time(Now),
+    get(P, time, T0),
+    get(P, max_dt, MaxDt),

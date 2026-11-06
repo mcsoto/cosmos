@@ -23,7 +23,7 @@ tictactoe2([]):-cosmos_require("space",A),cosmos_require("table",B),cosmos_requi
 'tictactoe2::$value_clear'(upvals([A])):-'tictactoe2::clear'(A).
 'tictactoe2::$closure_0.0'([A],upvals([])):-r_lt(A,3.0).
 'tictactoe2::$closure_2.0'([A],upvals([])):-r_lt(A,3.0).
-'tictactoe2::$closure_3.0'([A],B,upvals([C,D,E,F,G,H,I])):-(((r_mul(C,I,J),r_mul(A,H,K),cosmos_method(G,"rectBorder",[J,K,I,H])),cosmos_method(D,"get",[C,A,L]),(L="x",r_mul(C,I,M),add_(M,5.0,N),r_mul(A,H,O),add_(O,5.0,P),cosmos_method(G,"drawImage",[F,N,P]);dif(L,"x"),(L="o",r_mul(C,I,Q),add_(Q,5.0,R),r_mul(A,H,S),add_(S,5.0,T),cosmos_method(G,"drawImage",[E,R,T]);dif(L,"o"),true))),(add_(A,1.0,U),V=U),W=V),B=[V],W=V.
+'tictactoe2::$closure_3.0'([A],B,upvals([C,D,E,F,G,H,I])):-(((r_mul(C,I,J),r_mul(A,H,K),cosmos_method(G,"rectBorder",[J,K,I,H])),cosmos_method(D,"get",[C,A,L]),if_(L="x",(r_mul(C,I,M),add_(M,5.0,N),r_mul(A,H,O),add_(O,5.0,P),cosmos_method(G,"drawImage",[F,N,P])),if_(L="o",(r_mul(C,I,Q),add_(Q,5.0,R),r_mul(A,H,S),add_(S,5.0,T),cosmos_method(G,"drawImage",[E,R,T])),true))),(add_(A,1.0,U),V=U),W=V),B=[V],W=V.
 'tictactoe2::$closure_1.0'([A],B,upvals([C,D,E,F,G,H])):-((I=0.0,cosmos_while(clos(upvals([]),'tictactoe2::$closure_2.0'),clos(upvals([A,C,D,E,F,G,H]),'tictactoe2::$closure_3.0'),[I],[J])),(add_(A,1.0,K),L=K),M=L),B=[L],M=L.
 'tictactoe2::draw'(A,B,C,D,E,F):-cosmos_callable("function","draw",'tictactoe2::$impl_draw'(A,B,C,D,E,F)).
 'tictactoe2::$value_draw'(A,upvals([B,C,D,E,F])):-'tictactoe2::draw'(A,B,C,D,E,F).
@@ -32,7 +32,7 @@ tictactoe2([]):-cosmos_require("space",A),cosmos_require("table",B),cosmos_requi
 'tictactoe2::move'(A,B,C,D,E):-cosmos_callable("function","move",'tictactoe2::$impl_move'(A,B,C,D,E)).
 'tictactoe2::$value_move'(A,B,C,D,upvals([E])):-'tictactoe2::move'(A,B,C,D,E).
 'tictactoe2::$closure_4.0'(A,B,C,D,upvals([E,F])):-'tictactoe2::find_tile'(A,G,F),'tictactoe2::find_tile'(B,H,F),print([G,H]),'tictactoe2::move'(G,H,C,D,E).
-'tictactoe2::$closure_5.0'(A,B,C,upvals([])):-A="escape",system:halt;dif(A,"escape"),C=B.
+'tictactoe2::$closure_5.0'(A,B,C,upvals([])):-if_(A="escape",system:halt,C=B).
 'tictactoe2::$closure_6.0'(A,A,upvals([B,C,D,E,F])):-'tictactoe2::clear'(D),G=A,cosmos_method(D,"setRGB",[0.0,0.0,0.0]),'tictactoe2::draw'(G,B,C,D,E,F),cosmos_method(D,"refresh",[]).
 :- initialization(cosmos_entry_main, main).
 cosmos_entry_root(Root) :-
@@ -68,8 +68,17 @@ cosmos_entry_main :-
       ; ensure_loaded(Runtime), ensure_loaded(Operations)
       ),
       directory_file_path(Root, '../libs/space_xpce_prolog.pl', Backend), ensure_loaded(Backend),
+      (   (   nb_current(cosmos_profile_requested,true),
+              directory_file_path(Root, '../compiler/platform/profile.pl', Profiler),
+              exists_file(Profiler),
+              ensure_loaded(Profiler),
+              cosmos_profile:cosmos_profile_start()
+          )
+      ->  true
+      ;   true
+      ),
       directory_file_path(Root, ?, SourceTemplate),
       atomic_list_concat([SourceTemplate,LibsTemplate,UserLibsTemplate,?],;,Path),
       nb_setval(path,Path),
-      Arguments = [Executable|RawArguments], tictactoe2([])
+      setup_call_cleanup(true,(Arguments = [Executable|RawArguments], tictactoe2([])),cosmos_profile_finish)
     ).

@@ -1,0 +1,11 @@
+
+//'expression'
+functor(Num, Functor)
+
+functor(Op, Functor)
+
+rel parse_value(l,tail,f) //str, number or -number
+	case
+		l=[Token(_,'-',_), Token(a,'number',_) | tail] and f=Num('-'+a)
+	case
+		l=[Token(a,'number',_)| tail] and f=Num(a)

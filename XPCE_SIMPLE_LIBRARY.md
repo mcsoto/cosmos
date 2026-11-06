@@ -114,8 +114,11 @@ Semantics that matter:
 ## 5. API
 
 Everything hangs off the `sp` table. `sp.graphics`, `sp.input`, `sp.keyboard`,
-`sp.mouse` and `sp.timer` are sub-tables; `input`, `keyboard` and `mouse` are
-the same table under three names, matching the browser Canvas vocabulary.
+`sp.mouse`, `sp.event` and `sp.timer` are sub-tables. `sp.input` is the
+combined table — it carries the keyboard's `isDown/1` under that name and the
+mouse's under `isMouseDown/1` — while `sp.keyboard` and `sp.mouse` are the
+specialised ones. `sp.input.isDown/1` is the keyboard and `sp.input.buttonDown/1`
+is the mouse.
 
 ### Top level
 
@@ -126,33 +129,37 @@ the same table under three names, matching the browser Canvas vocabulary.
 | `sp.startCanvas(fps, callbacks, state)` | Fixed-fps loop; `intervalMs = 1000/fps`. |
 | `sp.quit()` | End the process. Same as closing the window. |
 | `sp.dispose()` | Currently just another name for `quit`. |
+| `sp.stop()` | The Love2D name for `quit`. |
+| `sp.beginFrame()` / `sp.endFrame()` | Frame markers. XPCE presents every drawing call at once, so these do nothing. |
 | `sp.loadImage(source, name)` | Loads via XPCE `image/1`; see §6. |
 
 ### `sp.graphics`
 
 | Call | Notes |
 | --- | --- |
-| `setBackgroundColor(c)` / `getBackgroundColor(c)` | Getter returns the fixed `#000000`. |
-| `setColor(c)` / `getColor(c)` | Current ink; sticky until changed. Getter returns `#ffffff`. |
+| `setBackgroundColor(c)` / `getBackgroundColor(c)` | The background, tracked separately from the ink. |
+| `setColor(c)` / `getColor(c)` | Current ink; sticky until changed. |
 | `clear(c)` | Paint background and clear. |
 | `rectangle(mode, x, y, w, h)` | |
 | `line(points)` | Flat `[x1,y1,x2,y2,…]`. |
+| `point(x, y)` | A single dot. |
+| `points(points)` | Several dots, as one flat list of coordinates. |
 | `circle(mode, x, y, r)` | `r` is a **radius**. |
 | `ellipse(mode, x, y, rx, ry)` | `rx`/`ry` are **radii**. |
-| `arc(mode, arcType, x, y, r, angle1, angle2)` | Angles in radians. |
+| `arc(mode, arcType, x, y, r, angle1, angle2)` | Angles in radians; `arcType` is `'open'` or `'pie'`. |
 | `polygon(mode, points)` | Flat `[x1,y1,…]`; filled by even-odd scanline. |
 | `print(text, x, y)` | |
-| `printf(text, x, y, width, align)` | `width`/`align` ignored. |
+| `printf(text, x, y, width, align)` | Text in a box `width` pixels wide, aligned `'left'`, `'center'` or `'right'`. |
 | `newFont(size, family, style, font)` | Returns a font handle; result is the **last** parameter. |
 | `setFont(font)` / `getFont(font)` | |
-| `getDimensions(size)` | `{width, height}`. |
-| `getWidth(w)` / `getHeight(h)` | |
+| `getDimensions(size)` | `{width, height}` of the window as it actually is. |
+| `getWidth(w)` / `getHeight(h)` | The real window size. |
 | `push()` / `pop()` | Transform stack. |
 | `origin()` | Reset the transform. |
 | `translate(x, y)` / `rotate(angle)` / `scale(x, y)` | Scale also affects shape sizes. |
-| `shear(x, y)` | No-op. |
+| `shear(x, y)` | Shear transform; sheared rectangles are drawn as polygons. |
 | `setLineWidth(w)` / `getLineWidth(w)` | |
-| `setLineStyle(style)` | No-op. |
+| `setLineStyle(style)` / `getLineStyle(style)` | Recorded and read back; XPCE has no rough/smooth pen of its own. |
 | `setScissor(x, y, w, h)` / `clearScissor()` / `getScissor(scissor)` | Recorded, **not enforced**. |
 | `draw(image, x, y)` | |
 | `refresh()` | Unnecessary; the loop flushes each frame. |
@@ -161,24 +168,35 @@ the same table under three names, matching the browser Canvas vocabulary.
 
 ### `sp.input` / `sp.keyboard` / `sp.mouse`
 
-These read the state the event layer maintains, so they only report real
-values after the first input event has arrived (see `sp.event`).
+`sp.keyboard.isDown/1` **polls** XPCE's keyboard device, so it answers from the
+hardware and is correct even if the app missed a press or release. `sp.mouse`
+reads the state the event layer maintains, so the pointer only reports a real
+position after the first mouse event has arrived (see `sp.event`).
 
 | Call | Notes |
 | --- | --- |
-| `isDown(key)` | Succeeds while the named key is held. |
+| `isDown(key)` | Succeeds while the named key is held. Under `sp.keyboard` and `sp.input` this is the keyboard. |
+| `isMouseDown(button)` | Succeeds while that button is held. Under `sp.mouse`, `isDown/1` is the same thing. |
 | `getX(x)` / `getY(y)` / `getPosition(pos)` | Last known pointer position. |
-| `buttonDown(button)` | Succeeds while that button is held. Buttons are `1` left, `2` middle, `3` right. |
+| `buttonDown(button)` | Succeeds while that button is held. Buttons are `1` left, `2` right, `3` middle. |
+
+Key names are the lower-case Love2D ones — `'a'`, `'space'`, `'escape'`,
+`'left'`, `'return'`, `'f1'` — and the DOM aliases (`'arrowleft'`,
+`'arrowup'`, …) are accepted as well. Mouse buttons may be given either as the
+number above or as the name `'left'`, `'right'`, `'middle'`.
+
+Held keys and buttons are cleared when the window loses the keyboard focus, so
+a key that was down at that moment does not stay "down" for ever.
 
 ### `sp.event` - the PyGame-style queue
 
-XPCE has no polling API in this build, so input arrives as callbacks into the
-backend and is queued here.
+Input arrives as callbacks into the backend and is queued here; `isDown/1` is
+the exception and polls the keyboard device directly.
 
 | Call | Notes |
 | --- | --- |
 | `get(events)` | Drains everything delivered since the last call. |
-| `getType(type, events)` | Drains only events of one kind. |
+| `getType(type, events)` | Drains only events of one kind; the others stay queued. |
 | `peek(events)` | Does **not** drain. This is what the frame tick uses. |
 
 Each event is a table with at least a `type` field:
@@ -188,8 +206,13 @@ Each event is a table with at least a `type` field:
 | `'mousemotion'` | `posx` `posy` `x` `y` `button` `clicks` `mod` |
 | `'mousedown'` | as above |
 | `'mouseup'` | as above |
-| `'mousewheel'` | as above, plus `wheel` (always `0` - see section 6) |
+| `'mousewheel'` | as above, plus `wheel` (the scroll amount in notches) |
 | `'keydown'` | `key` `char` `mod` |
+| `'keyup'` | `key` `mod` — the release of the matching key-down |
+| `'textinput'` | `text` — the character a key press produced |
+| `'focus'` | the window gained the keyboard focus |
+| `'blur'` | the window lost it |
+| `'resize'` | `width` `height` |
 
 A field an event does not carry reads back as `null` rather than failing, so
 `ev.posx` on a keydown is harmless.
@@ -197,7 +220,8 @@ A field an event does not carry reads back as `null` rather than failing, so
 `key` is the lower-case name (`'a'`, `'space'`, `'escape'`, `'left'`, `'f1'`),
 `char` is the character as typed, and `mod` is any of `"s"` (shift), `"c"`
 (control), `"m"` (meta). Shift is already folded into the character, so
-shift+A arrives as `key='a'`, `char='A'`, `mod='s'`.
+shift+A arrives as `key='a'`, `char='A'`, `mod='s'`. A `'keyup'` carries the
+same `key` name as the `'keydown'` it ends.
 
 ```cosmos
 rel update(_dt, s, s2)
@@ -205,9 +229,6 @@ rel update(_dt, s, s2)
     list.each(events, show, _out)   // each/3 calls p(index, element, result)
     s2 = s
 ```
-
-There is **no `'keyup'`**: this XPCE build's `@event_tree` has no release
-events under `keyboard/`, so only presses are ever delivered.
 
 ### Callbacks (Love2D style)
 
@@ -228,9 +249,9 @@ with `get()` decides which frame sees which event.
 
 | Call | Notes |
 | --- | --- |
-| `getTime(time)` | Seconds. |
-| `getDelta(delta)` | Seconds since the previous frame. |
-| `getFPS(fps)` | |
+| `getTime(time)` | Seconds since the backend was created. |
+| `getDelta(delta)` | Milliseconds per frame (the update interval). |
+| `getFPS(fps)` | The corresponding frame rate. |
 
 ## 6. Drawing conventions
 
@@ -244,10 +265,15 @@ with `get()` decides which frame sees which event.
 - **`circle` and `ellipse` take radii**, whereas raw XPCE's `circle/1` and
   `ellipse/2` take a bounding-box size. This is the one place the API
   deliberately departs from XPCE so the numbers mean what they say.
+- **`arc` also takes a radius, in radians**, while raw XPCE's `arc/3` takes a
+  radius in degrees and the *size* of the sweep rather than its end angle. The
+  Space angles are converted on the way in.
 - **`newFont` returns its result last**, which is what lets
   `g.setFont(g.newFont(24,'sans','normal'))` work in value position.
 - **Transforms** apply to coordinates *and* to shape sizes, so `scale` inside a
-  `push`/`pop` pair magnifies what you draw.
+  `push`/`pop` pair magnifies what you draw. `shear` is part of the same stack;
+  a sheared rectangle is drawn as a polygon, since XPCE has no sheared
+  rectangle.
 
 ## 7. Compile-time checking
 
@@ -398,14 +424,14 @@ lands on the right predicate. Nothing to work around.
 
 Known and deliberate for this version:
 
-- **Input arrives as events, not polling.** `sp.event.get()` drains the queue
-  and `sp.input` reads the state it maintains, so `isDown/1`, `buttonDown/1`
-  and `getX`/`getY`/`getPosition` only report real values after the first
-  event arrives. There is no `'keyup'`, and `wheel` is always `0`. See the
-  event section above.
+- **Keyboard state is polled, mouse state is event-driven.** `isDown/1` asks
+  XPCE's keyboard device, so it is accurate at any time. `buttonDown/1` and
+  `getX`/`getY`/`getPosition` read the state the event layer maintains, so the
+  pointer only reports a real position after the first mouse event arrives.
+  See the input section above.
 - **`setScissor` records but does not clip.**
-- **`shear` and `setLineStyle` are no-ops**; `getLineStyle`-style accessors do
-  not exist.
+- **`setLineStyle` records but does not change the pen** — XPCE draws every
+  line in one style. `getLineStyle` reads the recorded value back.
 - **Rotating an ellipse** moves its centre; the shape stays axis-aligned.
 - **No window title control.** The title is always `Cosmos Space`.
 - **Image loading is format-limited and fails silently** — see §6.

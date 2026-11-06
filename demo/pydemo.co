@@ -1,0 +1,37 @@
+Viability of a setup,
+init ship=object.create(Ship)
+while(true)
+ rel update()
+   next ship.x += 1 //update only ship object, others unchanged
+ rel draw() ship.draw()
+ for e in events.get() ...
+//
+rel events.get(l)
+	true
+	
+init ship = object.create(Ship)
+
+rel update()
+    next ship.x += 1
+
+rel draw()
+    ship.draw()
+
+while(true)
+    for e in events.get()
+        handle(e)
+
+    update()
+    draw()
+	
+//
+init ship = object.create(Ship)
+
+rel update()
+    next ship.x += 1
+
+rel draw()
+    ship.draw()
+
+rel event(e)
+    ...

@@ -1,0 +1,52 @@
+// Canvas renderer for the declarative command tables made by ui.co.
+//
+// ui.panel/ui.rect/ui.label/ui.button create data; ui_canvas.draw or drawAll
+// consumes that data through the Space canvas API.  The adapter contains no
+// layout policy, so applications can compose their own command lists.
+//
+// The renderer draws through the native Space (XPCE) API: the ink colour is
+// set first, then the shape is filled or the text printed.  The old `canvas'
+// receiver only existed under the JavaScript host, so under XPCE it resolved
+// to nothing and the window stayed blank.
+
+require('ui', ui)
+require('space', sp)
+
+rel draw(command)
+    if(command.kind='panel')
+        sp.graphics.setColor(command.color)
+        sp.graphics.rectangle('fill',command.x,command.y,command.width,command.height)
+    elseif(command.kind='rect')
+        sp.graphics.setColor(command.color)
+        sp.graphics.rectangle('fill',command.x,command.y,command.width,command.height)
+    elseif(command.kind='label')
+        sp.graphics.setColor(command.color)
+        sp.graphics.print(command.text,command.x,command.y)
+    elseif(command.kind='button')
+        draw_button(command)
+    else
+        true
+
+rel draw_button(command)
+    if(command.hovered=1)
+        color='#3a675b'
+    else
+        color='#263f4a'
+    sp.graphics.setColor(color)
+    sp.graphics.rectangle('fill',command.x,command.y,command.width,command.height)
+    sp.graphics.setColor('#e6edf7')
+    sp.graphics.print(command.text,command.x+10,command.y+8)
+
+rel draw_all(commands)
+    if(commands=[])
+        true
+    else
+        commands=[command|tail]
+        draw(command)
+        draw_all(tail)
+
+t={
+    'draw'=draw
+    'drawAll'=draw_all
+}
+export(t)

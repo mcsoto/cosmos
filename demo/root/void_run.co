@@ -1,0 +1,202 @@
+// VOID//RUN — collect every shard, avoid the sentry fields.
+// Keys: arrows to move, R to restart after a run ends.
+require('space', sp)
+require('math', math)
+
+functor(Won, Functor)
+
+cols=16
+rows=10
+cell=32
+top=42
+width=cols*cell
+height=rows*cell+top
+tick_ms=80
+
+initial={
+    x=1 and y=1
+    c1=0 and c2=0 and c3=0 and c4=0
+    score=0 and lives=3 and moves=0
+    game_over=0 and win=0
+}
+
+rel same(x1,y1,x2,y2)
+    x1=x2 and y1=y2
+
+rel wall(x,y)
+    (x=4 and y>=1 and y<=6) or
+    (x=8 and y>=4 and y<=10) or
+    (x=12 and y>=1 and y<=6) or
+    (y=8 and x>=2 and x<=5) or
+    (y=3 and x>=9 and x<=11)
+
+rel sentry(x,y)
+    (x=6 and y=2) or
+    (x=10 and y=7) or
+    (x=14 and y=4) or
+    (x=3 and y=9)
+
+rel copy_state(s,s2,x,y,c1,c2,c3,c4,score,lives,moves,game_over,win)
+    s2={x=x and y=y and c1=c1 and c2=c2 and c3=c3 and c4=c4 and score=score and lives=lives and moves=moves and game_over=game_over and win=win}
+
+rel collect(x,y,s,c1,c2,c3,c4,score)
+    if(same(x,y,2,6) and s.c1=0)
+        c1=1 and c2=s.c2 and c3=s.c3 and c4=s.c4 and score=s.score+1
+    elseif(same(x,y,6,9) and s.c2=0)
+        c1=s.c1 and c2=1 and c3=s.c3 and c4=s.c4 and score=s.score+1
+    elseif(same(x,y,10,2) and s.c3=0)
+        c1=s.c1 and c2=s.c2 and c3=1 and c4=s.c4 and score=s.score+1
+    elseif(same(x,y,15,8) and s.c4=0)
+        c1=s.c1 and c2=s.c2 and c3=s.c3 and c4=1 and score=s.score+1
+    else
+        c1=s.c1 and c2=s.c2 and c3=s.c3 and c4=s.c4 and score=s.score
+
+rel move(dx,dy,s,s2)
+    if(s.game_over=1)
+        s2=s
+    elseif(s.win=1)
+        s2=s
+    else
+        nx=s.x+dx
+        ny=s.y+dy
+        if(nx<1 or nx>cols or ny<1 or ny>rows)
+            s2=s
+        elseif(wall(nx,ny))
+            s2=s
+        elseif(sentry(nx,ny))
+            if(s.lives<=1)
+                copy_state(s,s2,1,1,s.c1,s.c2,s.c3,s.c4,s.score,0,s.moves+1,1,0)
+            else
+                copy_state(s,s2,1,1,s.c1,s.c2,s.c3,s.c4,s.score,s.lives-1,s.moves+1,0,0)
+        else
+            collect(nx,ny,s,c1,c2,c3,c4,score)
+            if(c1=1 and c2=1 and c3=1 and c4=1)
+                copy_state(s,s2,nx,ny,c1,c2,c3,c4,score,s.lives,s.moves+1,0,1)
+            else
+                copy_state(s,s2,nx,ny,c1,c2,c3,c4,score,s.lives,s.moves+1,0,0)
+
+rel handle_key(s,key,s2)
+    if(key='up')
+        move(0,-1,s,s2)
+    elseif(key='down')
+        move(0,1,s,s2)
+    elseif(key='left')
+        move(-1,0,s,s2)
+    elseif(key='right')
+        move(1,0,s,s2)
+    elseif(key='r')
+        s2=initial
+    else
+        s2=s
+
+// The XPCE backend has no `keypressed` callback name: input is polled from
+// the event queue inside update, and handle_key is fed from it, one key at a
+// time, threading the state through the keys.
+//
+// The queue is taken in one go and sorted out here.  getType/2 would keep
+// the events it was not asked for, and this demo never looks at them, so
+// they would pile up for ever.
+rel update(s,s2)
+    sp.event.get(events)
+    apply_events(events,s,s2)
+
+// Apply every event of this frame to the running state.
+rel apply_events(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[ev|rest]
+        kind=ev.type
+        if(kind='keydown')
+            handle_key(s,ev.key,s1)
+        else
+            s1=s
+        apply_events(rest,s1,s2)
+
+rel draw_tile(x,y,s)
+    px=(x-1)*cell
+    py=top+(y-1)*cell
+    if(math.mod(x+y,2,0))
+        sp.graphics.setColor('#101b2b')
+        sp.graphics.rectangle('fill',px+1,py+1,cell-2,cell-2)
+    else
+        sp.graphics.setColor('#0d1726')
+        sp.graphics.rectangle('fill',px+1,py+1,cell-2,cell-2)
+    if(wall(x,y))
+        sp.graphics.setColor('#253d56')
+        sp.graphics.rectangle('fill',px+3,py+3,cell-6,cell-6)
+        sp.graphics.setColor('#31506a')
+        sp.graphics.rectangle('fill',px+8,py+8,cell-16,cell-16)
+    if(sentry(x,y))
+        sp.graphics.setColor('#d9515e')
+        sp.graphics.rectangle('fill',px+6,py+6,cell-12,cell-12)
+        sp.graphics.setColor('#ffb35c')
+        sp.graphics.rectangle('fill',px+12,py+12,cell-24,cell-24)
+
+rel draw_shard(x,y,collected)
+    if(collected=0)
+        px=(x-1)*cell
+        py=top+(y-1)*cell
+        sp.graphics.setColor('#f5d06f')
+        sp.graphics.rectangle('fill',px+11,py+5,10,22)
+        sp.graphics.setColor('#ffe7a3')
+        sp.graphics.rectangle('fill',px+6,py+11,20,10)
+
+rel draw_player(s)
+    px=(s.x-1)*cell
+    py=top+(s.y-1)*cell
+    sp.graphics.setColor('#59d7e8')
+    sp.graphics.rectangle('fill',px+5,py+5,cell-10,cell-10)
+    sp.graphics.setColor('#d8fbff')
+    sp.graphics.rectangle('fill',px+10,py+10,cell-20,cell-20)
+    sp.graphics.setColor('#17263c')
+    sp.graphics.rectangle('fill',px+13,py+13,6,6)
+
+rel draw_panel(s)
+    sp.graphics.setColor('#08111e')
+    sp.graphics.rectangle('fill',0,0,width,top)
+    sp.graphics.setColor('#59d7e8')
+    sp.graphics.rectangle('fill',0,top-3,width,3)
+    sp.graphics.setColor('#12283a')
+    sp.graphics.rectangle('fill',10,10,122,20)
+    sp.graphics.rectangle('fill',138,10,90,20)
+    sp.graphics.rectangle('fill',236,10,110,20)
+    sp.graphics.rectangle('fill',354,10,90,20)
+    sp.graphics.rectangle('fill',452,10,50,20)
+    if(s.lives>=1)
+        sp.graphics.setColor('#ff7b70')
+        sp.graphics.rectangle('fill',460,15,8,10)
+    if(s.lives>=2)
+        sp.graphics.rectangle('fill',472,15,8,10)
+    if(s.lives>=3)
+        sp.graphics.rectangle('fill',484,15,8,10)
+
+rel draw(s)
+    sp.graphics.setColor('#08111e')
+    sp.graphics.rectangle('fill',0,0,width,height)
+    draw_panel(s)
+    for(init y=1;y<=rows;next y=y+1;)
+        for(init x=1;x<=cols;next x=x+1;)
+            draw_tile(x,y,s)
+    draw_shard(2,6,s.c1)
+    draw_shard(6,9,s.c2)
+    draw_shard(10,2,s.c3)
+    draw_shard(15,8,s.c4)
+    draw_player(s)
+    if(s.game_over=1)
+        sp.graphics.setColor('#3d1a2a')
+        sp.graphics.rectangle('fill',176,190,160,74)
+        sp.graphics.setColor('#ff7b70')
+        sp.graphics.rectangle('fill',188,202,136,4)
+        sp.graphics.rectangle('fill',204,222,104,5)
+    elseif(s.win=1)
+        sp.graphics.setColor('#193c3c')
+        sp.graphics.rectangle('fill',160,190,192,74)
+        sp.graphics.setColor('#7dffd1')
+        sp.graphics.rectangle('fill',176,202,160,4)
+        sp.graphics.rectangle('fill',192,222,128,5)
+
+sp.init(width,height)
+sp.start(tick_ms,{
+    update=update and draw=draw
+},initial)

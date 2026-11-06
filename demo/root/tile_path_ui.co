@@ -1,0 +1,114 @@
+// Tile Path UI — a compact Space integration test for pathfinder + ui_canvas.
+// Click a tile to move the goal. Click Reset to restore the initial route.
+
+require('space', sp)
+require('pathfinder', pathfinder)
+require('ui', ui)
+require('ui_canvas', ui_canvas)
+
+cols=12
+rows=8
+tile=42
+width=cols*tile
+height=rows*tile+58
+fps=30
+
+initial={player_x=2 and player_y=4 and goal_x=10 and goal_y=4}
+
+rel state(player_x,player_y,goal_x,goal_y,result)
+    result={player_x=player_x and player_y=player_y and goal_x=goal_x and goal_y=goal_y}
+
+rel draw_tiles(x,y)
+    if(y>rows)
+        true
+    elseif(x>cols)
+        draw_tiles(1,y+1)
+    else
+        px=(x-1)*tile
+        py=58+(y-1)*tile
+        parity=(x+y)%2
+        if(parity=0)
+            sp.graphics.setColor('#142534')
+            sp.graphics.rectangle('fill',px,py,tile-1,tile-1)
+        else
+            sp.graphics.setColor('#10202e')
+            sp.graphics.rectangle('fill',px,py,tile-1,tile-1)
+        draw_tiles(x+1,y)
+
+rel draw_path(path)
+    if(path=[])
+        true
+    else
+        path=[point|tail]
+        px=(point.x-1)*tile+13
+        py=58+(point.y-1)*tile+13
+        sp.graphics.setColor('#4a8a74')
+        sp.graphics.rectangle('fill',px,py,16,16)
+        draw_path(tail)
+
+rel draw(s)
+    sp.graphics.setColor('#09131f')
+    sp.graphics.rectangle('fill',0,0,width,height)
+    draw_tiles(1,1)
+    pathfinder.find(s.player_x,s.player_y,s.goal_x,s.goal_y,path,cost)
+    draw_path(path)
+    sp.graphics.setColor('#67ddb4')
+    sp.graphics.rectangle('fill',(s.player_x-1)*tile+7,58+(s.player_y-1)*tile+7,28,28)
+    sp.graphics.setColor('#ffbd6c')
+    sp.graphics.rectangle('fill',(s.goal_x-1)*tile+7,58+(s.goal_y-1)*tile+7,28,28)
+    ui.panel(0,0,width,54,'#162b3a',panel)
+    ui.label('Tile Path UI',12,11,'#e7f5fa',title)
+    ui.label('Click a tile to route there',12,31,'#9bb7c6',help)
+    ui.button('reset','Reset',width-82,11,70,32,-1,-1,reset_button,_)
+    ui_canvas.drawAll([panel,title,help,reset_button])
+
+// The XPCE backend has no `mouseup' callback name: the click is polled from
+// the event queue inside update, and the mouseup handler below is fed from
+// it, one event at a time, threading the state through it.
+rel update(s,s2)
+    sp.event.get(events)
+    apply_clicks(events,s,s2)
+
+// Apply every mouse release of this frame to the running state.
+rel apply_clicks(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[ev|rest]
+        if(ev.type='mouseup')
+            mouseup(ev.x,ev.y,s,s1)
+        else
+            s1=s
+        apply_clicks(rest,s1,s2)
+
+rel inside_board(x,y,inside)
+    if(x<1)
+        inside=0
+    elseif(x>cols)
+        inside=0
+    elseif(y<1)
+        inside=0
+    elseif(y>rows)
+        inside=0
+    else
+        inside=1
+
+rel mouseup(mx,my,s,s2)
+    ui.button('reset','Reset',width-82,11,70,32,mx,my,_,clicked)
+    if(clicked=1)
+        s2=initial
+    elseif(my<58)
+        s2=s
+    else
+        x=int(mx/tile)+1
+        y=int((my-58)/tile)+1
+        inside_board(x,y,inside)
+        if(inside=0)
+            s2=s
+        else
+            state(s.player_x,s.player_y,x,y,s2)
+
+sp.init(width,height)
+sp.startCanvas(fps,{
+    update=update and draw=draw
+},initial)

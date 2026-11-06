@@ -1,22 +1,34 @@
 // Space XPCE Backend - Native graphics API for Cosmos
 // Implements the Space Canvas API using SWI-Prolog's XPCE toolkit
 // Uses pl:: to call the predicates in libs/space_xpce_prolog.pl
+//
+// The backend talks to XPCE 10.0.0.  Two of its features matter most here:
+//
+//   * the keyboard INPUT DEVICE (@keyboard_device), which answers whether a
+//     key is held down right now.  That is what keyboard.isDown/1 polls, so
+//     the answer comes from the hardware rather than from the events, and a
+//     key that was pressed while another window had the focus does not stay
+//     stuck "down" for ever.
+//
+//   * the key RELEASE event, which XPCE delivers as an event whose id is the
+//     atom key_up.  It arrives as a "keyup" in the event queue, next to the
+//     "keydown" that matches it.
 
 // Graphics module
 graphics = {
     // Background color
     rel setBackgroundColor(color)
-        pl::space_xpce_set_color(_, color)
+        pl::space_xpce_set_background_color(_, color)
 
     rel getBackgroundColor(color)
-        color = '#000000'
+        pl::space_xpce_get_background_color(_, color)
 
     // Foreground color
     rel setColor(color)
         pl::space_xpce_set_color(_, color)
 
     rel getColor(color)
-        color = '#ffffff'
+        pl::space_xpce_get_color(_, color)
 
     // Clear canvas (color required; pass explicit color)
     rel clear(color)
@@ -30,6 +42,14 @@ graphics = {
     rel line(points)
         pl::space_xpce_line(_, points)
 
+    // A single dot.
+    rel point(x, y)
+        pl::space_xpce_point(_, int(x), int(y))
+
+    // Several dots, as one flat list of coordinates.
+    rel points(points)
+        pl::space_xpce_points(_, points)
+
     // Circle
     rel circle(mode, x, y, radius)
         pl::space_xpce_circle(_, mode, int(x), int(y), int(radius))
@@ -38,7 +58,7 @@ graphics = {
     rel ellipse(mode, x, y, radiusX, radiusY)
         pl::space_xpce_ellipse(_, mode, int(x), int(y), int(radiusX), int(radiusY))
 
-    // Arc
+    // Arc.  arcType is 'open' or 'pie'; the angles are radians.
     rel arc(mode, arcType, x, y, radius, angle1, angle2)
         pl::space_xpce_arc(_, mode, arcType, int(x), int(y), int(radius), angle1, angle2)
 
@@ -50,9 +70,10 @@ graphics = {
     rel print(text, x, y)
         pl::space_xpce_print(_, text, int(x), int(y))
 
+    // Text in a box of the given width, aligned in it ('left', 'center' or
+    // 'right').
     rel printf(text, x, y, width, align)
-        // Simplified - just print at position
-        pl::space_xpce_print(_, text, int(x), int(y))
+        pl::space_xpce_printf(_, text, int(x), int(y), width, align)
 
     // Font handle: last param is the out value, so newFont(...) also
     // works nested in value position (e.g. setFont(newFont(...))).
@@ -63,17 +84,19 @@ graphics = {
         pl::space_xpce_set_font(_, font.size, font.family, font.style)
 
     rel getFont(font)
-        font = {size=12 and family='sans' and style='normal'}
+        pl::space_xpce_get_font(_, size, family, style)
+        font = {size=size and family=family and style=style}
 
-    // Dimensions
+    // Dimensions.  These are the size of the window as it actually is.
     rel getDimensions(size)
-        size = {width=640 and height=480}
+        pl::space_xpce_get_dimensions(_, width, height)
+        size = {width=width and height=height}
 
     rel getWidth(w)
-        w = 640
+        pl::space_xpce_get_width(_, w)
 
     rel getHeight(h)
-        h = 480
+        pl::space_xpce_get_height(_, h)
 
     // Transform stack
     rel push()
@@ -95,19 +118,20 @@ graphics = {
         pl::space_xpce_scale(_, x, y)
 
     rel shear(x, y)
-        // Not directly supported in XPCE
-        true
+        pl::space_xpce_shear(_, x, y)
 
     // Line style
     rel setLineWidth(width)
         pl::space_xpce_set_line_width(_, width)
 
     rel getLineWidth(w)
-        w = 1.0
+        pl::space_xpce_get_line_width(_, w)
 
     rel setLineStyle(style)
-        // XPCE doesn't have line style directly
-        true
+        pl::space_xpce_set_line_style(_, style)
+
+    rel getLineStyle(style)
+        pl::space_xpce_get_line_style(_, style)
 
     // Scissor/clipping (recorded; use clearScissor() to reset)
     rel setScissor(x, y, width, height)
@@ -117,8 +141,8 @@ graphics = {
         pl::space_xpce_clear_scissor(_)
 
     rel getScissor(scissor)
-        // Recorded only: XPCE device clip cannot be called safely here.
-        scissor = {x=0 and y=0 and width=640 and height=480}
+        pl::space_xpce_get_scissor(_, x, y, width, height)
+        scissor = {x=x and y=y and width=width and height=height}
 
     // Images
     rel draw(image, x, y)
@@ -128,14 +152,19 @@ graphics = {
         true  // XPCE renders immediately
 }
 
-// Input modules (one rel per name; goal forms for polling)
-input = {
-    // Keyboard: succeeds while the key is held
+// Keyboard module: the key names are the lowercase Love2D ones ('left',
+// 'return', 'space', 'f1', ...).  The DOM aliases ('arrowleft', ...) are
+// accepted as well.
+keyboard = {
+    // Succeeds while the key is held down.
     rel isDown(key)
         pl::space_xpce_keyboard_is_down(_, key, down)
         down = 1
+}
 
-    // Mouse
+// Mouse module
+mouse = {
+    // Position of the pointer, in canvas pixels.
     rel getX(x)
         pl::space_xpce_mouse_get_position(_, x, _)
 
@@ -146,9 +175,41 @@ input = {
         pl::space_xpce_mouse_get_position(_, x, y)
         pos = {x=x and y=y}
 
-    // Mouse button: succeeds while the button is held
+    // Succeeds while the button is held down.  The buttons are numbered the
+    // way the Space API numbers them: 1 left, 2 right, 3 middle.  The names
+    // 'left', 'right' and 'middle' are accepted too.
+    rel isDown(button)
+        pl::space_xpce_mouse_is_down(_, button, down)
+        down = 1
+
+    // The Love2D name of the same thing.
     rel buttonDown(button)
-        pl::space_xpce_mouse_is_down(_, int(button), down)
+        pl::space_xpce_mouse_is_down(_, button, down)
+        down = 1
+}
+
+// The combined table.  Both the keyboard and the mouse are reachable here.
+input = {
+    rel isDown(key)
+        pl::space_xpce_keyboard_is_down(_, key, down)
+        down = 1
+
+    rel isMouseDown(button)
+        pl::space_xpce_mouse_is_down(_, button, down)
+        down = 1
+
+    rel getX(x)
+        pl::space_xpce_mouse_get_position(_, x, _)
+
+    rel getY(y)
+        pl::space_xpce_mouse_get_position(_, _, y)
+
+    rel getPosition(pos)
+        pl::space_xpce_mouse_get_position(_, x, y)
+        pos = {x=x and y=y}
+
+    rel buttonDown(button)
+        pl::space_xpce_mouse_is_down(_, button, down)
         down = 1
 }
 
@@ -164,17 +225,20 @@ timer = {
         pl::space_xpce_get_fps(_, fps)
 }
 
-// PyGame-style event queue.  sp.event.get() drains everything XPCE has
-// delivered since the last call and hands back a list of tables, each with
-// at least a `type` field:
+// get/1 drains everything XPCE has delivered since the last call and
+// hands back a list of tables, each with at least a `type` field.
+// getType/2 drains only the events of one type and leaves the rest
+// queued for the next caller.  The event types and their fields:
 //   mousemotion  posx posy x y button clicks mod
 //   mousedown    + the above
 //   mouseup      + the above
-//   mousewheel   + wheel (always 0 here, see the backend)
+//   mousewheel   + wheel
 //   keydown      key char mod
-// There is no keyup: this XPCE build's @event_tree has no release events
-// under keyboard/ (only ascii/control/printable, function_key, cursor and
-// named_function), so only presses are ever delivered.
+//   keyup        key mod          the release of a key
+//   textinput    text             the character a key press produced
+//   focus        the window gained the keyboard focus
+//   blur         the window lost it
+//   resize       width height
 //
 // get/1 and getType/2 are separate NAMES rather than one overloaded get,
 // because the Cosmos compiler resolves a method by name, not by arity.
@@ -212,6 +276,18 @@ sp = {
     rel dispose()
         pl::space_xpce_dispose(_)
 
+    // End the program the way quit does.  The Love2D name for it.
+    rel stop()
+        pl::space_xpce_stop(_)
+
+    // Frame markers.  XPCE presents every drawing call at once, so these
+    // have nothing to do.
+    rel beginFrame()
+        pl::space_xpce_begin_frame(_)
+
+    rel endFrame()
+        pl::space_xpce_end_frame(_)
+
     // Load image
     rel loadImage(source, name)
         pl::space_xpce_load_image(_, source, name)
@@ -219,8 +295,8 @@ sp = {
     // Graphics, input, timer, events
     'graphics' = graphics
     'input' = input
-    'keyboard' = input
-    'mouse' = input
+    'keyboard' = keyboard
+    'mouse' = mouse
     'timer' = timer
     'event' = event
 }

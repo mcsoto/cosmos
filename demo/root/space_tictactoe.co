@@ -1,0 +1,277 @@
+// Tic-tac-toe - the Space/XPCE port.
+//
+//   cosmos -l demo/tictactoe2.co --xpce
+//
+// Click a square to place your 'o'; the CPU answers with an 'x' in the
+// leftmost free square.  R restarts the game, ESC quits.
+//
+// This demo used to draw through the JS-only `canvas' receiver (which does
+// nothing natively, so the window stayed blank) and to drive the board through
+// the `board' module.  That module cannot be instantiated natively:
+// object.create/1 on it dies with "assoc:insert/5: No rule matches", so the
+// board lives here as a plain list of nine squares inside the state table.
+//
+// The drawing goes through sp.graphics, and the input is polled in the update
+// with sp.event.get/1 - the old `mouseup'/`keypressed' callbacks are never
+// fired by the XPCE backend.
+
+require('space', sp)
+
+tile=50
+span=150
+win_w=600
+win_h=450
+grid_x=225
+grid_y=150
+
+initial={
+    cells=[' ',' ',' ',' ',' ',' ',' ',' ',' '] and
+    turn='o' and over=0 and winner=' ' and
+    message='Your turn - click a square'
+}
+
+// ------------------------------------------------------------- list helpers
+//
+// The board is a list of nine squares, and a list cannot be indexed with
+// `l[i]' in this compiler (that is a table read).  So it is walked by hand.
+
+rel list_nth(l,n,v)
+    if(l = [])
+        v = ' '
+    else
+        l = [h|t]
+        if(n = 0)
+            v = h
+        else
+            n1 = n - 1
+            list_nth(t,n1,v)
+
+rel list_put(l,n,v,out)
+    if(l = [])
+        out = l
+    else
+        l = [h|t]
+        if(n = 0)
+            out = [v|t]
+        else
+            n1 = n - 1
+            list_put(t,n1,v,rest)
+            out = [h|rest]
+
+// ---------------------------------------------------------------- the board
+
+rel cell_index(x,y,i)
+    i = x + y * 3
+
+rel mark_pos(n,x,y)
+    x = n % 3
+    y = int(n / 3)
+
+rel set_cell(cells,x,y,ch,cells2)
+    cell_index(x,y,i)
+    list_put(cells,i,ch,cells2)
+
+rel copy_state(s,s2,cells,turn,over,winner,message)
+    s2={cells=cells and turn=turn and over=over and winner=winner and message=message}
+
+// Is the square (x,y) taken by one of the three given indices?
+rel three(cells,i1,i2,i3,piece,flag)
+    list_nth(cells,i1,a)
+    list_nth(cells,i2,b)
+    list_nth(cells,i3,c)
+    if(a = piece and b = piece and c = piece)
+        flag = 1
+    else
+        flag = 0
+
+rel check_win(cells,piece,flag)
+    three(cells,0,1,2,piece,w1)
+    three(cells,3,4,5,piece,w2)
+    three(cells,6,7,8,piece,w3)
+    three(cells,0,3,6,piece,w4)
+    three(cells,1,4,7,piece,w5)
+    three(cells,2,5,8,piece,w6)
+    three(cells,0,4,8,piece,w7)
+    three(cells,2,4,6,piece,w8)
+    if(w1 = 1 or w2 = 1 or w3 = 1 or w4 = 1 or w5 = 1 or w6 = 1 or w7 = 1 or w8 = 1)
+        flag = 1
+    else
+        flag = 0
+
+rel has_empty(cells,flag)
+    if(cells = [])
+        flag = 0
+    else
+        cells = [h|t]
+        if(h = ' ')
+            flag = 1
+        else
+            has_empty(t,flag)
+
+// The leftmost free square: the AI of the original demo.
+rel find_empty(cells,n,x,y,found)
+    if(n >= 9)
+        x = 0
+        y = 0
+        found = 0
+    else
+        list_nth(cells,n,ch)
+        if(ch = ' ')
+            mark_pos(n,x,y)
+            found = 1
+        else
+            n1 = n + 1
+            find_empty(cells,n1,x,y,found)
+
+// ------------------------------------------------------------------- moves
+
+rel cpu_move(s,cells,s2)
+    find_empty(cells,0,x,y,found)
+    if(found = 0)
+        s2 = s
+    else
+        set_cell(cells,x,y,'x',cells2)
+        check_win(cells2,'x',won)
+        if(won = 1)
+            copy_state(s,s2,cells2,'x',1,'x','The CPU wins - press R to play again')
+        else
+            copy_state(s,s2,cells2,'x',0,' ','Your turn - click a square')
+
+rel player_move(s,x,y,s2)
+    cell_index(x,y,i)
+    list_nth(s.cells,i,ch)
+    if(s.over = 1)
+        s2 = s
+    elseif(ch != ' ')
+        s2 = s
+    else
+        set_cell(s.cells,x,y,'o',cells)
+        check_win(cells,'o',won)
+        if(won = 1)
+            copy_state(s,s2,cells,'o',1,'o','You win - press R to play again')
+        else
+            has_empty(cells,empty)
+            if(empty = 1)
+                copy_state(s,s2,cells,'o',1,' ','A draw - press R to play again')
+            else
+                cpu_move(s,cells,s2)
+
+// ------------------------------------------------------------------ input
+
+// Which square is the pixel in?  The grid sits at (grid_x, grid_y), so the
+// offset has to be taken off before the division.
+rel tile_of(px,py,x,y,ok)
+    dx = px - grid_x
+    dy = py - grid_y
+    if(dx < 0 or dy < 0 or dx >= span or dy >= span)
+        x = 0
+        y = 0
+        ok = 0
+    else
+        x = int(dx / tile)
+        y = int(dy / tile)
+        ok = 1
+
+// The event queue is read ONCE per frame: every read clears the whole queue,
+// so asking for the keys and the clicks separately would throw one of them
+// away.  The events are therefore taken in one go and sorted out here.
+rel apply_events(events,s,s2)
+    if(events = [])
+        s2 = s
+    else
+        events = [ev|rest]
+        apply_event(ev,s,s1)
+        apply_events(rest,s1,s2)
+
+rel apply_event(ev,s,s2)
+    kind = ev.type
+    if(kind = 'keydown')
+        apply_key(ev,s,s2)
+    elseif(kind = 'mouseup')
+        apply_click(ev,s,s2)
+    else
+        s2 = s
+
+rel apply_key(ev,s,s2)
+    kname = ev.key
+    if(kname = 'escape')
+        sp.quit()
+        s2 = s
+    elseif(kname = 'r')
+        s2 = initial
+    else
+        s2 = s
+
+rel apply_click(ev,s,s2)
+    mx = ev.x
+    my = ev.y
+    tile_of(mx,my,tx,ty,ok)
+    if(ok = 1)
+        player_move(s,tx,ty,s2)
+    else
+        s2 = s
+
+// --------------------------------------------------------------- rendering
+
+rel draw_mark(cells,n)
+    list_nth(cells,n,ch)
+    if(ch = 'x')
+        mark_pos(n,x,y)
+        sp.graphics.setColor('#7cf4cb')
+        sp.graphics.print('X', grid_x + x * tile + 18, grid_y + y * tile + 14)
+    elseif(ch = 'o')
+        mark_pos(n,x,y)
+        sp.graphics.setColor('#f3c969')
+        sp.graphics.print('O', grid_x + x * tile + 18, grid_y + y * tile + 14)
+    else
+        true
+
+rel draw_marks(cells,n)
+    if(n >= 9)
+        true
+    else
+        draw_mark(cells,n)
+        n1 = n + 1
+        draw_marks(cells,n1)
+
+rel draw_grid(y)
+    if(y >= 3)
+        true
+    else
+        draw_grid_row(y,0)
+        y1 = y + 1
+        draw_grid(y1)
+
+rel draw_grid_row(y,x)
+    if(x >= 3)
+        true
+    else
+        sp.graphics.rectangle('line', grid_x + x * tile, grid_y + y * tile, tile, tile)
+        x1 = x + 1
+        draw_grid_row(y,x1)
+
+rel draw(s)
+    sp.graphics.clear('#0d1720')
+    sp.graphics.setColor('#36516c')
+    draw_grid(0)
+    draw_marks(s.cells,0)
+    sp.graphics.setColor('#dcebea')
+    sp.graphics.print(s.message, 20, 30)
+    sp.graphics.setColor('#9bb7c6')
+    sp.graphics.print('R restarts - ESC quits', 20, win_h - 30)
+
+// ------------------------------------------------------------------- run
+//
+// The tick is 33ms (30 frames a second) rather than the 500ms of the original
+// SDL version: the input is polled every frame, so a slow tick would make the
+// clicks feel laggy.
+
+sp.init(win_w, win_h)
+
+sp.start(33,{
+    rel update(dt,s,s2)
+        sp.event.get(events)
+        apply_events(events,s,s2)
+    rel draw(s)
+        draw(s)
+},initial)

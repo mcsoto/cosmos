@@ -4,7 +4,7 @@
 'xpce_events::$impl_show_one'(A,B,C):-(cosmos_get(B,"type",D),cosmos_get(B,"posx",E),cosmos_get(B,"posy",F),cosmos_get(B,"button",G),cosmos_get(B,"clicks",H),cosmos_get(B,"key",I),cosmos_get(B,"char",J),cosmos_get(B,"mod",K),print(["POLL #",A," ",D," x=",E," y=",F," button=",G," clicks=",H," key=",I," char=",J," mod=",K])),C=0.0.
 'xpce_events::$impl_handle'(A,B):-(cosmos_receiver("list",B),cosmos_method(B,"each",[A,clos(upvals([]),'xpce_events::$value_show_one'),C])),(cosmos_receiver("list",B),cosmos_method(B,"size",[A,D])),(r_gt(D,0.0),print(["POLL drained ",D," event(s) this frame"]);r_le(D,0.0),true).
 'xpce_events::$impl_draw'(A,B,C):-(cosmos_get(C,"graphics",D),cosmos_method(D,"clear",["#101820"])),(cosmos_get(C,"graphics",E),cosmos_method(E,"setColor",["#7ec8ff"])),(cosmos_get(C,"graphics",F),cosmos_method(F,"rectangle",["fill",20.0,20.0,340.0,28.0])),(cosmos_get(C,"graphics",G),cosmos_method(G,"setColor",["#ffffff"])),(cosmos_get(C,"graphics",H),cosmos_method(H,"print",["click in the window, or press a key",30.0,38.0])),(cosmos_get(C,"graphics",I),cosmos_method(I,"setColor",["#ffd166"])),(cosmos_get(C,"input",J),cosmos_method(J,"getPosition",[K])),(cosmos_get(K,"x",L),add_("mouse x=",L,M),add_(M," y=",N),cosmos_get(K,"y",O),add_(N,O,P),cosmos_get(C,"graphics",Q),cosmos_method(Q,"print",[P,20.0,58.0])),(cosmos_get(C,"event",R),cosmos_method(R,"get",[S])),(cosmos_receiver("list",B),cosmos_method(B,"size",[S,T])),(add_("queue holds ",T,U),add_(U," event(s) since the last get()",V),cosmos_get(C,"graphics",W),cosmos_method(W,"print",[V,20.0,74.0])),((cosmos_get(C,"input",X),cosmos_method(X,"buttonDown",[1.0])),cosmos_get(C,"graphics",Y),cosmos_method(Y,"print",["LEFT BUTTON HELD",20.0,86.0]);\+ (cosmos_get(C,"input",Z),cosmos_method(Z,"buttonDown",[1.0])),true).
-'xpce_events::$impl_update'(A,B,C,D,E,F,G):-(cosmos_receiver("mutable",F),cosmos_method(F,"get",[D,"value",H])),(add_(H,1.0,I),cosmos_receiver("mutable",F),cosmos_method(F,"set",[D,"value",I])),(cosmos_get(G,"event",J),cosmos_method(J,"get",[K])),(cosmos_receiver("list",E),cosmos_method(E,"size",[K,L])),(r_gt(L,0.0),'xpce_events::handle'(K,E);r_le(L,0.0),true),((r_mod(H,30.0,M),M=0.0),print(["frame ",H," events ",L]);(r_mod(H,30.0,N),dif(N,0.0)),true),(r_gt(H,400.0),print(["STOPPING after ",H," frames"]),cosmos_method(G,"quit",[]);r_le(H,400.0),true),C=B.
+'xpce_events::$impl_update'(A,B,C,D,E,F,G):-(cosmos_receiver("mutable",F),cosmos_method(F,"get",[D,"value",H])),(add_(H,1.0,I),cosmos_receiver("mutable",F),cosmos_method(F,"set",[D,"value",I])),(cosmos_get(G,"event",J),cosmos_method(J,"get",[K])),(cosmos_receiver("list",E),cosmos_method(E,"size",[K,L])),(r_gt(L,0.0),'xpce_events::handle'(K,E);r_le(L,0.0),true),(r_mod(H,30.0,M),if_(M=0.0,print(["frame ",H," events ",L]),true)),(r_gt(H,1200.0),print(["STOPPING after ",H," frames"]),cosmos_method(G,"quit",[]);r_le(H,1200.0),true),C=B.
 xpce_events([]):-cosmos_require("space",A),cosmos_require("list",B),cosmos_require("mutable",C),((cosmos_receiver("mutable",C),cosmos_method_value(C,"new",[],D)),E=D),(cosmos_receiver("mutable",C),cosmos_method(C,"set",[E,"value",0.0])),cosmos_method(A,"init",[460.0,320.0]),(new(F),set_(F,"size",13.0,G),set_(G,"family","sans",H),set_(H,"style","normal",I),cosmos_get(A,"graphics",J),cosmos_method(J,"setFont",[I])),new(K),set_(K,"update",clos(upvals([E,B,C,A]),'xpce_events::$value_update'),L),set_(L,"draw",clos(upvals([B,A]),'xpce_events::$value_draw'),M),new(N),set_(N,"keydown",clos(upvals([]),'xpce_events::$value_on_keydown'),O),set_(O,"mousedown",clos(upvals([]),'xpce_events::$value_on_mousedown'),P),set_(M,"on",P,Q),cosmos_method(A,"start",[33.0,Q,R]).
 'xpce_events::on_keydown'(A):-'xpce_events::$impl_on_keydown'(A).
 'xpce_events::$value_on_keydown'(A,upvals([])):-'xpce_events::on_keydown'(A).
@@ -52,8 +52,17 @@ cosmos_entry_main :-
       ; ensure_loaded(Runtime), ensure_loaded(Operations)
       ),
       directory_file_path(Root, '../libs/space_xpce_prolog.pl', Backend), ensure_loaded(Backend),
+      (   (   nb_current(cosmos_profile_requested,true),
+              directory_file_path(Root, '../compiler/platform/profile.pl', Profiler),
+              exists_file(Profiler),
+              ensure_loaded(Profiler),
+              cosmos_profile:cosmos_profile_start()
+          )
+      ->  true
+      ;   true
+      ),
       directory_file_path(Root, ?, SourceTemplate),
       atomic_list_concat([SourceTemplate,LibsTemplate,UserLibsTemplate,?],;,Path),
       nb_setval(path,Path),
-      Arguments = [Executable|RawArguments], xpce_events([])
+      setup_call_cleanup(true,(Arguments = [Executable|RawArguments], xpce_events([])),cosmos_profile_finish)
     ).

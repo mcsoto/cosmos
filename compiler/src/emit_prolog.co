@@ -481,6 +481,18 @@ rel control(kind,condition,yes,no,c,env,result)
     elseif(kind='when')
         term(',',[a,b],branch)
         term(';',[branch,d],result)
+    elseif(kind='if' and condition=UnifyGoal(left,right,_))
+        // A unification in a relational conditional has a reified form in
+        // library(reif).  Using it keeps the then/else alternatives coupled
+        // to the same condition instead of lowering them into a separate
+        // unification and disequality disjunction.
+        expression(left,c,env,leftValue,leftGoals)
+        expression(right,c,env,rightValue,rightGoals)
+        join([leftGoals,rightGoals],conditionGoals)
+        term('=',[leftValue,rightValue],reifiedCondition)
+        term('if_',[reifiedCondition,b,d],conditional)
+        join([conditionGoals,[conditional]],all)
+        sequence(all,result)
     elseif(kind='if')
         unary_goal('not',condition,c,env,complement)
         term(',',[a,b],first)

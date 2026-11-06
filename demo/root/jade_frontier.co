@@ -1,0 +1,183 @@
+require('space', sp)
+sp.init(600,450)
+
+functor(Win, Functor)
+
+map_w=24
+map_h=16
+tile=24
+width=map_w*tile
+height=map_h*tile
+tick_ms=250
+
+initial={
+    day=1 and hour=6 and clock=0
+    rice=44 and meals=12 and wood=74 and stone=42
+    threat=8 and prestige=12
+    selected=0 and tool=0
+    shrine=0 and tower=0 and walls=0 and farms=1
+    win=Win and game_over=0/* todo
+    settlers=[
+        {x=8 and y=7 and color='#e07b54' and role='grower'}
+        {x=9 and y=7 and color='#4fa6bd' and role='builder'}
+        {x=10 and y=7 and color='#d7a83e' and role='cook'}
+        {x=8 and y=8 and color='#a477bd' and role='doctor'}
+        {x=9 and y=8 and color='#63a66b' and role='guard'}
+    ]*/
+	settlers=[
+        {x=8 and y=7 and color='#e07b54' and role='grower'},
+        {x=9 and y=7 and color='#4fa6bd' and role='builder'},
+        {x=10 and y=7 and color='#d7a83e' and role='cook'},
+        {x=8 and y=8 and color='#a477bd' and role='doctor'},
+        {x=9 and y=8 and color='#63a66b' and role='guard'}
+    ]
+}
+
+rel copy_state(s,s2,day,hour,clock,rice,meals,wood,stone,threat,prestige,selected,tool,shrine,tower,walls,farms,win,game_over)
+    s2={day=day and hour=hour and clock=clock and rice=rice and meals=meals and wood=wood and stone=stone and threat=threat and prestige=prestige and selected=selected and tool=tool and shrine=shrine and tower=tower and walls=walls and farms=farms and win=win and game_over=game_over and settlers=s.settlers}
+
+rel next_day(s,s2)
+    copy_state(s,s2,s.day+1,6,s.clock,s.rice+8,s.meals,s.wood+4,s.stone+2,s.threat+6,s.prestige,s.selected,s.tool,s.shrine,s.tower,s.walls,s.farms,s.win,s.game_over)
+
+fun game_update(s,s2)
+    if(s.game_over=1 or s.win=Win)
+        s2=s
+    elseif(s.clock>=4)
+        if(s.hour>=23)
+            next_day(s,s2)
+        else
+            copy_state(s,s2,s.day,s.hour+1,0,s.rice,s.meals,s.wood,s.stone,s.threat,s.prestige,s.selected,s.tool,s.shrine,s.tower,s.walls,s.farms,s.win,s.game_over)
+    else
+        copy_state(s,s2,s.day,s.hour,s.clock+1,s.rice,s.meals,s.wood,s.stone,s.threat,s.prestige,s.selected,s.tool,s.shrine,s.tower,s.walls,s.farms,s.win,s.game_over)
+
+rel game_keypressed(key,s,s2)
+    if(key='r')
+        s2=initial
+    elseif(key='1')
+        copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood,s.stone,s.threat,s.prestige,s.selected,1,s.shrine,s.tower,s.walls,s.farms,s.win,s.game_over)
+    elseif(key='2')
+        copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood,s.stone,s.threat,s.prestige,s.selected,2,s.shrine,s.tower,s.walls,s.farms,s.win,s.game_over)
+    elseif(key='3')
+        copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood,s.stone,s.threat,s.prestige,s.selected,3,s.shrine,s.tower,s.walls,s.farms,s.win,s.game_over)
+    elseif(key='space')
+        copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood,s.stone,s.threat,s.prestige,s.selected,s.tool,s.shrine,s.tower,s.walls,s.farms,s.win,1)
+    else
+        s2=s
+
+rel game_mouseup(mx,my,s,s2)
+    x=int(mx/tile)
+    y=int(my/tile)
+    if(x>=1 and x<=map_w and y>=1 and y<=map_h)
+        if(s.tool=1 and s.wood>=10 and s.stone>=8)
+            copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood-10,s.stone-8,s.threat,s.prestige,s.selected,s.tool,1,s.tower,s.walls,s.farms,s.win,s.game_over)
+        elseif(s.tool=2 and s.wood>=12 and s.stone>=6)
+            copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood-12,s.stone-6,s.threat,s.prestige,s.selected,s.tool,s.shrine,1,s.walls,s.farms,s.win,s.game_over)
+        elseif(s.tool=3 and s.wood>=1)
+            copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood-1,s.stone,s.threat,s.prestige,s.selected,s.tool,s.shrine,s.tower,s.walls+1,s.farms,s.win,s.game_over)
+        else
+            copy_state(s,s2,s.day,s.hour,s.clock,s.rice,s.meals,s.wood,s.stone,s.threat,s.prestige,x+(y-1)*map_w,s.tool,s.shrine,s.tower,s.walls,s.farms,s.win,s.game_over)
+    else
+        // A click outside the map changes nothing; the state stays bound.
+        s2=s
+
+rel terrain(x,y,color)
+    if(x<=2 or (x=3 and y>11))
+        color='#2f6870'
+    elseif(x>=21 and y<8)
+        color='#55584d'
+    elseif(math.mod(x+y,2,0))//((x+y)%2=0)
+        color='#334b2d'
+    else
+        color='#3b5731'
+
+rel draw_tile(x,y,s)
+    terrain(x,y,color)
+    sp.graphics.setColor(color)
+    sp.graphics.rectangle('fill',(x-1)*tile,(y-1)*tile,tile-1,tile-1)
+    if(x=7 and y=6 or x=8 and y=6 or x=9 and y=6 or x=10 and y=6)
+        sp.graphics.setColor('#695535')
+        sp.graphics.rectangle('fill',(x-1)*tile+3,(y-1)*tile+3,tile-6,tile-6)
+    if(s.tool=1 and x=12 and y=5)
+        sp.graphics.setColor('#d4a340')
+        sp.graphics.rectangle('fill',(x-1)*tile+4,(y-1)*tile+4,tile-8,tile-8)
+
+rel draw_settler(s)
+    sp.graphics.setColor(s.color)
+    sp.graphics.rectangle('fill',(s.x-1)*tile+5,(s.y-1)*tile+5,tile-10,tile-10)
+    sp.graphics.setColor('#eee7d2')
+    sp.graphics.rectangle('fill',(s.x-1)*tile+9,(s.y-1)*tile+7,6,6)
+
+// The settlers are a list, and indexing a list is a table read in this
+// compiler, so the list is walked and every settler is drawn in turn.
+rel draw_settlers(settlers)
+    if(settlers=[])
+        true
+    else
+        settlers=[settler|tail]
+        draw_settler(settler)
+        draw_settlers(tail)
+
+rel draw_panel(s)
+    sp.graphics.setColor('#151b16')
+    sp.graphics.rectangle('fill',0,0,width,34)
+    sp.graphics.setColor('#d4a340')
+    sp.graphics.rectangle('fill',0,34,width,2)
+    sp.graphics.setColor('#252a20')
+    sp.graphics.rectangle('fill',8,7,122,20)
+    sp.graphics.rectangle('fill',140,7,72,20)
+    sp.graphics.rectangle('fill',222,7,72,20)
+    sp.graphics.rectangle('fill',304,7,72,20)
+    sp.graphics.rectangle('fill',386,7,72,20)
+    sp.graphics.rectangle('fill',468,7,72,20)
+    sp.graphics.rectangle('fill',width-150,height-30,142,22)
+
+rel game_draw(s)
+    // The host does not clear the canvas, so every frame starts from a
+    // clean background.
+    sp.graphics.clear('#000000')
+    draw_panel(s)
+    for(init y=1;y<=map_h;next y=y+1;)
+        for(init x=1;x<=map_w;next x=x+1;)
+            draw_tile(x,y,s)
+    draw_settlers(s.settlers)
+    if(s.shrine=1)
+        sp.graphics.setColor('#c85747')
+        sp.graphics.rectangle('fill',15*tile,3*tile,20,20)
+    if(s.tower=1)
+        sp.graphics.setColor('#d4a340')
+        sp.graphics.rectangle('fill',19*tile,5*tile,20,28)
+    if(s.walls>0)
+        sp.graphics.setColor('#9b7547')
+        sp.graphics.rectangle('fill',11*tile,11*tile,80,10)
+    if(s.game_over=1)
+        sp.graphics.setColor('#351d19')
+        sp.graphics.rectangle('fill',190,180,196,54)
+    elseif(s.win=Win)
+        sp.graphics.setColor('#394326')
+        sp.graphics.rectangle('fill',170,180,236,54)
+
+// The XPCE backend has no `keypressed'/`mouseup' callback names: input is
+// polled from the event queue inside update, and the handlers above are fed
+// from it, one event at a time, threading the state through them.
+rel update(s,s2)
+    sp.event.get(events)
+    apply_events(events,s,s1)
+    game_update(s1,s2)
+
+// Apply every key press and mouse release of this frame to the state.
+rel apply_events(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[ev|rest]
+        if(ev.type='keydown')
+            game_keypressed(ev.key,s,s1)
+        elseif(ev.type='mouseup')
+            game_mouseup(ev.x,ev.y,s,s1)
+        else
+            s1=s
+        apply_events(rest,s1,s2)
+
+sp.start(tick_ms,{
+    update=update and draw=draw
+},initial)

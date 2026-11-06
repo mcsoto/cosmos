@@ -1,0 +1,1 @@
+t("module","pathfinder",<,t("format",1.0,<,t("exports",t,-,t,t),t),t("schemas",t("t",t("kind","constructor",-,t("fields",[fc_Entry(fc_LiteralExpr("find",fc_Loc(42.0,5.0)),fc_VarExpr("find",fc_Loc(42.0,12.0))),fc_Entry(fc_LiteralExpr("pointAt",fc_Loc(43.0,5.0)),fc_VarExpr("point_at",fc_Loc(43.0,15.0)))],-,t,t),t("location",fc_Loc(41.0,1.0),-,t,t)),-,t,t),-,t,t)).

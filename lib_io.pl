@@ -1,0 +1,2 @@
+:- style_check(-singleton).
+lib_io([]):-((cosmos_receiver("io",A),cosmos_method_value(A,"readFile",["readme.txt"],B)),C=B),print(C),print(22.0),(cosmos_receiver("io",A),cosmos_method(A,"writeToFile",["tempfile.txt","asd"])),((cosmos_receiver("io",A),cosmos_method_value(A,"open",["tempfile2.txt","write"],D)),E=D),(cosmos_receiver("io",A),cosmos_method(A,"write",[E,1.0])),(cosmos_receiver("io",A),cosmos_method(A,"write",[E,2.0])),cosmos_receiver("io",A),cosmos_method(A,"close",[E]).

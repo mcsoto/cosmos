@@ -32,7 +32,10 @@ else
 
 s=io.readFile('readme.txt')
 print(s)
+print(22)
+//f=io.open('tempfile.txt','write')
+io.writeToFile('tempfile.txt','asd')
 
-f=io.open('tempfile.txt','write')
-f.writeToFile('asd')
-f.close()
+/*f=io.open('tempfile.txt','write')
+f.write('asd')
+f.close()*/

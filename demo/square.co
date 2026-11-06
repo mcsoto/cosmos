@@ -1,0 +1,17 @@
+require('space', sp)
+
+sp.init(480,280)
+
+state={x=175 and y=75 and width=130 and height=130 and color='#64d7b0' and step=0}
+
+rel update(s,s2)
+    s2=s
+
+rel draw(s)
+    -- canvas.rect is dead under the native backend: the Space library
+    -- draws a filled rectangle with setColor + rectangle('fill',...).
+    sp.graphics.setColor(s.color)
+    sp.graphics.rectangle('fill', s.x, s.y, s.width, s.height)
+
+callbacks={update=update and draw=draw}
+sp.start(16,callbacks,state)

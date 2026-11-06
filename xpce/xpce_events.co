@@ -80,7 +80,7 @@ rel update(_dt, s, s2)
     mutable.set(frames, 'value', n + 1)
     sp.event.get(events)
     list.size(events, count)
-    // Only walk the queue when there is one.  list.each/3 on an empty list
+	// Only walk the queue when there is one.  list.each/3 on an empty list
     // fails, and a failing relation makes the whole frame tick fail -- which
     // silently freezes the app after one frame, with no error anywhere.
     if(count > 0)
@@ -91,7 +91,7 @@ rel update(_dt, s, s2)
         print(['frame ', n, ' events ', count])
     else
         true
-    if(n > 400)
+    if(n > 1200)
         print(['STOPPING after ', n, ' frames'])
         sp.quit()
     else

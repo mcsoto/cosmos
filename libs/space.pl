@@ -4,6 +4,9 @@
 'space::$impl_startCanvas'(A,B,C,D):-cosmos_method(D,"startCanvas",[A,B,C]).
 'space::$impl_quit'(A):-cosmos_method(A,"quit",[]).
 'space::$impl_dispose'(A):-cosmos_method(A,"dispose",[]).
+'space::$impl_stop'(A):-cosmos_method(A,"stop",[]).
+'space::$impl_beginFrame'(A):-cosmos_method(A,"beginFrame",[]).
+'space::$impl_endFrame'(A):-cosmos_method(A,"endFrame",[]).
 'space::$impl_loadImage'(A,B,C):-cosmos_method(C,"loadImage",[A,B]).
 'space::$impl_setBackgroundColor'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"setBackgroundColor",[A]).
 'space::$impl_getBackgroundColor'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"getBackgroundColor",[A]).
@@ -12,6 +15,8 @@
 'space::$impl_clear'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"clear",[A]).
 'space::$impl_rectangle'(A,B,C,D,E,F):-cosmos_get(F,"graphics",G),cosmos_method(G,"rectangle",[A,B,C,D,E]).
 'space::$impl_line'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"line",[A]).
+'space::$impl_point'(A,B,C):-cosmos_get(C,"graphics",D),cosmos_method(D,"point",[A,B]).
+'space::$impl_points'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"points",[A]).
 'space::$impl_circle'(A,B,C,D,E):-cosmos_get(E,"graphics",F),cosmos_method(F,"circle",[A,B,C,D]).
 'space::$impl_ellipse'(A,B,C,D,E,F):-cosmos_get(F,"graphics",G),cosmos_method(G,"ellipse",[A,B,C,D,E]).
 'space::$impl_arc'(A,B,C,D,E,F,G,H):-cosmos_get(H,"graphics",I),cosmos_method(I,"arc",[A,B,C,D,E,F,G]).
@@ -34,12 +39,14 @@
 'space::$impl_setLineWidth'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"setLineWidth",[A]).
 'space::$impl_getLineWidth'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"getLineWidth",[A]).
 'space::$impl_setLineStyle'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"setLineStyle",[A]).
+'space::$impl_getLineStyle'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"getLineStyle",[A]).
 'space::$impl_setScissor'(A,B,C,D,E):-cosmos_get(E,"graphics",F),cosmos_method(F,"setScissor",[A,B,C,D]).
 'space::$impl_clearScissor'(A):-cosmos_get(A,"graphics",B),cosmos_method(B,"clearScissor",[]).
 'space::$impl_getScissor'(A,B):-cosmos_get(B,"graphics",C),cosmos_method(C,"getScissor",[A]).
 'space::$impl_draw'(A,B,C,D):-cosmos_get(D,"graphics",E),cosmos_method(E,"draw",[A,B,C]).
 'space::$impl_refresh'(A):-cosmos_get(A,"graphics",B),cosmos_method(B,"refresh",[]).
 'space::$impl_isDown'(A,B):-cosmos_get(B,"input",C),cosmos_method(C,"isDown",[A]).
+'space::$impl_isMouseDown'(A,B):-cosmos_get(B,"input",C),cosmos_method(C,"isMouseDown",[A]).
 'space::$impl_getX'(A,B):-cosmos_get(B,"input",C),cosmos_method(C,"getX",[A]).
 'space::$impl_getY'(A,B):-cosmos_get(B,"input",C),cosmos_method(C,"getY",[A]).
 'space::$impl_getPosition'(A,B):-cosmos_get(B,"input",C),cosmos_method(C,"getPosition",[A]).
@@ -50,7 +57,7 @@
 'space::$impl_getEvents'(A,B):-cosmos_get(B,"event",C),cosmos_method(C,"get",[A]).
 'space::$impl_getEventsOf'(A,B,C):-cosmos_get(C,"event",D),cosmos_method(D,"getType",[A,B]).
 'space::$impl_peekEvents'(A,B):-cosmos_get(B,"event",C),cosmos_method(C,"peek",[A]).
-space(A):-cosmos_require("space_xpce",B),new(C),set_(C,"init",clos(upvals([B]),'space::$value_init'),D),set_(D,"start",clos(upvals([B]),'space::$value_start'),E),set_(E,"startCanvas",clos(upvals([B]),'space::$value_startCanvas'),F),set_(F,"quit",clos(upvals([B]),'space::$value_quit'),G),set_(G,"dispose",clos(upvals([B]),'space::$value_dispose'),H),set_(H,"loadImage",clos(upvals([B]),'space::$value_loadImage'),I),new(J),set_(J,"setBackgroundColor",clos(upvals([B]),'space::$value_setBackgroundColor'),K),set_(K,"getBackgroundColor",clos(upvals([B]),'space::$value_getBackgroundColor'),L),set_(L,"setColor",clos(upvals([B]),'space::$value_setColor'),M),set_(M,"getColor",clos(upvals([B]),'space::$value_getColor'),N),set_(N,"clear",clos(upvals([B]),'space::$value_clear'),O),set_(O,"rectangle",clos(upvals([B]),'space::$value_rectangle'),P),set_(P,"line",clos(upvals([B]),'space::$value_line'),Q),set_(Q,"circle",clos(upvals([B]),'space::$value_circle'),R),set_(R,"ellipse",clos(upvals([B]),'space::$value_ellipse'),S),set_(S,"arc",clos(upvals([B]),'space::$value_arc'),T),set_(T,"polygon",clos(upvals([B]),'space::$value_polygon'),U),set_(U,"print",clos(upvals([B]),'space::$value_print'),V),set_(V,"printf",clos(upvals([B]),'space::$value_printf'),W),set_(W,"newFont",clos(upvals([B]),'space::$value_newFont'),X),set_(X,"setFont",clos(upvals([B]),'space::$value_setFont'),Y),set_(Y,"getFont",clos(upvals([B]),'space::$value_getFont'),Z),set_(Z,"getDimensions",clos(upvals([B]),'space::$value_getDimensions'),A1),set_(A1,"getWidth",clos(upvals([B]),'space::$value_getWidth'),B1),set_(B1,"getHeight",clos(upvals([B]),'space::$value_getHeight'),C1),set_(C1,"push",clos(upvals([B]),'space::$value_push'),D1),set_(D1,"pop",clos(upvals([B]),'space::$value_pop'),E1),set_(E1,"origin",clos(upvals([B]),'space::$value_origin'),F1),set_(F1,"translate",clos(upvals([B]),'space::$value_translate'),G1),set_(G1,"rotate",clos(upvals([B]),'space::$value_rotate'),H1),set_(H1,"scale",clos(upvals([B]),'space::$value_scale'),I1),set_(I1,"shear",clos(upvals([B]),'space::$value_shear'),J1),set_(J1,"setLineWidth",clos(upvals([B]),'space::$value_setLineWidth'),K1),set_(K1,"getLineWidth",clos(upvals([B]),'space::$value_getLineWidth'),L1),set_(L1,"setLineStyle",clos(upvals([B]),'space::$value_setLineStyle'),M1),set_(M1,"setScissor",clos(upvals([B]),'space::$value_setScissor'),N1),set_(N1,"clearScissor",clos(upvals([B]),'space::$value_clearScissor'),O1),set_(O1,"getScissor",clos(upvals([B]),'space::$value_getScissor'),P1),set_(P1,"draw",clos(upvals([B]),'space::$value_draw'),Q1),set_(Q1,"refresh",clos(upvals([B]),'space::$value_refresh'),R1),set_(I,"graphics",R1,S1),new(T1),set_(T1,"isDown",clos(upvals([B]),'space::$value_isDown'),U1),set_(U1,"getX",clos(upvals([B]),'space::$value_getX'),V1),set_(V1,"getY",clos(upvals([B]),'space::$value_getY'),W1),set_(W1,"getPosition",clos(upvals([B]),'space::$value_getPosition'),X1),set_(X1,"buttonDown",clos(upvals([B]),'space::$value_buttonDown'),Y1),set_(S1,"input",Y1,Z1),new(A2),set_(A2,"isDown",clos(upvals([B]),'space::$value_isDown'),B2),set_(B2,"getX",clos(upvals([B]),'space::$value_getX'),C2),set_(C2,"getY",clos(upvals([B]),'space::$value_getY'),D2),set_(D2,"getPosition",clos(upvals([B]),'space::$value_getPosition'),E2),set_(E2,"buttonDown",clos(upvals([B]),'space::$value_buttonDown'),F2),set_(Z1,"keyboard",F2,G2),new(H2),set_(H2,"isDown",clos(upvals([B]),'space::$value_isDown'),I2),set_(I2,"getX",clos(upvals([B]),'space::$value_getX'),J2),set_(J2,"getY",clos(upvals([B]),'space::$value_getY'),K2),set_(K2,"getPosition",clos(upvals([B]),'space::$value_getPosition'),L2),set_(L2,"buttonDown",clos(upvals([B]),'space::$value_buttonDown'),M2),set_(G2,"mouse",M2,N2),new(O2),set_(O2,"getTime",clos(upvals([B]),'space::$value_getTime'),P2),set_(P2,"getDelta",clos(upvals([B]),'space::$value_getDelta'),Q2),set_(Q2,"getFPS",clos(upvals([B]),'space::$value_getFPS'),R2),set_(N2,"timer",R2,S2),new(T2),set_(T2,"get",clos(upvals([B]),'space::$value_getEvents'),U2),set_(U2,"getType",clos(upvals([B]),'space::$value_getEventsOf'),V2),set_(V2,"peek",clos(upvals([B]),'space::$value_peekEvents'),W2),set_(S2,"event",W2,A).
+space(A):-cosmos_require("space_xpce",B),new(C),set_(C,"init",clos(upvals([B]),'space::$value_init'),D),set_(D,"start",clos(upvals([B]),'space::$value_start'),E),set_(E,"startCanvas",clos(upvals([B]),'space::$value_startCanvas'),F),set_(F,"quit",clos(upvals([B]),'space::$value_quit'),G),set_(G,"dispose",clos(upvals([B]),'space::$value_dispose'),H),set_(H,"stop",clos(upvals([B]),'space::$value_stop'),I),set_(I,"beginFrame",clos(upvals([B]),'space::$value_beginFrame'),J),set_(J,"endFrame",clos(upvals([B]),'space::$value_endFrame'),K),set_(K,"loadImage",clos(upvals([B]),'space::$value_loadImage'),L),new(M),set_(M,"setBackgroundColor",clos(upvals([B]),'space::$value_setBackgroundColor'),N),set_(N,"getBackgroundColor",clos(upvals([B]),'space::$value_getBackgroundColor'),O),set_(O,"setColor",clos(upvals([B]),'space::$value_setColor'),P),set_(P,"getColor",clos(upvals([B]),'space::$value_getColor'),Q),set_(Q,"clear",clos(upvals([B]),'space::$value_clear'),R),set_(R,"rectangle",clos(upvals([B]),'space::$value_rectangle'),S),set_(S,"line",clos(upvals([B]),'space::$value_line'),T),set_(T,"point",clos(upvals([B]),'space::$value_point'),U),set_(U,"points",clos(upvals([B]),'space::$value_points'),V),set_(V,"circle",clos(upvals([B]),'space::$value_circle'),W),set_(W,"ellipse",clos(upvals([B]),'space::$value_ellipse'),X),set_(X,"arc",clos(upvals([B]),'space::$value_arc'),Y),set_(Y,"polygon",clos(upvals([B]),'space::$value_polygon'),Z),set_(Z,"print",clos(upvals([B]),'space::$value_print'),A1),set_(A1,"printf",clos(upvals([B]),'space::$value_printf'),B1),set_(B1,"newFont",clos(upvals([B]),'space::$value_newFont'),C1),set_(C1,"setFont",clos(upvals([B]),'space::$value_setFont'),D1),set_(D1,"getFont",clos(upvals([B]),'space::$value_getFont'),E1),set_(E1,"getDimensions",clos(upvals([B]),'space::$value_getDimensions'),F1),set_(F1,"getWidth",clos(upvals([B]),'space::$value_getWidth'),G1),set_(G1,"getHeight",clos(upvals([B]),'space::$value_getHeight'),H1),set_(H1,"push",clos(upvals([B]),'space::$value_push'),I1),set_(I1,"pop",clos(upvals([B]),'space::$value_pop'),J1),set_(J1,"origin",clos(upvals([B]),'space::$value_origin'),K1),set_(K1,"translate",clos(upvals([B]),'space::$value_translate'),L1),set_(L1,"rotate",clos(upvals([B]),'space::$value_rotate'),M1),set_(M1,"scale",clos(upvals([B]),'space::$value_scale'),N1),set_(N1,"shear",clos(upvals([B]),'space::$value_shear'),O1),set_(O1,"setLineWidth",clos(upvals([B]),'space::$value_setLineWidth'),P1),set_(P1,"getLineWidth",clos(upvals([B]),'space::$value_getLineWidth'),Q1),set_(Q1,"setLineStyle",clos(upvals([B]),'space::$value_setLineStyle'),R1),set_(R1,"getLineStyle",clos(upvals([B]),'space::$value_getLineStyle'),S1),set_(S1,"setScissor",clos(upvals([B]),'space::$value_setScissor'),T1),set_(T1,"clearScissor",clos(upvals([B]),'space::$value_clearScissor'),U1),set_(U1,"getScissor",clos(upvals([B]),'space::$value_getScissor'),V1),set_(V1,"draw",clos(upvals([B]),'space::$value_draw'),W1),set_(W1,"refresh",clos(upvals([B]),'space::$value_refresh'),X1),set_(L,"graphics",X1,Y1),new(Z1),set_(Z1,"isDown",clos(upvals([B]),'space::$value_isDown'),A2),set_(A2,"isMouseDown",clos(upvals([B]),'space::$value_isMouseDown'),B2),set_(B2,"getX",clos(upvals([B]),'space::$value_getX'),C2),set_(C2,"getY",clos(upvals([B]),'space::$value_getY'),D2),set_(D2,"getPosition",clos(upvals([B]),'space::$value_getPosition'),E2),set_(E2,"buttonDown",clos(upvals([B]),'space::$value_buttonDown'),F2),set_(Y1,"input",F2,G2),new(H2),set_(H2,"isDown",clos(upvals([B]),'space::$value_isDown'),I2),set_(I2,"getX",clos(upvals([B]),'space::$value_getX'),J2),set_(J2,"getY",clos(upvals([B]),'space::$value_getY'),K2),set_(K2,"getPosition",clos(upvals([B]),'space::$value_getPosition'),L2),set_(L2,"buttonDown",clos(upvals([B]),'space::$value_buttonDown'),M2),set_(G2,"keyboard",M2,N2),new(O2),set_(O2,"isDown",clos(upvals([B]),'space::$value_isMouseDown'),P2),set_(P2,"getX",clos(upvals([B]),'space::$value_getX'),Q2),set_(Q2,"getY",clos(upvals([B]),'space::$value_getY'),R2),set_(R2,"getPosition",clos(upvals([B]),'space::$value_getPosition'),S2),set_(S2,"buttonDown",clos(upvals([B]),'space::$value_buttonDown'),T2),set_(N2,"mouse",T2,U2),new(V2),set_(V2,"getTime",clos(upvals([B]),'space::$value_getTime'),W2),set_(W2,"getDelta",clos(upvals([B]),'space::$value_getDelta'),X2),set_(X2,"getFPS",clos(upvals([B]),'space::$value_getFPS'),Y2),set_(U2,"timer",Y2,Z2),new(A3),set_(A3,"get",clos(upvals([B]),'space::$value_getEvents'),B3),set_(B3,"getType",clos(upvals([B]),'space::$value_getEventsOf'),C3),set_(C3,"peek",clos(upvals([B]),'space::$value_peekEvents'),D3),set_(Z2,"event",D3,A).
 'space::init'(A,B,C):-'space::$impl_init'(A,B,C).
 'space::$value_init'(A,B,upvals([C])):-'space::init'(A,B,C).
 'space::start'(A,B,C,D):-'space::$impl_start'(A,B,C,D).
@@ -61,6 +68,12 @@ space(A):-cosmos_require("space_xpce",B),new(C),set_(C,"init",clos(upvals([B]),'
 'space::$value_quit'(upvals([A])):-'space::quit'(A).
 'space::dispose'(A):-'space::$impl_dispose'(A).
 'space::$value_dispose'(upvals([A])):-'space::dispose'(A).
+'space::stop'(A):-'space::$impl_stop'(A).
+'space::$value_stop'(upvals([A])):-'space::stop'(A).
+'space::beginFrame'(A):-'space::$impl_beginFrame'(A).
+'space::$value_beginFrame'(upvals([A])):-'space::beginFrame'(A).
+'space::endFrame'(A):-'space::$impl_endFrame'(A).
+'space::$value_endFrame'(upvals([A])):-'space::endFrame'(A).
 'space::loadImage'(A,B,C):-'space::$impl_loadImage'(A,B,C).
 'space::$value_loadImage'(A,B,upvals([C])):-'space::loadImage'(A,B,C).
 'space::setBackgroundColor'(A,B):-'space::$impl_setBackgroundColor'(A,B).
@@ -77,6 +90,10 @@ space(A):-cosmos_require("space_xpce",B),new(C),set_(C,"init",clos(upvals([B]),'
 'space::$value_rectangle'(A,B,C,D,E,upvals([F])):-'space::rectangle'(A,B,C,D,E,F).
 'space::line'(A,B):-'space::$impl_line'(A,B).
 'space::$value_line'(A,upvals([B])):-'space::line'(A,B).
+'space::point'(A,B,C):-'space::$impl_point'(A,B,C).
+'space::$value_point'(A,B,upvals([C])):-'space::point'(A,B,C).
+'space::points'(A,B):-'space::$impl_points'(A,B).
+'space::$value_points'(A,upvals([B])):-'space::points'(A,B).
 'space::circle'(A,B,C,D,E):-'space::$impl_circle'(A,B,C,D,E).
 'space::$value_circle'(A,B,C,D,upvals([E])):-'space::circle'(A,B,C,D,E).
 'space::ellipse'(A,B,C,D,E,F):-'space::$impl_ellipse'(A,B,C,D,E,F).
@@ -121,6 +138,8 @@ space(A):-cosmos_require("space_xpce",B),new(C),set_(C,"init",clos(upvals([B]),'
 'space::$value_getLineWidth'(A,upvals([B])):-'space::getLineWidth'(A,B).
 'space::setLineStyle'(A,B):-'space::$impl_setLineStyle'(A,B).
 'space::$value_setLineStyle'(A,upvals([B])):-'space::setLineStyle'(A,B).
+'space::getLineStyle'(A,B):-'space::$impl_getLineStyle'(A,B).
+'space::$value_getLineStyle'(A,upvals([B])):-'space::getLineStyle'(A,B).
 'space::setScissor'(A,B,C,D,E):-'space::$impl_setScissor'(A,B,C,D,E).
 'space::$value_setScissor'(A,B,C,D,upvals([E])):-'space::setScissor'(A,B,C,D,E).
 'space::clearScissor'(A):-'space::$impl_clearScissor'(A).
@@ -133,6 +152,8 @@ space(A):-cosmos_require("space_xpce",B),new(C),set_(C,"init",clos(upvals([B]),'
 'space::$value_refresh'(upvals([A])):-'space::refresh'(A).
 'space::isDown'(A,B):-'space::$impl_isDown'(A,B).
 'space::$value_isDown'(A,upvals([B])):-'space::isDown'(A,B).
+'space::isMouseDown'(A,B):-'space::$impl_isMouseDown'(A,B).
+'space::$value_isMouseDown'(A,upvals([B])):-'space::isMouseDown'(A,B).
 'space::getX'(A,B):-'space::$impl_getX'(A,B).
 'space::$value_getX'(A,upvals([B])):-'space::getX'(A,B).
 'space::getY'(A,B):-'space::$impl_getY'(A,B).
