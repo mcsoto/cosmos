@@ -192,8 +192,8 @@ rel apply_event(ev,s,s2)
     else
         s2 = s
 
-rel apply_key(ev,s,s2)
-    kname = ev.key
+rel keypressed(kname, s, s2)
+    print(['keypressed', kname])
     if(kname = 'escape')
         sp.quit()
         s2 = s

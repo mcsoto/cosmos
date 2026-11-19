@@ -27,7 +27,6 @@
 :- dynamic space_scissor/5.  % space_scissor(Prefix, X, Y, W, H) recorded only
 :- dynamic space_mouse/4.     % space_mouse(Prefix, X, Y, [HeldButton|...])
 :- dynamic space_keys/2.      % space_keys(Prefix, [KeyName|...]) held
-:- dynamic space_focus/2.     % space_focus(Prefix, true|false) window has input focus
 :- dynamic space_bg/2.        % space_bg(Prefix, ColourString) background colour
 :- dynamic space_fg/2.        % space_fg(Prefix, ColourString) foreground colour
 :- dynamic space_line_style/2. % space_line_style(Prefix, 'smooth'|'rough')
@@ -109,6 +108,24 @@ space_set_last(Prefix, Time) :-
     space_key(space_last_, Prefix, Key),
     nb_linkval(Key, Time).
 
+% Whether the window has the input focus.  It used to be a dynamic fact,
+% and the frame tick rewrote it every frame with retractall/1 and
+% assertz/1 -- the retraction is the expensive half, 616 us against 0.5 us
+% for a global, so the tick paid for a rewrite that changed nothing most
+% of the time.  It is a global now, and it is only written when the focus
+% actually changed.
+space_focus(Prefix, HasFocus) :-
+    space_key(space_focus_, Prefix, Key),
+    catch(nb_getval(Key, HasFocus), _, fail).
+
+space_set_focus(Prefix, HasFocus) :-
+    space_key(space_focus_, Prefix, Key),
+    nb_setval(Key, HasFocus).
+
+space_clear_focus(Prefix) :-
+    space_key(space_focus_, Prefix, Key),
+    catch(nb_delete(Key), _, true).
+
 % The frame (interval and callbacks) is written once and read every
 % frame; the state is what changes.
 space_frame(Prefix, IntervalMs, Callbacks) :-
@@ -136,19 +153,45 @@ space_set_frame(Prefix, IntervalMs, Callbacks) :-
 % nb_setval/2 copies the queue into the protected area of the global
 % variable space, so the tables stay whole.  Reading copies as well, so the
 % caller never holds cells that the next push can free.
+% The queue keeps its length next to it, so that the limit below can be
+% checked without walking the list every time an event arrives.
 space_events(Prefix, Events) :-
     space_key(space_events_, Prefix, Key),
-    catch(nb_getval(Key, Queue), _, fail),
-    copy_term(Queue, QueueCopy),
-    reverse(QueueCopy, Events).
-
-space_push_event(Prefix, Event) :-
-    space_key(space_events_, Prefix, Key),
-    (   catch(nb_getval(Key, Queue), _, fail)
+    (   catch(nb_getval(Key, queue(_, Queue)), _, fail)
     ->  true
     ;   Queue = []
     ),
-    nb_setval(Key, [Event|Queue]).
+    copy_term(Queue, QueueCopy),
+    reverse(QueueCopy, Events).
+
+% How many events the queue holds at most.
+%
+% A program that polls drains the queue every frame, so it never comes near
+% the limit.  A program that only uses the callbacks never drains it at all,
+% and without the limit the queue would grow for ever: an hour of mouse
+% movement is a quarter of a million events, each one a table the backend
+% has to copy.  The OLDEST event is the one that goes, because the newest
+% are the ones the program has not seen yet.
+space_queue_limit(256).
+
+space_push_event(Prefix, Event) :-
+    space_key(space_events_, Prefix, Key),
+    (   catch(nb_getval(Key, queue(N, Queue)), _, fail)
+    ->  true
+    ;   N = 0, Queue = []
+    ),
+    space_queue_limit(Limit),
+    (   N >= Limit
+    ->  (   append(Newest, [_Oldest], Queue)
+        ->  N1 = Limit
+        ;   Newest = Queue,
+            N1 is N + 1
+        )
+    ;   Newest = Queue,
+        N1 is N + 1
+    ),
+    nb_setval(Key, queue(N1, [Event|Newest])),
+    space_push_undelivered(Prefix, Event).
 
 space_clear_events(Prefix) :-
     space_key(space_events_, Prefix, Key),
@@ -159,11 +202,53 @@ space_clear_events(Prefix) :-
 space_set_events(Prefix, Events) :-
     space_key(space_events_, Prefix, Key),
     reverse(Events, NewestFirst),
-    nb_setval(Key, NewestFirst).
+    length(NewestFirst, N),
+    nb_setval(Key, queue(N, NewestFirst)).
+
+% --- the events the callbacks have not seen yet ------------------------------
+%
+% The tick PEEKS at the queue, because a polling program drains it with
+% event.get/2 from update and must still find its events there.  The
+% callbacks used to be fired with the WHOLE queue on every frame, so a
+% program that never drained it was told about the same key press again on
+% the next frame, and again on the one after that: one press produced an
+% endless stream of keypressed callbacks, forever.
+%
+% The undelivered list is the part of the queue the callbacks have not seen
+% yet.  The tick takes it, fires the callbacks with it and empties it, so
+% every event reaches the callbacks exactly once.  The queue itself is left
+% alone, so a polling program still finds the event with event.get/2.
+%
+% The two lists are independent on purpose: an event that arrives in the
+% middle of a frame is in the queue before the program drains it and in the
+% undelivered list until the next tick, and it has to reach the callbacks
+% even though the program has already seen it.
+space_undelivered_events(Prefix, Events) :-
+    space_key(space_undelivered_, Prefix, Key),
+    (   catch(nb_getval(Key, Queue), _, fail)
+    ->  true
+    ;   Queue = []
+    ),
+    copy_term(Queue, QueueCopy),
+    reverse(QueueCopy, Events).
+
+% Take the events the callbacks have not seen, and mark them as seen.
+space_xpce_take_undelivered(Prefix, Events) :-
+    space_undelivered_events(Prefix, Events),
+    space_key(space_undelivered_, Prefix, Key),
+    nb_setval(Key, []).
+
+space_push_undelivered(Prefix, Event) :-
+    space_key(space_undelivered_, Prefix, Key),
+    (   catch(nb_getval(Key, Queue), _, fail)
+    ->  true
+    ;   Queue = []
+    ),
+    nb_setval(Key, [Event|Queue]).
 
 % Drop everything a window keeps between frames.
 space_forget(Prefix) :-
-    forall(member(Kind, [space_state_, space_ink_, space_last_, space_frame_, space_events_]),
+    forall(member(Kind, [space_state_, space_ink_, space_last_, space_frame_, space_events_, space_undelivered_, space_focus_, space_mods_]),
            (   space_key(Kind, Prefix, Key)
            ->  nb_delete(Key)
            ;   true
@@ -252,6 +337,53 @@ event(G, Ev:event) :->
 
 :- pce_end_class.
 
+% --- the game ----------------------------------------------------------------
+%
+% A Space application is a 'game' class, the way XPCE's own SDL demos are
+% written: prolog/demo/asteroids.pl has asteroids_game, a frame, with the
+% asteroids_window inside it, and the game class owns the timer that drives
+% the frames.
+%
+% The game IS the canvas: it extends space_picture, so it keeps the input
+% capture, and it owns the timer.  The callbacks and the game state stay
+% where the Space API keeps them, in the per-prefix facts: they are Cosmos
+% values that travel from update/2 to draw/1, not XPCE objects.
+%
+% The window is opened from inside pce_main_loop's boot goal, because
+% pce_loop only dispatches the frames that goal created.  That is how the
+% window's close ends the process, with no done_message override.
+:- pce_begin_class(space_game, space_picture,
+                   "A Space application: the canvas, the timer and the frame dispatch").
+
+variable(prefix, name, both, "The Space instance this game belongs to").
+
+initialise(G, Prefix:name) :->
+    "Remember the Space instance and start the frame timer"::
+    % The superclass sets the label and the scrollbars; without it the
+    % window is not a proper picture and the program ends at once.
+    send_super(G, initialise, 'Cosmos Space'),
+    send(G, slot, prefix, Prefix),
+    space_xpce_start_timer(G).
+
+tick(G) :->
+    "Run one frame"::
+    get(G, prefix, Prefix),
+    space_xpce_tick(Prefix).
+
+:- pce_end_class.
+
+% The timer that drives the frames.  It sends tick to the game, so the game
+% is what decides what a frame does.
+space_xpce_start_timer(Game) :-
+    get(Game, prefix, Prefix),
+    (   space_frame(Prefix, IntervalMs, _)
+    ->  true
+    ;   IntervalMs = 16
+    ),
+    Secs is IntervalMs / 1000.0,
+    new(_Timer, timer(Secs, message(Game, tick))),
+    send(_Timer, start).
+
 % --- helpers ---------------------------------------------------------------
 
 space_prefix(Prefix0, Prefix) :-
@@ -281,16 +413,50 @@ space_colour(Color, Colour) :-
     new(Colour, colour(@default, R, G, B)).
 
 space_colour_channels(Color, R, G, B) :-
-    (   string(Color), sub_string(Color, 0, 1, _, "#") ->
-        sub_string(Color, 1, 2, _, RHex),
-        sub_string(Color, 3, 2, _, GHex),
-        sub_string(Color, 5, 2, _, BHex),
-        space_hex(RHex, R), space_hex(GHex, G), space_hex(BHex, B)
-    ;   is_list(Color), Color = [R0, G0, B0], maplist(number, [R0, G0, B0]) ->
-        space_channel(R0, R), space_channel(G0, G), space_channel(B0, B)
-    ; Color=fc_rgb(R,G,B) 
-	; R = 255, G = 255, B = 255
+    (   space_xpce_colour_hex(Color, R, G, B)
+    ->  true
+    ;   space_xpce_colour_list(Color, R, G, B)
+    ->  true
+    ;   space_xpce_colour_functor(Color, R, G, B)
+    ->  true
+    ;   R = 255, G = 255, B = 255
     ).
+
+% "#rrggbb".
+space_xpce_colour_hex(Color, R, G, B) :-
+    string(Color),
+    sub_string(Color, 0, 1, _, "#"),
+    sub_string(Color, 1, 2, _, RHex),
+    sub_string(Color, 3, 2, _, GHex),
+    sub_string(Color, 5, 2, _, BHex),
+    space_hex(RHex, R), space_hex(GHex, G), space_hex(BHex, B).
+
+% [R,G,B].
+space_xpce_colour_list(Color, R, G, B) :-
+    is_list(Color),
+    Color = [R0, G0, B0],
+    maplist(number, [R0, G0, B0]),
+    space_channel(R0, R), space_channel(G0, G), space_channel(B0, B).
+
+% The rgb(...) functor.  A Cosmos functor crosses the pl:: bridge as a
+% term whose name is fc_<name>, so rgb(255,0,0) arrives here as the term
+% fc_rgb(255,0,0).  The old code tried to match it with a BINDING
+% (Color = fc_rgb(R,G,B)) in the middle of a chain of conditions, where it
+% is the condition of the last else-branch: it therefore also matched
+% colours that are not functors at all, and the white fallback was
+% unreachable.  The three forms are separate goals now, each of which
+% either produces the three channels or fails.
+%
+% rgba(...) is accepted as well; XPCE's colour object has no alpha
+% channel, so the alpha is dropped.
+space_xpce_colour_functor(fc_rgb(R0, G0, B0), R, G, B) :-
+    !,
+    maplist(number, [R0, G0, B0]),
+    space_channel(R0, R), space_channel(G0, G), space_channel(B0, B).
+space_xpce_colour_functor(fc_rgba(R0, G0, B0, _), R, G, B) :-
+    !,
+    maplist(number, [R0, G0, B0]),
+    space_channel(R0, R), space_channel(G0, G), space_channel(B0, B).
 
 space_channel(V0, V) :-
     ( V0 =< 1.0 -> V is round(V0 * 255) ; V is round(V0) ).
@@ -447,6 +613,12 @@ space_xpce_init(Prefix0, W0, H0) :-
     ; assertz(space_xform(Prefix, 0, 0, 0, 1, 1, 0, 0))
     ).
 
+% Open the canvas from the program side: sp.open() calls this, and a game
+% relation that opens its own window calls it from inside the relation.
+space_xpce_open(Prefix0) :-
+    space_prefix(Prefix0, Prefix),
+    space_xpce_open_window(Prefix).
+
 % Create (or reuse) the window. Called from inside pce_main_loop's boot
 % goal so pce_loop tracks the frame and dispatches until it is closed.
 % No done_message override.  Overriding it is what made closing the window
@@ -458,15 +630,30 @@ space_xpce_init(Prefix0, W0, H0) :-
 % survives; without it the process exits 0 with no dialog.)
 space_xpce_boot_window(Prefix) :-
     ( space_window(Prefix, _) -> true
+    ; space_xpce_open_window(Prefix)
+    ).
+
+% Open the canvas.  The game class IS the canvas: it extends space_picture,
+% so it keeps the input capture, and it owns the frame timer.
+%
+% A program that wants to open the window itself -- the startLoop shape,
+% where the game relation does the opening -- calls space_xpce_open/1 from
+% inside that relation.  Then the window is created while pce_loop's goal
+% runs, which is what lets pce_loop find it and dispatch until it is closed.
+space_xpce_open_window(Prefix) :-
+    ( space_window(Prefix, _) -> true
     ; ( space_pending(Prefix, W, H) -> true ; W = 640, H = 480 ),
       % Drop what the previous window left behind BEFORE the new window is
       % built: opening a window can already deliver events (the keyboard
       % focus arrives with it), and clearing the queue afterwards threw those
       % away again.
       space_clear_events(Prefix),
-      % space_picture, not picture: the subclass is what routes ->event into
+      % space_game, not picture: the subclass is what routes ->event into
       % space_xpce_capture/2.  A plain picture would simply ignore input.
-      new(Window, space_picture('Cosmos Space')),
+      % The game class also owns the frame timer, so the application is one
+      % object with its own start-up and its own tick, like the SDL demos.
+      new(Window, space_game(Prefix)),
+      send(Window, name, 'Cosmos Space'),
       send(Window, size, size(W, H)),
       send(Window, open),
       % Keyboard events are delivered to the graphical selected by
@@ -490,7 +677,7 @@ space_xpce_boot_window(Prefix) :-
       ( space_line_style(Prefix, _) -> true ; assertz(space_line_style(Prefix, "smooth")) ),
       retractall(space_mouse(Prefix, _, _, _)),
       retractall(space_keys(Prefix, _)),
-      retractall(space_focus(Prefix, _))
+      space_clear_focus(Prefix)
     ).
 
 % NOTE: never destroy/hide an opened XPCE window programmatically: outside
@@ -502,7 +689,7 @@ space_xpce_forget_window(Prefix) :-
     space_forget(Prefix),
     retractall(space_mouse(Prefix, _, _, _)),
     retractall(space_keys(Prefix, _)),
-    retractall(space_focus(Prefix, _)),
+    space_clear_focus(Prefix),
     retractall(space_size(Prefix, _)).
 
 space_xpce_start(Prefix0, IntervalMs, Callbacks, InitialState) :-
@@ -513,6 +700,36 @@ space_xpce_start(Prefix0, IntervalMs, Callbacks, InitialState, W, H) :-
     space_prefix(Prefix0, Prefix),
     space_xpce_init(Prefix, W, H),
     space_xpce_start_loop(Prefix, IntervalMs, Callbacks, InitialState).
+
+% The game-loop shape: the GAME relation opens the window and the loop
+% dispatches until it is closed.  This is the Space answer to xp.main_loop/1.
+%
+% The entry point is pce_main_loop/1, the same one sp.start/3 uses: it runs
+% setup_runtime, hands the command line to the goal and dispatches until the
+% last frame is gone.  The window has to be created while that goal runs --
+% pce_loop only dispatches the windows the goal created -- so the goal is the
+% program's own relation, and the relation is what calls sp.open().
+%
+% The interval is in SECONDS here, like the XPCE timer; sp.start/3 takes
+% milliseconds.
+space_xpce_start_loop_game(Prefix0, IntervalSeconds, Game, Callbacks, State) :-
+    space_prefix(Prefix0, Prefix),
+    IntervalMs is IntervalSeconds * 1000.0,
+    space_set_frame(Prefix, IntervalMs, Callbacks),
+    space_set_state(Prefix, State),
+    get_time(Now),
+    space_set_last(Prefix, Now),
+    % The same unwind handling as space_xpce_start_loop/4: closing the
+    % window halts the process, and that arrives here as the ball
+    % unwind(halt(0)).  Reporting it as an error would turn a clean exit
+    % into status 1.
+    catch(pce_main_loop(space_xpce_goal(Game)), E, space_xpce_loop_error(E)),
+    halt(0).
+
+% pce_loop/2 calls its goal with the argument list; the Cosmos relation
+% takes that list as its single argument.
+space_xpce_goal(Closure, Argv) :-
+    call_cl(Closure, [Argv]).
 
 space_xpce_start_loop(Prefix0, IntervalMs, Callbacks, State) :-
     space_prefix(Prefix0, Prefix),
@@ -537,14 +754,15 @@ space_xpce_loop_error(E) :-
     halt(1).
 
 % Boot goal run by pce_loop (called with argv appended).
+%
+% The window is created HERE, inside the boot goal, because pce_loop only
+% dispatches the frames that this goal created.  The game class opens the
+% canvas and starts its own timer, so the boot goal only has to place the
+% window and set the clock.
 space_xpce_boot(Prefix, _Argv) :-
     space_xpce_boot_window(Prefix),
-    space_frame(Prefix, IntervalMs, _),
     get_time(Now),
-    space_set_last(Prefix, Now),
-    Secs is IntervalMs / 1000.0,
-    new(_Timer, timer(Secs, message(@prolog, space_xpce_tick, Prefix))),
-    send(_Timer, start).
+    space_set_last(Prefix, Now).
 
 space_xpce_start_canvas(Prefix, Fps, Callbacks, State) :-
     Ms is 1000.0 / Fps,
@@ -562,26 +780,35 @@ space_xpce_tick(Prefix) :-
       space_state(Prefix, State),
       space_window(Prefix, Window) ->
         get_time(Now),
-        ( space_last(Prefix, Last) -> Dt is Now - Last ; Dt = 0.016 ),
+        ( space_last(Prefix, Last) -> Dt0 is Now - Last ; Dt0 = 0.016 ),
         space_set_last(Prefix, Now),
+        space_xpce_clamp_dt(Prefix, Dt0, Dt),
         % The Space API says the held key and mouse-button state is cleared
         % when the canvas loses focus, and a key pressed while another window
         % had the focus never produces a release.  The window reports its own
         % focus, so the change is picked up here, once a frame.
         space_xpce_update_focus(Prefix, Window),
+        % The modifier keys are polled once a frame: XPCE does not deliver
+        % events for them, so the device is the only thing that notices a
+        % modifier that was pressed or released on its own.  A change
+        % queues an ordinary key event for it.
+        space_xpce_update_modifiers(Prefix, none),
         % XPCE has delivered whatever input arrived since the last tick.
-        % Callbacks registered under "on" fire here, BEFORE update/draw, so a
-        % handler sees the frame's events.  The queue is only PEEKED at: it is
-        % drained by event.get/2, which is what a polling program calls from
-        % update.  Draining here instead would starve every polling caller.
-        space_xpce_events_pending(Prefix, Events),
-        ( Events == [] -> true
-        ; space_xpce_dispatch_callbacks(Prefix, Events)
+        % The callbacks fire here, BEFORE update/draw, so a handler sees the
+        % frame's events.  Only the events the callbacks have NOT seen yet
+        % are fired: the queue itself is only PEEKED at, because a polling
+        % program drains it with event.get/2, and firing the whole queue
+        % again every frame told the program about the same key press for
+        % ever.
+        space_xpce_take_undelivered(Prefix, Events),
+        (   Events == []
+        ->  State1 = State
+        ;   space_xpce_dispatch_callbacks(Prefix, Events, State, State1)
         ),
         ( get_assoc("update", Callbacks, Update) ->
-            catch(space_xpce_call_update(Update, Dt, State, NewState), E,
-                  ( print_message(warning, E), NewState = State ))
-        ; NewState = State
+            catch(space_xpce_call_update(Update, Dt, State1, NewState), E,
+                  ( print_message(warning, E), NewState = State1 ))
+        ; NewState = State1
         ),
         space_set_state(Prefix, NewState),
         %catch(send(Window, clear), _, true),
@@ -591,6 +818,32 @@ space_xpce_tick(Prefix) :-
         ),
         catch(send(Window, flush), _, true)
     ; true
+    ).
+
+% The step is clamped.
+%
+% dt is the time since the previous tick, so a callback that took a second
+% -- a long print, a slow disk write, a window that was dragged -- hands the
+% NEXT frame a dt of a second.  A game that multiplies its speed by dt then
+% jumps across the screen, and a collision check that assumes a small step
+% walks straight through a wall.  The limit is a few frame intervals, so a
+% frame that ran long loses time instead of teleporting things.  A program
+% that runs at its normal speed never reaches the limit, so nothing changes
+% for it.
+%
+% The clock can also jump backwards, so a negative dt is clamped to zero.
+space_xpce_max_steps(4).
+
+space_xpce_clamp_dt(Prefix, Dt0, Dt) :-
+    (   space_frame(Prefix, Ms, _)
+    ->  Limit is Ms / 1000.0 * 4
+    ;   Limit = 0.064
+    ),
+    (   Dt0 > Limit
+    ->  Dt = Limit
+    ;   Dt0 < 0.0
+    ->  Dt = 0.0
+    ;   Dt = Dt0
     ).
 
 % Space demos use both callback shapes: update(state, newState) and
@@ -659,9 +912,33 @@ space_xpce_colour_string(Color, Hex) :-
     (   string(Color)
     ->  Hex = Color
     ;   catch(space_colour_channels(Color, R, G, B), _, fail)
-    ->  format(atom(A), "#~2.16.0b~2.16.0b~2.16.0b", [R, G, B]),
-        atom_string(A, Hex)
+    ->  space_xpce_channel_hex(R, RH),
+        space_xpce_channel_hex(G, GH),
+        space_xpce_channel_hex(B, BH),
+        string_concat("#", RH, S1),
+        string_concat(S1, GH, S2),
+        string_concat(S2, BH, Hex)
     ;   Hex = "#ffffff"
+    ).
+
+% One colour channel as two hex digits.  The old code used
+% format(atom(A), "#~2.16.0b...", ...), and that format is not a thing:
+% SWI-Prolog rejects it with "format_character '.' does not exist", so
+% every colour that was not already a string raised an error here and the
+% drawing call that asked for it failed.
+space_xpce_channel_hex(V0, Hex) :-
+    V is V0 mod 256,
+    High is V // 16,
+    Low is V mod 16,
+    space_xpce_hex_digit(High, HD),
+    space_xpce_hex_digit(Low, LD),
+    atom_codes(A, [HD, LD]),
+    atom_string(A, Hex).
+
+space_xpce_hex_digit(N, D) :-
+    (   N < 10
+    ->  D is 0'0 + N
+    ;   D is 0'a + N - 10
     ).
 
 space_xpce_rectangle(Prefix0, Mode, X0, Y0, W0, H0) :-
@@ -1091,19 +1368,30 @@ space_xpce_draw_image(Prefix0, Name, X, Y) :-
 % (the guard in the ->event method above swallows failure) and, more
 % importantly, must not raise: see the two constraints at the top.
 
-debug_write(X,Y) :- true. %write(X), writeln(Y).
-
+debug_write(X,Y) :- true. 
+	%write(X), writeln(Y).
 
 space_xpce_capture(Window, Ev) :-
     ( space_xpce_prefix_of(Window, Prefix) -> true ; Prefix = default ),
-    space_xpce_read(Ev, Type, Fields),
+    space_xpce_read(Prefix, Ev, Type, Fields),
+    % The modifier keys are updated BEFORE the event is queued: a modifier
+    % that was pressed together with this key has to be queued first, or
+    % the program sees the key and only afterwards the modifier that was
+    % already down when the key was typed.  A mouse event says nothing
+    % about the modifiers, so only the keyboard events ask.
+    (   Type == "keydown"
+    ->  space_xpce_update_modifiers(Prefix, Ev)
+    ;   Type == "keyup"
+    ->  space_xpce_update_modifiers(Prefix, Ev)
+    ;   true
+    ),
     % Build the table FIRST and pass that on.  Downstream code indexes it
     % with get_assoc/3, which needs the assoc -- passing the raw Key-Value
     % list raises "'$btree_find_node'/5: Type error: `btree' expected".
     space_event_assoc(Fields, Event),
     space_xpce_update_state(Prefix, Type, Event),
     space_push_event(Prefix, Event),
-	debug_write("Ev:",Fields),
+	debug_write("Ev:",[Fields, Ev, Type]),
     % A key press that carries a printable character is also text input.
     space_xpce_text_input(Prefix, Type, Event),!.
 
@@ -1155,11 +1443,10 @@ space_xpce_update_focus(Prefix, Window) :-
     ;   HasFocus = false
     ),
     (   space_focus(Prefix, Was) -> true ; Was = false ),
-    retractall(space_focus(Prefix, _)),
-    assertz(space_focus(Prefix, HasFocus)),
     (   Was == HasFocus
     ->  true
-    ;   retractall(space_keys(Prefix, _)),
+    ;   space_set_focus(Prefix, HasFocus),
+        retractall(space_keys(Prefix, _)),
         assertz(space_keys(Prefix, [])),
         retractall(space_mouse(Prefix, _, _, _)),
         assertz(space_mouse(Prefix, 0, 0, [])),
@@ -1211,10 +1498,10 @@ space_event_assoc(Fields, Event) :-
 %     event, key press and key release alike.
 % The last test is the one that matters most: it needs no list of key names,
 % so a key this file has never heard of is still recognised as a key.
-space_xpce_read(Ev, Type, Fields) :-
+space_xpce_read(Prefix, Ev, Type, Fields) :-
     get(Ev, id, Id),
     (   send(Ev, is_a, mouse)
-    ->  space_xpce_read_mouse(Ev, Id, Type, Fields)
+    ->  space_xpce_read_mouse(Prefix, Ev, Id, Type, Fields)
     ;   send(Ev, is_a, key_up)
     ->  space_xpce_read_key(Ev, Id, Type, Fields)
     ;   space_xpce_key_event(Ev, Id)
@@ -1235,7 +1522,7 @@ space_xpce_key_event(Ev, Id) :-
         )
     ).
 
-space_xpce_read_mouse(Ev, Id, Type, Fields) :-
+space_xpce_read_mouse(Prefix, Ev, Id, Type, Fields) :-
     get(Ev, position, Pt),
     get(Pt, x, X0), get(Pt, y, Y0),
     ( send(Ev, is_down) -> Down = true ; Down = false ),
@@ -1246,6 +1533,16 @@ space_xpce_read_mouse(Ev, Id, Type, Fields) :-
     space_xpce_mouse_type(Id, Down, Up, Drag, Type),
     space_xpce_mods(Ev, Mod),
     space_xpce_button_number(Button, ButtonNumber),
+    % The movement since the previous position.  The mousemoved callback
+    % needs it, and the event table did not carry it before.  The stored
+    % position is the one of the previous event: the state is updated
+    % after this read.
+    (   space_mouse(Prefix, PrevX, PrevY, _)
+    ->  true
+    ;   PrevX = 0, PrevY = 0
+    ),
+    DX is X0 - PrevX,
+    DY is Y0 - PrevY,
     % The wheel ROTATION is read from event <-rotation, which is an ordinary
     % get method and answers a non-number for every event that is not a
     % wheel.  It reports 1/15th of a notch, so a whole notch is 15.
@@ -1258,6 +1555,7 @@ space_xpce_read_mouse(Ev, Id, Type, Fields) :-
     % atom-keyed assoc reads back as missing and `ev.type' yields null.
     Fields = [ "type"-Type, "mod"-Mod,
                "posx"-X0, "posy"-Y0, "x"-X0, "y"-Y0,
+               "dx"-DX, "dy"-DY,
                "button"-ButtonNumber, "clicks"-Clicks, "wheel"-Wheel ].
 
 % A key release is an event of its own: the id is the atom key_up and the
@@ -1323,12 +1621,11 @@ space_xpce_button_name(Button) :-
     memberchk(Button, [left, middle, right]).
 
 % Modifier string in PyGame style: any of "s" (shift), "c" (control),
-% "m" (meta/super).  Only these three are accepted by has_modifier/1.
-space_xpce_mods(Ev, Mods) :-
-    findall(L,
-            ( member(L, [s, c, m]), send(Ev, has_modifier, L) ),
-            Ms),
-    ( Ms == [] -> Mods = "" ; atom_chars(Mods, Ms) ).
+% "m" (meta/super).  It is read from the event's buttons mask, not from
+% has_modifier/1: a modifier object demands the OTHER modifier keys to be
+% up, so has_modifier(s) fails as soon as control is held as well, and the
+% modifier string of a control+shift press came out empty.  The mask has
+% no such restriction.  See the section on the modifier keys below.
 
 % Key naming.  XPCE gives a printable key as its ASCII code and everything
 % else as an atom from the @event_tree hierarchy.  Names are returned as
@@ -1590,7 +1887,8 @@ space_xpce_device_key(Name0, DeviceKey) :-
     ->  true
     ;   DeviceKey = Lower
     ).
-
+	
+%kept alias to arrow-keys only
 space_xpce_device_alias(left, cursor_left).
 space_xpce_device_alias(arrowleft, cursor_left).
 space_xpce_device_alias(right, cursor_right).
@@ -1599,27 +1897,6 @@ space_xpce_device_alias(up, cursor_up).
 space_xpce_device_alias(arrowup, cursor_up).
 space_xpce_device_alias(down, cursor_down).
 space_xpce_device_alias(arrowdown, cursor_down).
-space_xpce_device_alias(enter, 'RET').
-space_xpce_device_alias(return, 'RET').
-space_xpce_device_alias(escape, 'ESC').
-space_xpce_device_alias(esc, 'ESC').
-space_xpce_device_alias(space, space).
-space_xpce_device_alias(tab, 'TAB').
-space_xpce_device_alias(backspace, 'BS').
-space_xpce_device_alias(delete, 'DEL').
-space_xpce_device_alias(del, 'DEL').
-space_xpce_device_alias(pageup, page_up).
-space_xpce_device_alias(pagedown, page_down).
-space_xpce_device_alias(home, cursor_home).
-space_xpce_device_alias(end, end).
-space_xpce_device_alias(insert, insert).
-space_xpce_device_alias(pause, pause).
-space_xpce_device_alias(lshift, 'Left Shift').
-space_xpce_device_alias(rshift, 'Right Shift').
-space_xpce_device_alias(lctrl, 'Left Ctrl').
-space_xpce_device_alias(rctrl, 'Right Ctrl').
-space_xpce_device_alias(lalt, 'Left Alt').
-space_xpce_device_alias(ralt, 'Right Alt').
 
 % Is this a name the device is guaranteed to know?  Anything else is not
 % polled, so XPCE never raises "Unknown key" on it.
@@ -1637,6 +1914,254 @@ space_xpce_device_key_known(DeviceKey) :-
 % device itself is unusable and the caller falls back to the event set.
 space_xpce_device_key_down(DeviceKey) :-
     catch(get(@keyboard_device, key_down, DeviceKey, @on), _, fail).
+
+% --- modifier keys ----------------------------------------------------------
+%
+% XPCE does NOT deliver events for the modifier keys.  Its own manual says
+% so (class key_data):
+%
+%   "Only keys that generated a keyboard event generate a key_up: a
+%    modifier key, such as Shift, generates neither."
+%
+% So a program that only looks at the events never sees shift, control or
+% alt being pressed.  XPCE does report them in two other places:
+%
+%   * the modifier state of an event, which lives in the event's BUTTONS
+%     MASK: control 0x1, shift 0x2, meta 0x4;
+%   * the keyboard device, which knows whether a key is held right now.
+%
+% The mask is the better of the two.  has_modifier/2 cannot be used to read
+% the state back: a modifier object demands the OTHER modifier keys to be
+% UP, so has_modifier(s) fails as soon as control is held as well, and the
+% modifier string of a control+shift press came out empty.  The mask has no
+% such restriction.
+%
+% Two things are built on top of that:
+%
+%   * the state of the modifier keys is tracked, so isDown/1 can answer for
+%     a modifier and not only for an ordinary key;
+%   * a modifier that is pressed or released is turned into an ordinary
+%     keydown/keyup event, so the modifier keys are visible in the event
+%     queue and reach the keypressed/keyreleased callbacks as well.
+%
+% The names are the ones XPCE itself uses.  Its modifier class has a
+% shift, a control and a meta slot, and its own key names spell them
+% "Shift-", "Ctrl-" and "Alt-" (see key_name/2 in XPCE's
+% pce_keybinding.pl), so:
+%
+%   shift   the shift key
+%   ctrl    the control key
+%   alt     the meta key, which is the alt key on the keyboard
+%
+% There is no fourth one.  XPCE's modifier class also has a gui slot, but
+% the gui key is in neither of the two places a modifier can be seen: the
+% event mask has no bit for it, and the keyboard device of this build does
+% not know the name of the key -- asking for it raises "Unknown key", and
+% an error raised inside the event loop stops the frame for good (see
+% constraint 1 at the top of this file).  A modifier that cannot be seen
+% is not offered at all.
+%
+% The SDL names of the keys ("Left Shift" and friends) are NOT part of the
+% Space vocabulary.  They are how the XPCE keyboard device spells the same
+% keys, and they are used here only to talk to that device.
+space_xpce_modifiers([shift, ctrl, alt]).
+
+% The spellings the Space API accepts for the same keys.
+space_xpce_modifier_alias(control, ctrl).
+space_xpce_modifier_alias(meta, alt).
+
+% How the XPCE keyboard device spells the modifier keys.  The device takes
+% the name SDL uses for the key ("Left Shift"); that is XPCE's own
+% vocabulary FOR THE DEVICE, not a name the Space API hands out.
+%
+% These three pairs are verified against this build: a name the device
+% does not know raises "Unknown key", which is fatal inside the event
+% loop.
+space_xpce_modifier_device_keys(shift, ['Left Shift', 'Right Shift']).
+space_xpce_modifier_device_keys(ctrl, ['Left Ctrl', 'Right Ctrl']).
+space_xpce_modifier_device_keys(alt, ['Left Alt', 'Right Alt']).
+
+% The modifier state: which modifiers are held down right now, and whether
+% the keyboard device has ever been seen to report a held modifier.
+%
+% It lives in a global variable rather than in a fact: it changes every
+% frame, and a fact would have to be retracted and asserted again (see the
+% note on nb_setval/2 at the top of this file).
+space_mod_state(Prefix, Mods, DeviceOk) :-
+    space_key(space_mods_, Prefix, Key),
+    (   catch(nb_getval(Key, V), _, fail)
+    ->  V = state(Mods, DeviceOk)
+    ;   Mods = [], DeviceOk = false
+    ).
+
+space_set_mod_state(Prefix, Mods, DeviceOk) :-
+    space_key(space_mods_, Prefix, Key),
+    nb_setval(Key, state(Mods, DeviceOk)).
+
+% The modifiers an event carries.
+%
+% The mask carries them, and has_modifier/2 confirms them: a modifier that
+% is down on its own is reported by has_modifier/2 even in a build whose
+% mask has no modifier bits.  The two are combined, so the state of an
+% event is read as fully as this build allows.
+space_xpce_event_modifiers(none, []) :- !.
+space_xpce_event_modifiers(Ev, Mods) :-
+    (   catch(get(Ev, buttons, Mask), _, fail), integer(Mask)
+    ->  true
+    ;   Mask = 0
+    ),
+    (   space_xpce_mask_bit(Mask, 2) -> Ms = [shift] ; Ms = [] ),
+    (   space_xpce_mask_bit(Mask, 1) -> append(Ms, [ctrl], Ms1) ; Ms1 = Ms ),
+    (   space_xpce_mask_bit(Mask, 4) -> append(Ms1, [alt], Ms2) ; Ms2 = Ms1 ),
+    (   catch(send(Ev, has_modifier, s), _, fail)
+    ->  append(Ms2, [shift], Ms3) ; Ms3 = Ms2 ),
+    (   catch(send(Ev, has_modifier, c), _, fail)
+    ->  append(Ms3, [ctrl], Ms4) ; Ms4 = Ms3 ),
+    (   catch(send(Ev, has_modifier, m), _, fail)
+    ->  append(Ms4, [alt], Ms5) ; Ms5 = Ms4 ),
+    sort(Ms5, Mods).
+
+% Is the bit set in the event's mask?  The mask is a bit field: control
+% 0x1, shift 0x2, meta 0x4.
+space_xpce_mask_bit(Mask, Bit) :-
+    Value is Mask /\ Bit,
+    Value =\= 0.
+
+% The modifier string of an event, in the PyGame style the event table
+% uses: any of "s" (shift), "c" (control), "m" (meta).
+space_xpce_mods(Ev, Mods) :-
+    space_xpce_event_modifiers(Ev, Names),
+    space_xpce_mod_letters(Names, Letters),
+    ( Letters == [] -> Mods = "" ; atom_chars(Mods, Letters) ).
+
+space_xpce_mod_letters(Mods, Letters) :-
+    (   memberchk(shift, Mods) -> Ms = [s] ; Ms = [] ),
+    (   memberchk(ctrl, Mods) -> append(Ms, [c], Ms1) ; Ms1 = Ms ),
+    (   memberchk(alt, Mods) -> append(Ms1, [m], Ms2) ; Ms2 = Ms1 ),
+    Letters = Ms2.
+
+% The modifier state, read from the keyboard device.  Fails when the device
+% cannot answer: it may not exist, and a key it does not know raises an
+% error in C++ that would open a modal dialog (constraint 1).
+%
+% The device is asked with an unbound state, so that "not held" is an
+% answer too and not a failure: the difference between "the user let go of
+% the shift key" and "the device is not there" is what the whole modifier
+% tracking rests on.
+space_xpce_device_modifiers(Mods) :-
+    space_xpce_modifiers(All),
+    space_xpce_device_modifiers_(All, [], Mods).
+
+space_xpce_device_modifiers_([], Acc, Mods) :- !,
+    sort(Acc, Mods).
+space_xpce_device_modifiers_([Mod|Mods], Acc, Held) :-
+    space_xpce_modifier_device_keys(Mod, Keys),
+    (   space_xpce_device_modifier_down(Keys)
+    ->  Acc1 = [Mod|Acc]
+    ;   Acc1 = Acc
+    ),
+    space_xpce_device_modifiers_(Mods, Acc1, Held).
+
+% Is one of these device keys held down?  The first answer that is not an
+% error decides; an error means the device is unusable here.
+space_xpce_device_modifier_down(Keys) :-
+    member(Key, Keys),
+    catch(get(@keyboard_device, key_down, Key, State), _, fail),
+    !,
+    State == @on.
+
+% Bring the tracked modifier state up to date and queue an event for every
+% modifier whose state changed.
+%
+% The device is the truth when it works.  It is only believed once it has
+% reported a held modifier at least once: a device that answers "nothing is
+% held" for every modifier would otherwise cancel the modifiers the events
+% reported, and the program would see shift being pressed and released over
+% and over.  Until then the events are believed.
+%
+% The event is the event that is being captured, or none.  It is the
+% fallback for a build whose device cannot be asked.
+space_xpce_update_modifiers(Prefix, Event) :-
+    space_mod_state(Prefix, Mods, DeviceOk),
+    (   space_xpce_device_modifiers(DeviceMods)
+    ->  (   DeviceOk == true
+        ->  Set = DeviceMods,
+            Ok = true
+        ;   DeviceMods == []
+        ->  (   space_xpce_event_modifiers(Event, EventMods),
+                EventMods \== []
+            ->  Set = EventMods,
+                Ok = DeviceOk
+            ;   Set = Mods,
+                Ok = DeviceOk
+            )
+        ;   Set = DeviceMods,
+            Ok = true
+        )
+    ;   (   space_xpce_event_modifiers(Event, EventMods)
+        ->  Set = EventMods,
+            Ok = DeviceOk
+        ;   Set = Mods,
+            Ok = DeviceOk
+        )
+    ),
+    space_xpce_apply_modifiers(Prefix, Set, Ok).
+
+% Set the modifier state and queue the events for the change.
+space_xpce_apply_modifiers(Prefix, Mods, DeviceOk) :-
+    space_mod_state(Prefix, Old, _),
+    (   Old == Mods
+    ->  space_set_mod_state(Prefix, Mods, DeviceOk)
+    ;   space_set_mod_state(Prefix, Mods, DeviceOk),
+        subtract(Mods, Old, Pressed),
+        subtract(Old, Mods, Released),
+        space_xpce_modifier_events(Prefix, Pressed, "keydown"),
+        space_xpce_modifier_events(Prefix, Released, "keyup")    ).
+
+% A modifier that is pressed or released is an ordinary key event, so the
+% modifier keys show up in the event queue and reach the keypressed and
+% keyreleased callbacks.
+%
+% The type is a STRING, like the type of every other event: an event with
+% an atom as its type is not found by a lookup for "keydown".
+space_xpce_modifier_events(Prefix, Mods, Type) :-
+    forall(member(Mod, Mods),
+           space_xpce_modifier_event(Prefix, Mod, Type)).
+
+space_xpce_modifier_event(Prefix, Mod, Type) :-
+    space_mod_state(Prefix, Current, _),
+    space_xpce_mods_string(Current, ModString),
+    % The key of an event is a STRING, like the key of every other event.
+    atom_string(Mod, ModName),
+    space_event_assoc([ "type"-Type, "key"-ModName, "char"-"", "mod"-ModString ],
+                      Event),
+    space_push_event(Prefix, Event).
+
+% The modifier string of a set of modifiers.
+space_xpce_mods_string(Mods, String) :-
+    space_xpce_mod_letters(Mods, Letters),
+    ( Letters == [] -> String = "" ; atom_chars(String, Letters) ).
+
+% Is one of the modifier keys held down?
+space_xpce_modifier_is_down(Prefix, Mod, 1) :-
+    space_xpce_modifier_device_keys(Mod, Keys),
+    (   space_xpce_device_modifier_down(Keys)
+    ->  true
+    ;   space_mod_state(Prefix, Held, _),
+        memberchk(Mod, Held)
+    ), !.
+space_xpce_modifier_is_down(_, _, 0).
+
+% Is this name one of the modifier keys?  The name is a string (the same
+% shape the key names of the events have), so it is compared as one.
+space_xpce_modifier_key(Name, Mod) :-
+    space_xpce_modifiers(All),
+    member(Mod, All),
+    (   atom_string(Mod, Name)
+    ->  true
+    ;   space_xpce_modifier_alias(Alias, Mod),
+        atom_string(Alias, Name)
+    ).
 
 % --- polling state ----------------------------------------------------------
 
@@ -1695,7 +2220,9 @@ space_xpce_mouse_buttons(Prefix, Type, Fields, Buttons) :-
 % keys arrive as strings (space_xpce_key/3), a Cosmos program passes a
 % string, and an old caller may pass an atom or a number.
 space_xpce_key_name(N, Name) :-
-    (   string(N)
+    (   var(N)
+    ->  Name = ""
+    ;   string(N)
     ->  Name = N
     ;   atom(N)
     ->  atom_string(N, Name)
@@ -1728,6 +2255,50 @@ space_xpce_event_get(Prefix0, Type, Events) :-
 space_event_type(Type, Event) :-
     ( get_assoc("type", Event, Type) -> true ; fail ).
 
+% Drop every pending event.  The queue is emptied without handing the
+% events over, which is what a program wants when it wants to throw the
+% input of the last frames away.
+space_xpce_event_clear(Prefix0) :-
+    space_prefix(Prefix0, Prefix),
+    space_clear_events(Prefix).
+
+% Drop the pending events of one type and leave the rest queued.
+space_xpce_event_clear_type(Prefix0, Type0) :-
+    space_prefix(Prefix0, Prefix),
+    space_xpce_type_name(Type0, Type),
+    ( space_events(Prefix, All) -> true ; All = [] ),
+    exclude(space_event_type(Type), All, Rest),
+    space_set_events(Prefix, Rest).
+
+% Is there a pending event of this type?
+space_xpce_event_has(Prefix0, Type0, 1) :-
+    space_prefix(Prefix0, Prefix),
+    space_xpce_type_name(Type0, Type),
+    ( space_events(Prefix, All) -> true ; All = [] ),
+    include(space_event_type(Type), All, Found),
+    Found \== [],
+    !.
+space_xpce_event_has(_, _, 0).
+
+% How many pending events of this type?
+space_xpce_event_count(Prefix0, Type0, N) :-
+    space_prefix(Prefix0, Prefix),
+    space_xpce_type_name(Type0, Type),
+    ( space_events(Prefix, All) -> true ; All = [] ),
+    include(space_event_type(Type), All, Found),
+    length(Found, N).
+
+% How many pending events in all?
+space_xpce_event_size(Prefix0, N) :-
+    space_prefix(Prefix0, Prefix),
+    ( space_events(Prefix, All) -> true ; All = [] ),
+    length(All, N).
+
+% The type of an event is a string in the event table, so a caller may
+% write it as a string or as an atom.
+space_xpce_type_name(Type0, Type) :-
+    space_xpce_key_name(Type0, Type).
+
 % Filtering on an unbound-or-different Type simply drops the event.
 
 % Is a key held down?
@@ -1744,12 +2315,17 @@ space_event_type(Type, Event) :-
 space_xpce_keyboard_is_down(Prefix0, Key, 1) :-
     space_prefix(Prefix0, Prefix),
     space_xpce_key_name(Key, Name),
-    space_xpce_device_key(Name, DeviceKey),
-    (   space_xpce_device_key_known(DeviceKey),
-        space_xpce_device_key_down(DeviceKey)
-    ->  true
-    ;   ( space_keys(Prefix, Held) -> true ; Held = [] ),
-        memberchk(Name, Held)
+    (   % A modifier key is not an ordinary key: the device spells it
+        % differently and the state of the modifiers is tracked separately.
+        space_xpce_modifier_key(Name, Mod)
+    ->  space_xpce_modifier_is_down(Prefix, Mod, 1)
+    ;   space_xpce_device_key(Name, DeviceKey),
+        (   space_xpce_device_key_known(DeviceKey),
+            space_xpce_device_key_down(DeviceKey)
+        ->  true
+        ;   ( space_keys(Prefix, Held) -> true ; Held = [] ),
+            memberchk(Name, Held)
+        )
     ), !.
 space_xpce_keyboard_is_down(_, _, 0).
 
@@ -1784,16 +2360,173 @@ space_xpce_button_label(1, "left").
 space_xpce_button_label(2, "right").
 space_xpce_button_label(3, "middle").
 
-% Dispatch queued events to Love2D-style callbacks supplied in the sp.start
-% map under "on".  Called from the frame tick, after XPCE has had the whole
-% frame to deliver input.
-space_xpce_dispatch_callbacks(Prefix, Events) :-
-    space_frame(Prefix, _, Callbacks),
-    ( get_assoc("on", Callbacks, Handlers) -> true ; Handlers = none ),
-    Handlers \== none,
-    forall(member(Event, Events), space_xpce_fire(Handlers, Event)),
-    !.
-space_xpce_dispatch_callbacks(_, _).
+% Dispatch queued events to the callbacks of the sp.start map.
+%
+% Two shapes are supported:
+%
+%   * a handler under "on", keyed by the type of the event.  It gets the
+%     event itself.
+%   * a TOP-LEVEL callback named after the kind of event: keypressed,
+%     keyreleased, mousepressed, mousereleased, mousemoved, wheel,
+%     textinput, focus, blur and resize.  It gets the arguments the Space
+%     API documents for it.
+%
+% The second shape is the one a program normally uses, because the map
+% that sp.start takes holds the relations under their own names:
+%
+%     sp.start(16, {update=update and draw=draw and keypressed=keypressed}, State)
+%
+% so a program that declared keypressed expected it to be called.  It was
+% not: only the handlers under "on" were ever dispatched.
+%
+% The state is threaded through the callbacks: a callback that produces a
+% new state hands it to the next one, and the update callback runs with the
+% state the input callbacks left behind.
+space_xpce_dispatch_callbacks(Prefix, Events, State0, State) :-
+    (   space_frame(Prefix, _, Callbacks)
+    ->  true
+    ;   Callbacks = []
+    ),
+    space_xpce_fire_on(Callbacks, Events),
+    space_xpce_fire_input(Callbacks, Events, State0, State).
+
+space_xpce_fire_on(Callbacks, Events) :-
+    (   get_assoc("on", Callbacks, Handlers),
+        Handlers \== none
+    ->  forall(member(Event, Events), space_xpce_fire(Handlers, Event))
+    ;   true
+    ).
+
+% The callback names that belong to a kind of event.  A mouse button has
+% two: the current name and the legacy one, which does not get the button.
+%
+% The type of an event is a STRING in the event table, so the kinds are
+% spelled as strings here as well.
+space_xpce_input_callbacks("mousedown", [mousepressed, mousedown]).
+space_xpce_input_callbacks("mouseup", [mousereleased, mouseup]).
+space_xpce_input_callbacks("mousemotion", [mousemoved]).
+space_xpce_input_callbacks("mousewheel", [wheel]).
+space_xpce_input_callbacks("keydown", [keypressed]).
+space_xpce_input_callbacks("keyup", [keyreleased]).
+space_xpce_input_callbacks("textinput", [textinput]).
+space_xpce_input_callbacks("focus", [focus]).
+space_xpce_input_callbacks("blur", [blur]).
+space_xpce_input_callbacks("resize", [resize]).
+
+space_xpce_fire_input(Callbacks, Events, State0, State) :-
+    space_xpce_fire_input_events(Callbacks, Events, State0, State).
+
+space_xpce_fire_input_events(_, [], State, State).
+space_xpce_fire_input_events(Callbacks, [Event|Events], State0, State) :-
+    space_xpce_fire_input_event(Callbacks, Event, State0, State1),
+    space_xpce_fire_input_events(Callbacks, Events, State1, State).
+
+space_xpce_fire_input_event(Callbacks, Event, State0, State) :-
+    (   get_assoc("type", Event, Type0),
+        space_xpce_type_name(Type0, Type),
+        space_xpce_input_callbacks(Type, Names)
+    ->  true
+    ;   Names = []
+    ),
+    space_xpce_fire_names(Callbacks, Names, Event, State0, State).
+
+space_xpce_fire_names(_, [], _, State, State).
+space_xpce_fire_names(Callbacks, [Name|Names], Event, State0, State) :-
+    (   atom_string(Name, Key),
+        get_assoc(Key, Callbacks, Handler),
+        Handler \== none
+    ->  space_xpce_call_input(Name, Handler, Event, State0, State1)
+    ;   State1 = State0
+    ),
+    space_xpce_fire_names(Callbacks, Names, Event, State1, State).
+
+% The arguments of the input callbacks, as the Space API documents them.
+% The first list of each is the full form; the others are the shorter ones
+% a program may use.
+%
+% The mouse button callbacks have two forms, because the legacy mousedown
+% and mouseup relations do not take the button:
+%   mousepressed(x,y,button,state,state2)   and   mousepressed(x,y,state,state2)
+space_xpce_cb_roles(keypressed,   [[key,state,state2], [key,state], [key]]).
+space_xpce_cb_roles(keyreleased,  [[key,state,state2], [key,state], [key]]).
+space_xpce_cb_roles(mousepressed, [[x,y,button,state,state2], [x,y,state,state2]]).
+space_xpce_cb_roles(mousereleased,[[x,y,button,state,state2], [x,y,state,state2]]).
+space_xpce_cb_roles(mousedown,    [[x,y,state,state2], [x,y,state]]).
+space_xpce_cb_roles(mouseup,      [[x,y,state,state2], [x,y,state]]).
+space_xpce_cb_roles(mousemoved,   [[x,y,dx,dy,state,state2], [x,y,dx,dy,state]]).
+space_xpce_cb_roles(wheel,        [[dx,dy,state,state2], [dx,dy,state]]).
+space_xpce_cb_roles(textinput,    [[text,state,state2], [text,state]]).
+space_xpce_cb_roles(focus,        [[state,state2]]).
+space_xpce_cb_roles(blur,         [[state,state2]]).
+space_xpce_cb_roles(resize,       [[width,height,state,state2], [width,height,state]]).
+
+% The form of the arguments that matches the number of parameters of the
+% relation.  When the relation has a number of parameters that is not
+% listed, the full form is used and the call fails loudly.
+space_xpce_cb_roles_for(Alternatives, N, Roles) :-
+    (   member(Roles, Alternatives),
+        length(Roles, N)
+    ->  true
+    ;   Alternatives = [Roles|_]
+    ).
+
+% How many parameters the callback has.  A Cosmos closure holds the
+% predicate of the relation, whose arity is the number of parameters of
+% the relation plus one for the list of captured values, so the number of
+% parameters is the arity minus one.
+space_xpce_cb_arity(Pred, N) :-
+    between(1, 8, A),
+    current_predicate(Pred/A),
+    !,
+    N is A - 1.
+space_xpce_cb_arity(_, 0).
+
+% Call one input callback.
+space_xpce_call_input(Name, Handler, Event, State0, State) :-
+    (   Handler = clos(_, Pred),
+        space_xpce_cb_arity(Pred, N),
+        N > 0
+    ->  space_xpce_cb_roles(Name, Alternatives),
+        space_xpce_cb_roles_for(Alternatives, N, Roles)
+    ;   space_xpce_cb_roles(Name, Alternatives),
+        Alternatives = [Roles|_]
+    ),
+    space_xpce_cb_arg_list(Roles, Event, State0, Args, State),
+    catch(call_cl(Handler, Args), E, print_message(warning, E)),
+    (   nonvar(State)
+    ->  true
+    ;   State = State0
+    ).
+
+% The arguments of a callback, in the order of the roles.  The last role
+% is the state the callback produces; it is a fresh variable that the
+% callback binds, and the state stays as it was when the callback does not
+% bind it.
+%
+% The base case must NOT tie the third argument (the state the callback
+% gets) to the fifth (the state it produces): doing so made the state the
+% callback produced the state it was given, so a callback could never
+% change anything.
+space_xpce_cb_arg_list([], _, _, [], State).
+space_xpce_cb_arg_list([Role|Roles], Event, State0, [Arg|Args], State) :-
+    (   Role == state
+    ->  Arg = State0
+    ;   Role == state2
+    ->  Arg = State
+    ;   space_xpce_cb_value(Role, Event, Arg)
+    ),
+    space_xpce_cb_arg_list(Roles, Event, State0, Args, State).
+
+% The value of one role, taken from the event.
+space_xpce_cb_value(x, Event, V) :- space_field("x", Event, 0, V).
+space_xpce_cb_value(y, Event, V) :- space_field("y", Event, 0, V).
+space_xpce_cb_value(button, Event, V) :- space_field("button", Event, 0, V).
+space_xpce_cb_value(dx, Event, V) :- space_field("dx", Event, 0, V).
+space_xpce_cb_value(dy, Event, V) :- space_field("dy", Event, 0, V).
+space_xpce_cb_value(key, Event, V) :- space_field("key", Event, "", V).
+space_xpce_cb_value(text, Event, V) :- space_field("text", Event, "", V).
+space_xpce_cb_value(width, Event, V) :- space_field("width", Event, 0, V).
+space_xpce_cb_value(height, Event, V) :- space_field("height", Event, 0, V).
 
 % Kept separate on purpose.  Nesting an if-then-else inside the conjunction
 % passed to forall/2 made the parser collapse forall/2 into a call to

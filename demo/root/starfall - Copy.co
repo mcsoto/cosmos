@@ -1,0 +1,230 @@
+// STARFALL // a compact arcade survival game.
+// Move with arrow keys. Collect all 8 cores. R restarts a run.
+require('space', sp)
+
+cols=12
+rows=10
+cell=40
+hud=40
+width=cols*cell
+height=rows*cell+hud
+tick_ms=130
+
+initial={
+    px=6 and py=9 and cores=0 and lives=3 and ended=0 and won=0
+    m1x=2 and m1y=1 and m2x=6 and m2y=4 and m3x=10 and m3y=7 and m4x=12 and m4y=2
+    corex=6 and corey=2
+}
+
+rel same(x1,y1,x2,y2)
+    x1=x2 and y1=y2
+
+rel meteor(x,y,s)
+    same(x,y,s.m1x,s.m1y) or same(x,y,s.m2x,s.m2y) or
+    same(x,y,s.m3x,s.m3y) or same(x,y,s.m4x,s.m4y)
+
+rel wrap_y(y,next_y)
+    if(y>=rows)
+        next_y=1
+    else
+        next_y=y+1
+
+rel wrap_x(x,shift,next_x)
+    raw_x=x+shift
+    if(raw_x>cols)
+        next_x=raw_x-cols
+    elseif(raw_x<1)
+        next_x=raw_x+cols
+    else
+        next_x=raw_x
+
+rel next_core(s,x,y)
+    if(s.cores=0)
+        x=10 and y=3
+    elseif(s.cores=1)
+        x=3 and y=5
+    elseif(s.cores=2)
+        x=8 and y=1
+    elseif(s.cores=3)
+        x=1 and y=7
+    elseif(s.cores=4)
+        x=11 and y=6
+    elseif(s.cores=5)
+        x=5 and y=3
+    elseif(s.cores=6)
+        x=9 and y=8
+    else
+        x=2 and y=2
+
+rel copy(s,s2,px,py,cores,lives,ended,won,m1x,m1y,m2x,m2y,m3x,m3y,m4x,m4y,corex,corey)
+    s2={px=px and py=py and cores=cores and lives=lives and ended=ended and won=won and m1x=m1x and m1y=m1y and m2x=m2x and m2y=m2y and m3x=m3x and m3y=m3y and m4x=m4x and m4y=m4y and corex=corex and corey=corey}
+
+// One frame of the world: the meteors drift, the player may be hit.
+rel step(s,s2)
+    if(s.ended=1 or s.won=1)
+        s2=s
+    else
+        wrap_y(s.m1y,n1y)
+        wrap_y(s.m2y,n2y)
+        wrap_y(s.m3y,n3y)
+        wrap_y(s.m4y,n4y)
+        wrap_x(s.m1x,1,n1x)
+        wrap_x(s.m2x,-1,n2x)
+        wrap_x(s.m3x,1,n3x)
+        wrap_x(s.m4x,-1,n4x)
+        if((same(s.px,s.py,n1x,n1y) or same(s.px,s.py,n2x,n2y) or same(s.px,s.py,n3x,n3y) or same(s.px,s.py,n4x,n4y)) and s.lives<=1)
+            copy(s,s2,6,9,s.cores,0,1,0,n1x,n1y,n2x,n2y,n3x,n3y,n4x,n4y,s.corex,s.corey)
+        elseif(same(s.px,s.py,n1x,n1y) or same(s.px,s.py,n2x,n2y) or same(s.px,s.py,n3x,n3y) or same(s.px,s.py,n4x,n4y))
+            copy(s,s2,6,9,s.cores,s.lives-1,0,0,n1x,n1y,n2x,n2y,n3x,n3y,n4x,n4y,s.corex,s.corey)
+        else
+            copy(s,s2,s.px,s.py,s.cores,s.lives,0,0,n1x,n1y,n2x,n2y,n3x,n3y,n4x,n4y,s.corex,s.corey)
+
+rel move(dx,dy,s,s2)
+    if(s.ended=1 or s.won=1)
+        s2=s
+    else
+        nx=s.px+dx
+        ny=s.py+dy
+        if(nx<1 or nx>cols or ny<1 or ny>rows)
+            s2=s
+        elseif(meteor(nx,ny,s))
+            if(s.lives<=1)
+                copy(s,s2,6,9,s.cores,0,1,0,s.m1x,s.m1y,s.m2x,s.m2y,s.m3x,s.m3y,s.m4x,s.m4y,s.corex,s.corey)
+            else
+                copy(s,s2,6,9,s.cores,s.lives-1,0,0,s.m1x,s.m1y,s.m2x,s.m2y,s.m3x,s.m3y,s.m4x,s.m4y,s.corex,s.corey)
+        elseif(same(nx,ny,s.corex,s.corey) and s.cores>=7)
+            copy(s,s2,nx,ny,8,s.lives,0,1,s.m1x,s.m1y,s.m2x,s.m2y,s.m3x,s.m3y,s.m4x,s.m4y,s.corex,s.corey)
+        elseif(same(nx,ny,s.corex,s.corey))
+            next_core(s,ncx,ncy)
+            copy(s,s2,nx,ny,s.cores+1,s.lives,0,0,s.m1x,s.m1y,s.m2x,s.m2y,s.m3x,s.m3y,s.m4x,s.m4y,ncx,ncy)
+        else
+            copy(s,s2,nx,ny,s.cores,s.lives,0,0,s.m1x,s.m1y,s.m2x,s.m2y,s.m3x,s.m3y,s.m4x,s.m4y,s.corex,s.corey)
+
+rel keypressed(key,s,s2)
+    if(key='r')
+        s2=initial
+    elseif(key='up')
+        move(0,-1,s,s2)
+    elseif(key='down')
+        move(0,1,s,s2)
+    elseif(key='left')
+        move(-1,0,s,s2)
+    elseif(key='right')
+        move(1,0,s,s2)
+    else
+        s2=s
+
+// The XPCE backend has no `keypressed` callback name: input is polled from
+// the event queue inside update, and keypressed is fed from it, one key at a
+// time, threading the state through the keys.
+//
+// The queue is taken in one go and sorted out here.  getType/2 would keep
+// the events it was not asked for, and this demo never looks at them, so
+// they would pile up for ever.
+rel update(s,s2)
+    sp.event.get(events)
+    apply_events(events,s,s1)
+    step(s1,s2)
+
+// Apply every event of this frame to the running state.
+rel apply_events(events,s,s2)
+    if(events=[])
+        s2=s
+    else
+        events=[ev|rest]
+        kind=ev.type
+        if(kind='keydown')
+            keypressed(ev.key,s,s1)
+        else
+            s1=s
+        apply_events(rest,s1,s2)
+
+rel draw_star(x,y,color)
+    px=(x-1)*cell
+    py=hud+(y-1)*cell
+    sp.graphics.setColor(color)
+    sp.graphics.rectangle('fill',px+17,py+5,6,30)
+    sp.graphics.rectangle('fill',px+5,py+17,30,6)
+    sp.graphics.rectangle('fill',px+12,py+12,16,16)
+
+rel draw_meteor(x,y)
+    px=(x-1)*cell
+    py=hud+(y-1)*cell
+    sp.graphics.setColor('#bb4e65')
+    sp.graphics.rectangle('fill',px+7,py+7,26,26)
+    sp.graphics.setColor('#f08962')
+    sp.graphics.rectangle('fill',px+12,py+12,16,16)
+    sp.graphics.setColor('#351633')
+    sp.graphics.rectangle('fill',px+17,py+17,6,6)
+
+rel draw_player(s)
+    px=(s.px-1)*cell
+    py=hud+(s.py-1)*cell
+    sp.graphics.setColor('#59d7e8')
+    sp.graphics.rectangle('fill',px+8,py+9,24,23)
+    sp.graphics.setColor('#d6fbff')
+    sp.graphics.rectangle('fill',px+13,py+4,14,8)
+    sp.graphics.setColor('#182346')
+    sp.graphics.rectangle('fill',px+13,py+18,5,5)
+    sp.graphics.rectangle('fill',px+22,py+18,5,5)
+
+rel draw_hud(s)
+    sp.graphics.setColor('#10172c')
+    sp.graphics.rectangle('fill',0,0,width,hud)
+    sp.graphics.setColor('#7dffd1')
+    sp.graphics.rectangle('fill',0,hud-3,width,3)
+    sp.graphics.setColor('#263759')
+    sp.graphics.rectangle('fill',10,10,120,18)
+    sp.graphics.rectangle('fill',145,10,120,18)
+    sp.graphics.rectangle('fill',280,10,190,18)
+    for(init i=1;i<=8;next i=i+1;)
+        if(i<=s.cores)
+            sp.graphics.setColor('#f5d06f')
+            sp.graphics.rectangle('fill',156+(i-1)*13,14,8,10)
+    if(s.lives>=1)
+        sp.graphics.setColor('#ff6f7d')
+        sp.graphics.rectangle('fill',294,14,12,10)
+    if(s.lives>=2)
+        sp.graphics.rectangle('fill',312,14,12,10)
+    if(s.lives>=3)
+        sp.graphics.rectangle('fill',330,14,12,10)
+
+rel draw(s)
+    sp.graphics.setColor('#080d1c')
+    sp.graphics.rectangle('fill',0,0,width,height)
+    draw_hud(s)
+    for(init y=1;y<=rows;next y=y+1;)
+        for(init x=1;x<=cols;next x=x+1;)
+            px=(x-1)*cell
+            py=hud+(y-1)*cell
+            parity=(x+y)%2
+            if(parity=0)
+                sp.graphics.setColor('#111a31')
+                sp.graphics.rectangle('fill',px+1,py+1,cell-2,cell-2)
+            else
+                sp.graphics.setColor('#0d1529')
+                sp.graphics.rectangle('fill',px+1,py+1,cell-2,cell-2)
+    draw_star(s.corex,s.corey,'#f5d06f')
+    draw_meteor(s.m1x,s.m1y)
+    draw_meteor(s.m2x,s.m2y)
+    draw_meteor(s.m3x,s.m3y)
+    draw_meteor(s.m4x,s.m4y)
+    draw_player(s)
+    if(s.ended=1)
+        sp.graphics.setColor('#3b1e37')
+        sp.graphics.rectangle('fill',120,190,240,70)
+        sp.graphics.setColor('#ff6f7d')
+        sp.graphics.rectangle('fill',138,207,204,7)
+        sp.graphics.rectangle('fill',168,228,144,7)
+    elseif(s.won=1)
+        sp.graphics.setColor('#173e3d')
+        sp.graphics.rectangle('fill',120,190,240,70)
+        sp.graphics.setColor('#7dffd1')
+        sp.graphics.rectangle('fill',138,207,204,7)
+        sp.graphics.setColor('#f5d06f')
+        sp.graphics.rectangle('fill',168,228,144,7)
+
+sp.init(width,height)
+sp.start(tick_ms,{
+    update=update and draw=draw
+},initial)

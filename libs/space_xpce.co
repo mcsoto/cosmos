@@ -155,6 +155,13 @@ graphics = {
 // Keyboard module: the key names are the lowercase Love2D ones ('left',
 // 'return', 'space', 'f1', ...).  The DOM aliases ('arrowleft', ...) are
 // accepted as well.
+//
+// The modifier keys are named the way XPCE names them: 'shift', 'ctrl',
+// 'alt' and 'gui' ('control' and 'meta' are accepted for the same keys).
+// XPCE does not deliver events for the modifier keys, so they are found
+// through the keyboard device and turned into ordinary key events; a
+// modifier therefore also shows up as a keydown/keyup event whose key is
+// 'shift', 'ctrl', 'alt' or 'gui'.
 keyboard = {
     // Succeeds while the key is held down.
     rel isDown(key)
@@ -229,7 +236,7 @@ timer = {
 // hands back a list of tables, each with at least a `type` field.
 // getType/2 drains only the events of one type and leaves the rest
 // queued for the next caller.  The event types and their fields:
-//   mousemotion  posx posy x y button clicks mod
+//   mousemotion  posx posy x y dx dy button clicks mod
 //   mousedown    + the above
 //   mouseup      + the above
 //   mousewheel   + wheel
@@ -242,6 +249,13 @@ timer = {
 //
 // get/1 and getType/2 are separate NAMES rather than one overloaded get,
 // because the Cosmos compiler resolves a method by name, not by arity.
+//
+// The queue can also be inspected and emptied without draining it:
+//   clear()            throw every pending event away
+//   clearType(type)    throw the pending events of one type away
+//   has(type)          is there a pending event of that type?
+//   count(type)        how many pending events of that type?
+//   size()             how many pending events in all?
 event = {
     rel get(events)
         pl::space_xpce_event_get(_, events)
@@ -252,6 +266,26 @@ event = {
     // Non-draining peek, used by the frame tick to fire callbacks.
     rel peek(events)
         pl::space_xpce_events_pending(_, events)
+
+    // Throw the pending events away without handing them over.
+    rel clear()
+        pl::space_xpce_event_clear(_)
+
+    // Throw the pending events of one type away; the rest stay queued.
+    rel clearType(type)
+        pl::space_xpce_event_clear_type(_, type)
+
+    // Is there a pending event of this type?  The answer is 1 or 0.
+    rel has(type, found)
+        pl::space_xpce_event_has(_, type, found)
+
+    // How many pending events of this type?
+    rel count(type, n)
+        pl::space_xpce_event_count(_, type, n)
+
+    // How many pending events in all?
+    rel size(n)
+        pl::space_xpce_event_size(_, n)
 }
 
 // Main Space API
@@ -260,9 +294,29 @@ sp = {
     rel init(width, height)
         pl::space_xpce_init(_, int(width), int(height))
 
+    // Open the canvas.  A program that opens its own window -- the
+    // startLoop shape -- calls this from inside its game relation.
+    rel open()
+        pl::space_xpce_open(_)
+
     // Start with fixed interval (ms); size comes from init/2
     rel start(intervalMs, callbacks, initialState)
         pl::space_xpce_start(_, int(intervalMs), callbacks, initialState)
+
+    // The game-loop shape: the GAME relation opens the window and the loop
+    // dispatches until it is closed.  This is the Space answer to
+    // xp.main_loop/1.
+    //
+    // The interval is in SECONDS here, like the XPCE timer; start/3 takes
+    // milliseconds.
+    //
+    //     rel game(_)
+    //         sp.init(640, 480)
+    //         sp.open()
+    //
+    //     sp.startLoop(0.016, game, {update=update and draw=draw}, state)
+    rel startLoop(interval, game, callbacks, initialState)
+        pl::space_xpce_start_loop_game(_, interval, game, callbacks, initialState)
 
     // Start with FPS; size comes from init/2
     rel startCanvas(fps, callbacks, initialState)

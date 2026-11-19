@@ -1,0 +1,12 @@
+
+export({
+	rel new(t)
+		c::create_mutable(_,t)
+
+	rel get(s,o)
+		c::get_mutable(o,s)
+		
+	rel set(s,o)
+		c::set_mutable(o,s)
+		
+})

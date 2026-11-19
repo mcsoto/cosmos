@@ -45,4 +45,4 @@ print(2)
 g = sp.graphics
 //g.setColor('#5ee7a0') and g.rectangle('fill', 0, 0, 50, 50)
 sp.init(640, 480)
-sp.start(16, {update=update and draw=draw}, {x=280 and y=215})
+sp.startLoop(16, {update=update and draw=draw}, {x=280 and y=215})

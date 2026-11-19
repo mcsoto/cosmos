@@ -1,5 +1,5 @@
 :- style_check(-singleton).
-xpce(A):-cosmos_require("xpce_prolog",B),new(C),set_(C,"create",clos(upvals([]),'xpce::$closure_0.0'),D),set_(D,"send",clos(upvals([]),'xpce::$closure_1.0'),E),set_(E,"get",clos(upvals([]),'xpce::$closure_2.0'),F),set_(F,"free",clos(upvals([]),'xpce::$closure_3.0'),G),set_(G,"color",clos(upvals([]),'xpce::$closure_4.0'),H),set_(H,"point",clos(upvals([]),'xpce::$closure_5.0'),I),set_(I,"size",clos(upvals([]),'xpce::$closure_6.0'),J),set_(J,"font",clos(upvals([]),'xpce::$closure_7.0'),K),set_(K,"on_click",clos(upvals([]),'xpce::$closure_8.0'),L),set_(L,"on_select",clos(upvals([]),'xpce::$closure_9.0'),M),set_(M,"on_event",clos(upvals([]),'xpce::$closure_10.0'),N),set_(N,"key_down",clos(upvals([]),'xpce::$closure_11.0'),O),set_(O,"timer",clos(upvals([]),'xpce::$closure_12.0'),P),set_(P,"set_data",clos(upvals([]),'xpce::$closure_13.0'),Q),set_(Q,"get_data",clos(upvals([]),'xpce::$closure_14.0'),R),set_(R,"loop",clos(upvals([]),'xpce::$closure_15.0'),S),set_(S,"quit",clos(upvals([]),'xpce::$closure_16.0'),T),set_(T,"poll",clos(upvals([]),'xpce::$closure_17.0'),U),A=U.
+xpce(A):-cosmos_require("xpce_prolog",B),new(C),set_(C,"create",clos(upvals([]),'xpce::$closure_0.0'),D),set_(D,"send",clos(upvals([]),'xpce::$closure_1.0'),E),set_(E,"get",clos(upvals([]),'xpce::$closure_2.0'),F),set_(F,"free",clos(upvals([]),'xpce::$closure_3.0'),G),set_(G,"color",clos(upvals([]),'xpce::$closure_4.0'),H),set_(H,"point",clos(upvals([]),'xpce::$closure_5.0'),I),set_(I,"size",clos(upvals([]),'xpce::$closure_6.0'),J),set_(J,"font",clos(upvals([]),'xpce::$closure_7.0'),K),set_(K,"on_click",clos(upvals([]),'xpce::$closure_8.0'),L),set_(L,"on_select",clos(upvals([]),'xpce::$closure_9.0'),M),set_(M,"on_event",clos(upvals([]),'xpce::$closure_10.0'),N),set_(N,"key_down",clos(upvals([]),'xpce::$closure_11.0'),O),set_(O,"timer",clos(upvals([]),'xpce::$closure_12.0'),P),set_(P,"set_data",clos(upvals([]),'xpce::$closure_13.0'),Q),set_(Q,"get_data",clos(upvals([]),'xpce::$closure_14.0'),R),set_(R,"loop",clos(upvals([]),'xpce::$closure_15.0'),S),set_(S,"main_loop",clos(upvals([]),'xpce::$closure_16.0'),T),set_(T,"quit",clos(upvals([]),'xpce::$closure_17.0'),U),set_(U,"poll",clos(upvals([]),'xpce::$closure_18.0'),V),A=V.
 'xpce::$closure_0.0'(A,B,C,upvals([])):-xpce_new(A,B,C).
 'xpce::$closure_1.0'(A,B,C,upvals([])):-xpce_send(A,B,C).
 'xpce::$closure_2.0'(A,B,C,upvals([])):-xpce_get(A,B,C).
@@ -16,5 +16,6 @@ xpce(A):-cosmos_require("xpce_prolog",B),new(C),set_(C,"create",clos(upvals([]),
 'xpce::$closure_13.0'(A,B,upvals([])):-xpce_set_data(A,B).
 'xpce::$closure_14.0'(A,B,upvals([])):-xpce_get_data(A,B).
 'xpce::$closure_15.0'(upvals([])):-xpce_loop.
-'xpce::$closure_16.0'(upvals([])):-system:halt.
-'xpce::$closure_17.0'(upvals([])):-xpce_poll.
+'xpce::$closure_16.0'(A,upvals([])):-xpce_main_loop(A).
+'xpce::$closure_17.0'(upvals([])):-system:halt.
+'xpce::$closure_18.0'(upvals([])):-xpce_poll.

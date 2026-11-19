@@ -1,0 +1,17 @@
+update=object.update
+
+class(Ship, {
+	x=1
+	y=1
+
+    rel new(this,result,x,y)
+        result={x=x,y=y}
+	rel move(this,x,y,result)
+		update(this,{'x'=x and 'y'=y},result)
+})
+
+//move ship to the right continuously
+init ship=new Ship(1,2)
+for(i in math.range(1,4))
+	print(ship.x)
+	next ship=ship.move(ship.x+1,1)

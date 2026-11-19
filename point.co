@@ -1,0 +1,16 @@
+// file: class-point.co
+class(Point,{
+    rel new(this,result,x,y)
+        result=object.create(this,{x=x,y=y})
+
+    rel moveX(this,amount,result)
+        result=this.x+amount
+
+    rel read(this,result)
+        result=[this.x,this.y]
+})
+
+Point point=new Point(10,20)
+point.read(position)
+point.moveX(5,movedX)
+export([position,movedX])

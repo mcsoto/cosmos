@@ -142,3 +142,5 @@ or access it through a captured/self table value.
 
 If a goal is absent from this table, `not Goal` is rejected. Use
 `unsafeNot Goal` only when negation as failure is intentionally required.
+
+`cut` is 0-arity, `A and cut and B`.

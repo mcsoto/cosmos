@@ -1,6 +1,6 @@
 // Dungeon - a turn-based tile crawler built on Space (Cosmos/XPCE).
 //
-//   cosmos -l misc/dungeon.co --xpce
+//   cosmos -l xpce/dungeon.co --xpce
 //
 // Collect every gem, then reach the exit.
 //
@@ -19,13 +19,23 @@
 // The file is in the `--xpce` header-only shape: `require` and the sp.init /
 // sp.start calls sit at the top level and there is no `main` relation.
 //
+// The keys arrive through a CALLBACK: `keypressed` is registered in the
+// sp.start map under its own name, the way xpce/test1.co does it, so the
+// backend calls it once for every key the user presses.  The queue in the
+// state holds the key NAMES and the update takes one off it per frame, because
+// the game is turn based: one key press is one turn.
+//
+// dungeon_queue.co is the same game in the older shape: it polls the event
+// queue with sp.event.getType('keydown', ...) every frame and keeps the
+// keydown EVENT TABLES in the queue.
+//
 // Setting autoplayFlag to 1 makes the player play itself, using the same
 // breadth-first sweep with the objective as the root.  That exercises the turn
 // loop, the search, the gem and exit logic and the win condition with no
 // keyboard attached, which is how this file is regression tested.  See
 // DUNGEON_TESTING.md.
 
-require('space', sp)
+require('space2', sp)
 require('string', str)
 
 // ---------------------------------------------------------------- constants
@@ -750,13 +760,30 @@ rel handle_key(s, key, s2)
     else
         try_key(s, key, s2)
 
-rel enqueue([], [], out)
-    out = []
-rel enqueue(q, [], out)
-    out = q
-rel enqueue(q, [k|t], out)
-    lst_cons(k, q, q2)
-    enqueue(q2, t, out)
+// ---------------------------------------------------------------- the input
+//
+// The key names arrive through a CALLBACK, not through the event queue.
+// `keypressed` is registered in the sp.start map under its own name, the way
+// xpce/test1.co does it, so the backend calls it once for every key the user
+// presses -- and only once, because the backend hands every event to the
+// callbacks exactly one time.
+//
+// The state the callback produces is the state the update then sees, so the
+// callback is where the press is put on the queue.
+//
+// The queue holds the key NAMES, oldest first, and the update takes one off it
+// per frame: the game is turn based, so one press is one turn.  A key is
+// APPENDED to the queue rather than pushed onto the front, so a burst of three
+// presses is played in the order it was typed and not backwards.
+//
+// dungeon_queue.co is the same game in the older shape: it polls the event
+// queue with sp.event.getType('keydown', ...) every frame and keeps the
+// keydown EVENT TABLES in the queue.
+
+rel keypressed(key, s, s2)
+    lst_concat(s.queue, [key], q)
+    a = s.queue:q
+    put(a, 1, s2)
 
 // ---------------------------------------------------------------- the loop
 // The game is turn based, so draw only repaints when a turn resolved.  A frame
@@ -796,44 +823,43 @@ rel diag(s)
 
 rel update(dt, s, s2)
     diag(s)
-    sp.event.getType('keydown', keys)
-	print(keys)
-    a = s.queue:s.queue
-    b = a.tick:s.tick + 1
-    enqueue(b.queue, keys, queue2)
-    c = b.queue:queue2
-    if(queue2 = [])
+    // The tick counter and the key queue.  The queue is read into a local
+    // first: comparing a table field inside a condition compiles to a table
+    // WRITE, and `a.queue = []` would wipe the queue out of the state.
+    a = s.tick:s.tick + 1
+    q = a.queue
+    if(q = [])
         field_is(s, 'demo', 1, demo)
         if(demo = 1)
             field_is(s, 'over', 0, alive)
             if(alive = 1)
-                autoplay_move(c, d)
-                e = d.queue:queue2
-                f = e.tick:b.tick
-                put(f, 1, s2)
+                autoplay_move(a, d)
+                put(d, 1, s2)
             else
-                put(c, 0, s2)
+                put(a, 0, s2)
         else
-            imod_tick = b.tick % 45
+            imod_tick = a.tick % 45
             if(imod_tick = 0)
-                put(c, 1, s2)
+                put(a, 1, s2)
             else
-                first_tick = b.tick
+                first_tick = a.tick
                 if(first_tick = 1)
-                    put(c, 1, s2)
+                    put(a, 1, s2)
                 else
-                    put(c, 0, s2)
+                    put(a, 0, s2)
     else
-        // The queue holds keydown EVENT TABLES, not bare key names: getType/2
-        // drains whole events, so pull `key' out of the head event here.
-        lst_get(queue2, 0, ev)
-        key = ev.key
-        drop_head(queue2, queue3, gotKey)
-        d = c.queue:queue3
-        handle_key(d, key, e)
-        f = e.queue:queue3
-        g = f.tick:b.tick
-        put(g, 1, s2)
+        // The queue holds key NAMES now, not event tables: the callback was
+        // given the key directly.  One key is played per frame.
+        lst_get(q, 0, key)
+        drop_head(q, queue3, gotKey)
+        b = a.queue:queue3
+        handle_key(b, key, e)
+        // The state handle_key produced is used as it is.  It already carries
+        // the tick and the rest of the queue, because it was built from b.
+        // A restart is the one exception, and there the fresh state is what
+        // is wanted: the turn counter goes back to zero and the keys that
+        // were still queued are dropped.
+        put(e, 1, s2)
 
 // Pop the head of the key queue.  The body never fails: a relation whose body
 // is `false` has that `false` hoisted into the end of the *caller's* body by
@@ -1007,4 +1033,4 @@ rel draw_hud(s)
 newGame(gameState)
 
 sp.init(672, 522)
-sp.start(16, {update=update and draw=draw}, gameState)
+sp.start(16, {update=update and draw=draw and keypressed=keypressed}, gameState)

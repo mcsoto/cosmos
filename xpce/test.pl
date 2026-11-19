@@ -1,16 +1,25 @@
 :- style_check(-singleton).
 'test::$impl_move'(A,B,C):-(A="left"->(cosmos_get(B,"x",D),add_(D,1.0,E),cosmos_update(B,"x",E,F),G=F),H=G;(A="up"->(cosmos_get(B,"y",I),r_sub(I,1.0,J),cosmos_update(B,"y",J,K),L=K),M=L;true,M=B),H=M),C=H.
 'test::$impl_move2'(A,B,C):-((A="left";A="right";A="up";A="down"),cosmos_update(B,"dir",A,D),E=D),C=E.
-'test::$impl_update'(A,B,C,D):-(new(E),cosmos_get(B,"x",F),add_(F,2.0,G),r_mod(G,520.0,H),set_(E,"x",H,I),set_(I,"y",0.0,J),C=J),K=B,(cosmos_get(K,"x",L),cosmos_get(K,"y",M),print([L,M])),((cosmos_get(D,"event",N),cosmos_method_value(N,"get",[],O)),P=O),cosmos_for(P,clos(upvals([K,Q]),'test::$closure_0.0'),[],[]).
+'test::$impl_update'(A,B,C,D):-(new(E),cosmos_get(B,"x",F),add_(F,2.0,G),r_mod(G,520.0,H),set_(E,"x",H,I),set_(I,"y",0.0,J),C=J),K=B,((cosmos_get(D,"event",L),cosmos_method_value(L,"get",[],M)),N=M),(cosmos_get(D,"keyboard",O),cosmos_method(O,"isDown",["left"])->print(1.0);true),cosmos_for(N,clos(upvals([K,P]),'test::$closure_0.0'),[],[]).
+'test::$impl_mouseup'(A,B,C,D):-print(["-mouse"]).
+'test::$impl_keypressed'(A,B,C):-print("-key"),if_(A="escape",(cosmos_method(D,"stop",[]),system:halt),true).
+'test::$impl_mousepressed'(A,B,C):-print("-").
 'test::$impl_draw'(A,B):-(cosmos_get(B,"graphics",C),D=C),cosmos_method(D,"clear",["#1b1b2f"]),cosmos_method(D,"setColor",["#3050ff"]),cosmos_get(A,"x",E),cosmos_method(D,"rectangle",["fill",E,100.0,80.0,50.0]).
-test([]):-cosmos_require("space",A),cosmos_method(A,"init",[640.0,480.0]),new(B),set_(B,"update",clos(upvals([A]),'test::$value_update'),C),set_(C,"draw",clos(upvals([A]),'test::$value_draw'),D),new(E),set_(E,"x",100.0,F),set_(F,"y",0.0,G),cosmos_method(A,"start",[16.0,D,G]).
+test([]):-cosmos_require("space",A),cosmos_method(A,"init",[640.0,480.0]),new(B),set_(B,"update",clos(upvals([A]),'test::$value_update'),C),set_(C,"draw",clos(upvals([A]),'test::$value_draw'),D),set_(D,"keypressed",clos(upvals([]),'test::$value_keypressed'),E),set_(E,"mouseup",clos(upvals([]),'test::$value_mouseup'),F),new(G),set_(G,"x",100.0,H),set_(H,"y",0.0,I),cosmos_method(A,"start",[16.0,F,I]).
 'test::move'(A,B,C):-cosmos_callable("function","move",'test::$impl_move'(A,B,C)).
 'test::$value_move'(A,B,C,upvals([])):-'test::move'(A,B,C).
 'test::move2'(A,B,C):-cosmos_callable("function","move2",'test::$impl_move2'(A,B,C)).
 'test::$value_move2'(A,B,C,upvals([])):-'test::move2'(A,B,C).
 'test::$closure_0.0'(A,B,[],C,upvals([D,E])):-(((cosmos_get(B,"type",F),dif(F,"mousemotion")),print(B);\+ (cosmos_get(B,"type",G),dif(G,"mousemotion")),true),cosmos_get(B,"type",H),if_(H="keyup",((cosmos_get(B,"key",I),print([I,D,J])),cosmos_get(B,"key",K),'test::move'(K,D,J)),true)),C=[].
-'test::update'(A,B,C,D):-cosmos_checked_call("function","update",[t("parameters",[t("mode","Unspecified",>,t,t("type","Any",-,t,t)),t("mode","In",>,t,t("type","Any",-,t,t)),t("mode","Unspecified",>,t,t("type","Any",-,t,t))],<,t("determinism","nondet",-,t,t),t)],[A,B,C],t("$imports",t("kind","metadata",-,t("fields",t,-,t,t),t("modules",[],-,t,t)),-,t,t),'test::$impl_update'(A,B,C,D),E).
+'test::update'(A,B,C,D):-cosmos_checked_call("function","update",[t("parameters",[t("mode","Unspecified",>,t,t("type","Any",-,t,t)),t("mode","In",>,t,t("type","Any",-,t,t)),t("mode","Unspecified",>,t,t("type","Any",-,t,t))],<,t("determinism","nondet",-,t,t),t)],[A,B,C],t("rgb",t("open",0.0,<,t("fields",["Number","Number","Number"],>,t,t("location",fc_Loc(38.0,1.0),-,t,t)),t("parent","Functor",-,t,t)),<,t("$imports",t("kind","metadata",-,t("fields",t,-,t,t),t("modules",[],-,t,t)),-,t,t),t),'test::$impl_update'(A,B,C,D),E).
 'test::$value_update'(A,B,C,upvals([D])):-'test::update'(A,B,C,D).
+'test::mouseup'(A,B,C,D):-'test::$impl_mouseup'(A,B,C,D).
+'test::$value_mouseup'(A,B,C,D,upvals([])):-'test::mouseup'(A,B,C,D).
+'test::keypressed'(A,B,C):-'test::$impl_keypressed'(A,B,C).
+'test::$value_keypressed'(A,B,C,upvals([])):-'test::keypressed'(A,B,C).
+'test::mousepressed'(A,B,C):-'test::$impl_mousepressed'(A,B,C).
+'test::$value_mousepressed'(A,B,C,upvals([])):-'test::mousepressed'(A,B,C).
 'test::draw'(A,B):-'test::$impl_draw'(A,B).
 'test::$value_draw'(A,upvals([B])):-'test::draw'(A,B).
 :- initialization(cosmos_entry_main, main).

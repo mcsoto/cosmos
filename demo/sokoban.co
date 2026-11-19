@@ -1,0 +1,587 @@
+// Sokoban - a box-pushing puzzle built on Space (Cosmos).
+//
+//   cosmos -l demo/sokoban.co
+//
+// Push every box onto a goal dot.  A box can only be pushed, never pulled, and
+// it stops dead against a wall or another box.  When every dot is covered the
+// level is solved and R moves on to the next one.
+//
+//   arrows / WASD  move              U  undo
+//   R  restart - after a win, next level
+//
+// Three levels: a warm-up, a hall of pushes, and the padded Microban no. 1,
+// whose '*' box has to leave its corner goal and come back.
+//
+// The file follows xpce/new_agent_xpce.md and docs/LOWERING_TABLE.md: branch
+// conditions are read into locals and committed with `choose` (which lowers to
+// `(A -> B ; C)` and evaluates its condition once, unlike `if`/3 which
+// recomputes it).  Lists are walked by hand because `l[i]` lowers to
+// cosmos_get/3, the table accessor, and no relation body is allowed to fail -
+// an answering `false` gets hoisted into the caller by the current compiler
+// and makes the caller always fail (xpce/ENGINE_ISSUES.md).
+
+require('space', sp)
+require('string', str)
+require('io', io)
+
+// ---------------------------------------------------------------- constants
+
+rel tileSize(t)
+    t = 32
+
+// The tallest level is seven rows; the HUD strip sits under it.
+rel hudTop(y)
+    y = 224
+
+rel hudHeight(hh)
+    hh = 60
+
+// ---------------------------------------------------------------- the levels
+// '#' wall   ' ' floor   '.' goal   '$' box   '@' start   '*' box already on
+// its goal.  Every row of a level is exactly as wide as the level's own w, so
+// the row strings can be indexed blindly with str.at/3.
+
+rel level1(rows)
+    rows = [
+        '#######',
+        '#     #',
+        '#@$$  #',
+        '#   ..#',
+        '#######'
+    ]
+
+// Two boxes and a push line.  Player at (2,5).
+rel level2(rows)
+    rows = [
+        '#########',
+        '#       #',
+        '#  $   .#',
+        '#  $  . #',
+        '#  $ .  #',
+        '# @     #',
+        '#########'
+    ]
+
+rel level3(rows)
+    rows = [
+        '#######',
+        '# .####',
+        '#  ####',
+        '#*@  ##',
+        '#  $ ##',
+        '#  ####',
+        '#######'
+    ]
+
+rel level_rows(n, rows)
+    choose(n = 1)
+        level1(rows)
+    else
+        choose(n = 2)
+            level2(rows)
+        else
+            level3(rows)
+
+rel level_dims(n, w, h)
+    choose(n = 1)
+        w = 7
+        h = 5
+    else
+        choose(n = 2)
+            w = 9
+            h = 7
+        else
+            w = 7
+            h = 7
+
+// ------------------------------------------------------------- list helpers
+// Cosmos relations are nondeterministic there, so every recursive walker here
+// is one clause that guards itself with an explicit `choose` - the base case
+// never has to rely on a cut.
+
+rel lst_cons(a, l, out)
+    out = [a|l]
+
+rel lst_len([], n)
+    n = 0
+rel lst_len([_|t], n)
+    lst_len(t, n1)
+    n = n1 + 1
+
+rel reverse_list([], acc, out)
+    out = acc
+rel reverse_list([h|t], acc, out)
+    reverse_list(t, [h|acc], out)
+
+// Indexed read.  `l[i]` is NOT a list read: it lowers to the table accessor,
+// so lists are walked by hand and every ignored parameter keeps a name.
+rel lst_get(l, i, v)
+    choose(l = [])
+        v = 0
+    else
+        l = [h|t]
+        choose(i = 0)
+            v = h
+        else
+            i1 = i - 1
+            lst_get(t, i1, v)
+
+rel same_cell(ax, ay, bx, by, flag)
+    choose(ax = bx)
+        choose(ay = by)
+            flag = 1
+        else
+            flag = 0
+    else
+        flag = 0
+
+// Is [x,y] somewhere in a list of pairs?  Answers 0/1, it never fails.
+rel list_has_cell(l, x, y, flag)
+    choose(l = [])
+        flag = 0
+    else
+        l = [p|t]
+        p = [px, py]
+        same_cell(px, py, x, y, hit)
+        choose(hit = 1)
+            flag = 1
+        else
+            list_has_cell(t, x, y, flag)
+
+// Replace the first box at (x, y) with [fx, fy], keeping the rest in order.
+// The recursion carries the head back on so boxes that do not match survive.
+rel replace_box(boxes, x, y, fx, fy, out)
+    choose(boxes = [])
+        out = []
+    else
+        boxes = [b|t]
+        b = [bx, by]
+        same_cell(bx, by, x, y, hit)
+        choose(hit = 1)
+            lst_cons([fx, fy], t, out)
+        else
+            replace_box(t, x, y, fx, fy, rest)
+            lst_cons(b, rest, out)
+
+// Is every box sitting on a goal?
+rel all_on(boxes, goals, flag)
+    choose(boxes = [])
+        flag = 1
+    else
+        boxes = [b|t]
+        b = [bx, by]
+        list_has_cell(goals, bx, by, hit)
+        choose(hit = 1)
+            all_on(t, goals, flag)
+        else
+            flag = 0
+
+// ------------------------------------------------------------ level parsing
+// One row-major walk over the rows.  Walls and floor stay in the row strings;
+// the scan collects the goals, the boxes and the start tile.
+
+rel parse_cell(ch, x, y, px, py, boxes, goals, outPx, outPy, outBoxes, outGoals)
+    choose(ch = '.')
+        lst_cons([x, y], goals, goals2)
+        outGoals = goals2
+        outBoxes = boxes
+        outPx = px
+        outPy = py
+    else
+        choose(ch = '$')
+            lst_cons([x, y], boxes, boxes2)
+            outBoxes = boxes2
+            outGoals = goals
+            outPx = px
+            outPy = py
+        else
+            choose(ch = '*')
+                lst_cons([x, y], boxes, boxes2)
+                lst_cons([x, y], goals, goals2)
+                outBoxes = boxes2
+                outGoals = goals2
+                outPx = px
+                outPy = py
+            else
+                choose(ch = '@')
+                    outPx = x
+                    outPy = y
+                    outBoxes = boxes
+                    outGoals = goals
+                else
+                    // floor and wall: nothing to record
+                    outPx = px
+                    outPy = py
+                    outBoxes = boxes
+                    outGoals = goals
+
+rel parse_row(row, y, x, w, px, py, boxes, goals, outPx, outPy, outBoxes, outGoals)
+    choose(x >= w)
+        outPx = px
+        outPy = py
+        outBoxes = boxes
+        outGoals = goals
+    else
+        str.at(row, x, ch)
+        parse_cell(ch, x, y, px, py, boxes, goals, px2, py2, boxes2, goals2)
+        parse_row(row, y, x + 1, w, px2, py2, boxes2, goals2, outPx, outPy, outBoxes, outGoals)
+
+rel parse_rows(rows, y, w, h, px, py, boxes, goals, outPx, outPy, outBoxes, outGoals)
+    choose(y >= h)
+        outPx = px
+        outPy = py
+        outBoxes = boxes
+        outGoals = goals
+    else
+        lst_get(rows, y, row)
+        parse_row(row, y, 0, w, px, py, boxes, goals, px2, py2, boxes2, goals2)
+        parse_rows(rows, y + 1, w, h, px2, py2, boxes2, goals2, outPx, outPy, outBoxes, outGoals)
+
+rel make_state(n, out)
+    level_rows(n, rows)
+    level_dims(n, w, h)
+    parse_rows(rows, 0, w, h, 0, 0, [], [], px, py, boxes, goals)
+    reverse_list(boxes, [], boxesR)
+    reverse_list(goals, [], goalsR)
+    count = lst_len(boxesR)
+    text = 'Level ' + str(n) + ' - push ' + str(count) + ' boxes onto the dots'
+    out = {
+        lvl = n and w = w and h = h and rows = rows and
+        px = px and py = py and boxes = boxesR and goals = goalsR and
+        moves = 0 and pushes = 0 and history = [] and
+        won = 0 and status = text
+    }
+
+// ---------------------------------------------------------------- the rules
+
+// The cell under (x, y).  Off the level counts as a wall, so the body never
+// has to fail.
+rel wall_at(rows, w, h, x, y, wall)
+    choose(x < 0)
+        wall = 1
+    else
+        choose(y < 0)
+            wall = 1
+        else
+            choose(x >= w)
+                wall = 1
+            else
+                choose(y >= h)
+                    wall = 1
+                else
+                    lst_get(rows, y, row)
+                    str.at(row, x, ch)
+                    choose(ch = '#')
+                        wall = 1
+                    else
+                        wall = 0
+
+rel blocked_at(rows, w, h, boxes, x, y, flag)
+    wall_at(rows, w, h, x, y, wall)
+    list_has_cell(boxes, x, y, boxHere)
+    choose(wall = 1)
+        flag = 1
+    else
+        choose(boxHere = 1)
+            flag = 1
+        else
+            flag = 0
+
+// Undo history keeps the player tile, the box layout and the push count of
+// the position before the move.
+rel write_step(s, nx, ny, movedBoxes, pushCount, s2)
+    oldPx = s.px
+    oldPy = s.py
+    oldBoxes = s.boxes
+    entry = {px = oldPx and py = oldPy and boxes = oldBoxes and pushes = pushCount}
+    lst_cons(entry, s.history, hist2)
+    moves = s.moves + 1
+    a = s.px:nx
+    b = a.py:ny
+    c = b.boxes:movedBoxes
+    d = c.history:hist2
+    e = d.moves:moves
+    f = e.pushes:pushCount
+    finish(f, s2)
+
+rel do_step(s, nx, ny, s2)
+    boxes = s.boxes
+    pushes = s.pushes
+    write_step(s, nx, ny, boxes, pushes, s2)
+
+rel do_push(s, nx, ny, fx, fy, s2)
+    replace_box(s.boxes, nx, ny, fx, fy, movedBoxes)
+    pushes = s.pushes + 1
+    write_step(s, nx, ny, movedBoxes, pushes, s2)
+
+rel try_move(s, dx, dy, s2)
+    won = s.won
+    choose(won = 1)
+        // The level is done; only U and R are acted on while it lasts.
+        s2 = s
+    else
+        nx = s.px + dx
+        ny = s.py + dy
+        wall_at(s.rows, s.w, s.h, nx, ny, wall)
+        list_has_cell(s.boxes, nx, ny, boxHere)
+        choose(boxHere = 1)
+            fx = nx + dx
+            fy = ny + dy
+            blocked_at(s.rows, s.w, s.h, s.boxes, fx, fy, hard)
+            choose(hard = 1)
+                s2 = s
+            else
+                do_push(s, nx, ny, fx, fy, s2)
+        else
+            choose(wall = 1)
+                s2 = s
+            else
+                do_step(s, nx, ny, s2)
+
+// Called at the end of every step: is the level won now?  It only runs while
+// the level was not won yet, because moves are refused once `won = 1`.
+rel finish(s, s2)
+    all_on(s.boxes, s.goals, win)
+    choose(win = 1)
+        nextMsg = 'Solved! R for the next level'
+        lastMsg = 'All levels cleared! R to start over'
+        lvl = s.lvl
+        choose(lvl = 3)
+            b = s.status:lastMsg
+        else
+            b = s.status:nextMsg
+        c = b.won:1
+        s2 = c
+    else
+        s2 = s
+
+rel do_undo(s, s2)
+    h = s.history
+    choose(h = [])
+        s2 = s
+    else
+        h = [entry|rest]
+        entry = {px = ux and py = uy and boxes = ub and pushes = up}
+        moves = s.moves - 1
+        a = s.px:ux
+        b = a.py:uy
+        c = b.boxes:ub
+        d = c.pushes:up
+        e = d.history:rest
+        f = e.moves:moves
+        s2 = f
+
+// R restarts the current level.  On a solved level it deals the next one;
+// past the last level it deals level 1 again.
+rel do_restart(s, s2)
+    lvl = s.lvl
+    won = s.won
+    choose(won = 1)
+        nxt = lvl + 1
+        choose(nxt > 3)
+            make_state(1, s2)
+        else
+            make_state(nxt, s2)
+    else
+        make_state(lvl, s2)
+
+// -------------------------------------------------------------------- input
+
+// Space normalises the DOM arrow keys to these lowercase names.
+rel move_key(key, flag, dx, dy)
+    choose(key = 'left')
+        flag = 1
+        dx = -1
+        dy = 0
+    else
+        choose(key = 'right')
+            flag = 1
+            dx = 1
+            dy = 0
+        else
+            choose(key = 'up')
+                flag = 1
+                dx = 0
+                dy = -1
+            else
+                choose(key = 'down')
+                    flag = 1
+                    dx = 0
+                    dy = 1
+                else
+                    choose(key = 'a')
+                        flag = 1
+                        dx = -1
+                        dy = 0
+                    else
+                        choose(key = 'd')
+                            flag = 1
+                            dx = 1
+                            dy = 0
+                        else
+                            choose(key = 'w')
+                                flag = 1
+                                dx = 0
+                                dy = -1
+                            else
+                                choose(key = 's')
+                                    flag = 1
+                                    dx = 0
+                                    dy = 1
+                                else
+                                    flag = 0
+                                    dx = 0
+                                    dy = 0
+
+rel key_action(key, s, s2)
+    move_key(key, flag, dx, dy)
+    choose(flag = 1)
+        try_move(s, dx, dy, s2)
+    else
+        choose(key = 'u')
+            do_undo(s, s2)
+        else
+            choose(key = 'r')
+                do_restart(s, s2)
+            else
+                s2 = s
+
+// The queue is drained ONCE per frame; `event.get` clears the whole queue, so
+// the keys are filtered by hand out of the drained list.
+rel apply_events(events, s, s2)
+    choose(events = [])
+        s2 = s
+    else
+        events = [e|tail]
+        kind = e.type
+        io.writeln(kind)
+        choose(kind = 'keydown')
+            k = e.key
+            io.writeln(k)
+            key_action(k, s, afterEvent)
+        else
+            afterEvent = s
+        apply_events(tail, afterEvent, s2)
+
+rel update(s, s2)
+    sp.event.get(events)
+    apply_events(events, s, s2)
+
+// ---------------------------------------------------------------- rendering
+
+rel draw_floor(px, py, t)
+    g = sp.graphics
+    g.setColor('#252e44')
+    g.rectangle('fill', px, py, t, t)
+
+rel draw_goal(px, py, t)
+    draw_floor(px, py, t)
+    cx = px + t / 2
+    cy = py + t / 2
+    sp.graphics.setColor('#d9a441')
+    sp.graphics.circle('fill', cx, cy, 5)
+
+rel draw_wall(px, py, t)
+    g = sp.graphics
+    g.setColor('#454f6e')
+    g.rectangle('fill', px, py, t, t)
+    g.setColor('#5a6489')
+    g.rectangle('fill', px, py, t, 3)
+
+// One clause only: a second clause headed by a literal next to a variable one
+// is miscompiled by the current compiler, so the dispatch tests the character
+// instead of pattern matching on it.
+rel draw_cell(ch, px, py, t)
+    choose(ch = '#')
+        draw_wall(px, py, t)
+    else
+        choose(ch = '.')
+            draw_goal(px, py, t)
+        else
+            draw_floor(px, py, t)
+
+rel draw_row(row, x, w, t, py)
+    choose(x >= w)
+        true
+    else
+        str.at(row, x, ch)
+        px = x * t
+        draw_cell(ch, px, py, t)
+        draw_row(row, x + 1, w, t, py)
+
+rel draw_rows(rows, py, w, t)
+    choose(rows = [])
+        true
+    else
+        rows = [row|rest]
+        draw_row(row, 0, w, t, py)
+        pyNext = py + t
+        draw_rows(rest, pyNext, w, t)
+
+rel draw_boxes(boxes, goals, t)
+    choose(boxes = [])
+        true
+    else
+        boxes = [b|rest]
+        b = [bx, by]
+        px = bx * t
+        py = by * t
+        list_has_cell(goals, bx, by, sit)
+        choose(sit = 1)
+            sp.graphics.setColor('#8ce99a')
+        else
+            sp.graphics.setColor('#e09f3e')
+        sp.graphics.rectangle('fill', px + 3, py + 3, t - 6, t - 6)
+        sp.graphics.setColor('#0d1117')
+        sp.graphics.rectangle('line', px + 3, py + 3, t - 6, t - 6)
+        draw_boxes(rest, goals, t)
+
+rel draw_player(s)
+    t = 32
+    cx = s.px * t + t / 2
+    cy = s.py * t + t / 2
+    sp.graphics.setColor('#5b9dff')
+    sp.graphics.circle('fill', cx, cy, t / 2 - 4)
+    sp.graphics.setColor('#0d1117')
+    sp.graphics.circle('fill', cx, cy, t / 2 - 9)
+
+rel draw_hud(s)
+    g = sp.graphics
+    hudHeight(hh)
+    hudTop(top)
+    g.setColor('#111a2b')
+    g.rectangle('fill', 0, top, 320, hh)
+    g.setColor('#31405f')
+    g.rectangle('fill', 0, top, 320, 2)
+    moves = s.moves
+    pushes = s.pushes
+    lvl = s.lvl
+    g.setColor('#c9d1e1')
+    g.print('Level ' + str(lvl), 10, top + 8)
+    g.print('Moves ' + str(moves) + '   Pushes ' + str(pushes), 120, top + 8)
+    g.setColor('#7a86a3')
+    g.print('arrows move   U undo   R restart / next', 10, top + 26)
+    g.print(s.status, 10, top + 44)
+
+rel draw(s)
+    t = 32
+    w = s.w
+    g = sp.graphics
+    g.clear('#0d1117')
+    g.setFont(g.newFont(12, 'sans', 'normal'))
+    hudTop(top)
+    g.setColor('#152039')
+    g.rectangle('fill', 0, 0, w * t, top)
+    draw_rows(s.rows, 0, w, t)
+    draw_boxes(s.boxes, s.goals, t)
+    draw_player(s)
+    draw_hud(s)
+
+// --------------------------------------------------------------------- run
+// The entry keeps the header-only shape of the other Space programs: build the
+// first state, then sp.init and sp.start, all at top level.
+
+make_state(1, initialState)
+
+sp.init(288, 284)
+sp.start(16, {update=update and draw=draw}, initialState)

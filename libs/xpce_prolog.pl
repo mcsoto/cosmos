@@ -1,4 +1,5 @@
 :- use_module(library(pce)).
+:- use_module(library(pce_main), [pce_loop/2]).
 :- style_check(-singleton).
 
 % Pure XPCE bridge for Cosmos.
@@ -23,6 +24,7 @@ xpce_prolog(_).
 :- dynamic xpce_next_id/1.
 :- dynamic xpce_data/2.     % xpce_data(Key, Cosmos value as received)
 :- dynamic xpce_event_cb/2. % xpce_event_cb(Handle, Cosmos clos term)
+:- dynamic xpce_in_main_loop/0. % set while xpce_main_loop/1 runs
 
 % --- value conversion ----------------------------------------------------
 % Cosmos only speaks numbers, strings, lists, tables and closures, so the
@@ -107,8 +109,26 @@ xpce_reserve_handle(Handle) :-
     xpce_next_handle(Handle).
 
 xpce_next_handle(Handle) :-
-    (   retract(xpce_next_id(N)) -> Handle is N + 1 ; Handle = 1 ),
-    assertz(xpce_next_id(Handle)).
+    xpce_allocate_id(Handle).
+
+% Handles and callback ids come from ONE counter, so every number this file
+% hands out is at least xpce_handle_base.  The base matters: xpce_arg/2
+% resolves a number that matches a live handle back to its object, so
+% handles and plain numbers cannot share a range.  With handles starting at
+% 1, a program that passed the number 2 to XPCE (a pen width, say) would
+% have it silently turned into whichever object happened to hold handle 2 --
+% and would then send a window where XPCE expects a number.  Starting the
+% handles well above every number a program passes as a coordinate, an
+% angle or a width keeps the two apart.
+%
+% 1,000,000 is far above any realistic XPCE argument and still exactly
+% representable as a double, so a handle survives a trip through Cosmos
+% arithmetic unchanged.
+xpce_handle_base(1000000).
+
+xpce_allocate_id(Id) :-
+    (   retract(xpce_next_id(N)) -> Id is N + 1 ; Id = 1000000 ),
+    assertz(xpce_next_id(Id)).
 
 % Handles are small ints, but a trip through Cosmos arithmetic can turn 3
 % into 3.0, so normalize before lookup.  An unbound handle is a Cosmos bug;
@@ -133,24 +153,82 @@ xpce_args([H|T], [H2|T2]) :- xpce_arg(H, H2), xpce_args(T, T2).
 
 % --- objects ---------------------------------------------------------------
 
+% The top-level windows the program opened, so the event loop can tell when
+% the application is done.  XPCE calls a window's done_message when the user
+% closes it; the handler below only RECORDS the close.
+%
+% It deliberately does NOT halt.  Halting from inside an XPCE event handler
+% unwinds through the toolkit's C++ frames, and the toolkit answers that with
+% a modal error dialog that blocks the application for good.  Letting the
+% loop return and the program finish normally avoids the whole problem, and
+% the process still ends with status 0.
+%
+% A window that is APPENDED to another one is a child: closing a child does
+% not end the application, closing its parent does.  That is the difference
+% between a frame with a dialog in it (the frame is the root) and two
+% independent windows (both are roots).
+:- dynamic xpce_window/1.      % handle of a tracked window
+:- dynamic xpce_root/1.        % handle of a tracked window that is not a child
+:- dynamic xpce_opened/0.      % set once the program opened a window
+
+xpce_track_window(Handle, Ref) :-
+    assertz(xpce_window(Handle)),
+    assertz(xpce_root(Handle)),
+    assertz(xpce_opened),
+    catch(send(Ref, done_message, message(@prolog, xpce_window_closed, Handle)),
+          _, true).
+
+xpce_window_closed(Handle) :-
+    retractall(xpce_window(Handle)),
+    retractall(xpce_root(Handle)).
+
+% A window appended into another window becomes a child of it.
+xpce_demote(Handle) :-
+    retractall(xpce_root(Handle)).
+
+% True when the program opened windows and every ROOT window is closed.
+% A child that was destroyed together with its parent never fires its own
+% done_message, so counting the children would keep the loop alive for ever.
+xpce_no_windows_left :-
+    xpce_opened,
+    \+ xpce_root(_).
+
 % xpce_new(+ClassString, +Args, -Handle).
 xpce_new(ClassString, Args, Handle) :-
     atom_string(Class, ClassString),
     xpce_args(Args, Args2),
     Term =.. [Class|Args2],
     new(Ref, Term),
-    % Top-level windows quit the process on close, Space-style: without
-    % this the loop would spin forever over an empty display.
-    ( memberchk(Class, [picture, frame, dialog]) ->
-        catch(send(Ref, done_message, message(@prolog, halt)), _, true)
-    ; true
-    ),
-    xpce_remember(Ref, Handle).
+    xpce_remember(Ref, Handle),
+    % A top-level window is tracked so the loop knows when it is closed.
+    % sdl_window belongs in the list as well: XPCE calls its done_message
+    % when the SDL window is closed, exactly as for a picture or a frame.
+    %
+    % Under xpce_main_loop/1 the tracking is skipped: there XPCE's own loop
+    % owns the close, and replacing done_message would take the default
+    % teardown away from it.
+    (   xpce_in_main_loop
+    ->  true
+    ;   memberchk(Class, [picture, frame, dialog, sdl_window])
+    ->  xpce_track_window(Handle, Ref)
+    ;   true
+    ).
 
 % xpce_send(+Handle, +MethodString, +Args).
 xpce_send(Handle, MethodString, Args) :-
     xpce_resolve(Handle, Ref),
     atom_string(Method, MethodString),
+    % A window appended into another window becomes a child of it, so
+    % closing it does not end the application.  The check is on the raw
+    % argument list: the handles are still numbers there.
+    (   Method == append,
+        Args = [Child],
+        number(Child),
+        Child1 is round(Child),
+        xpce_window(Child1)
+    ->  xpce_demote(Child1)
+    ;   true
+    ),
     xpce_args(Args, Args2),
     Msg =.. [Method|Args2],
     send(Ref, Msg).
@@ -184,6 +262,8 @@ xpce_out_value(Raw, Value) :- xpce_out(Raw, Value).
 xpce_free(Handle) :-
     xpce_resolve(Handle, Ref),
     retractall(xpce_obj(Handle, _)),
+    retractall(xpce_window(Handle)),
+    retractall(xpce_root(Handle)),
     send(Ref, free).
 
 % --- value constructors (XPCE compounds Cosmos cannot spell) ----------------
@@ -253,8 +333,7 @@ xpce_timer(Secs, Closure, Handle) :-
     assertz(xpce_obj(Handle, Ref)).
 
 xpce_next_callback(Id) :-
-    (   retract(xpce_next_id(N)) -> Id is N + 1 ; Id = 1 ),
-    assertz(xpce_next_id(Id)).
+    xpce_allocate_id(Id).
 
 % Fired by XPCE on the event loop.  The closure gets the source handle,
 % so one relation can serve many objects.  A throwing Cosmos callback must
@@ -533,12 +612,18 @@ xpce_prime_menu_bitmaps :-
 :- xpce_prime_menu_bitmaps.
 
 % --- event loop --------------------------------------------------------------
-% xpce_loop: dispatch XPCE events until the process ends (window close is
-% wired to halt at creation sites the program controls, and quit() ends
-% it from a callback).  Like pce_main_loop/1 this never returns; unlike
-% it, windows may be created BEFORE the loop starts, because the loop
-% does not track frames -- it just pumps the display.  Control balls
-% (halt/abort) are rethrown so quit() from a callback really quits.
+% xpce_loop: pump XPCE's event dispatcher until the program's windows are
+% closed.  send(@display, dispatch) BLOCKS while there is nothing to do, so
+% the old sleep(0.01) between the calls only added latency to every event;
+% XPCE's own dispatch_for_frames/1 loops on it without a sleep.
+%
+% The loop ends when every top-level window the program opened has been
+% closed -- the close arrives as the window's done_message, which
+% xpce_window_closed/1 turns into a flag.  A program that opened no window
+% keeps looping, as before.
+%
+% Control balls (halt/abort) are rethrown so quit() from a callback really
+% quits.
 xpce_loop :-
     repeat,
     catch(send(@display, dispatch), Error,
@@ -546,9 +631,42 @@ xpce_loop :-
           ->  throw(Error)
           ;   true
           )),
-    sleep(0.01),
-    fail.
-xpce_loop.
+    (   xpce_no_windows_left
+    ->  true
+    ;   fail
+    ).
+
+% xpce_main_loop(+Closure): the XPCE-native loop, the one the SDL demos use.
+%
+% The closure is a Cosmos relation of arity 1 and it is the thing that
+% OPENS the window: pce_loop/2 takes the windows it finds after the goal
+% has run and dispatches until they are gone.  The window therefore has to
+% be created inside the goal, which is exactly how XPCE's own pce_main_loop/1
+% works and why the SDL demos put their window in a 'game' class whose
+% initialise opens it.
+%
+% Unlike pce_main_loop/1 this RETURNS instead of halting, so the Cosmos
+% program can finish its own goals and the process ends normally, with
+% status 0.
+xpce_main_loop(Closure) :-
+    retractall(xpce_in_main_loop),
+    assertz(xpce_in_main_loop),
+    current_prolog_flag(argv, Argv),
+    catch(pce_loop(xpce_cosmos_goal(Closure), Argv), E, xpce_loop_error(E)),
+    retractall(xpce_in_main_loop).
+
+% pce_loop/2 calls its goal with the argument list; the Cosmos relation
+% takes that list as its single argument.
+xpce_cosmos_goal(Closure, Argv) :-
+    call_cl(Closure, [Argv]).
+
+% The window close ends the process by itself, so an error here is a real
+% error.  An unwind ball is rethrown: that is how a quit() from a callback
+% arrives, and reporting it would turn a clean exit into status 1.
+xpce_loop_error('$abort') :- !, throw('$abort').
+xpce_loop_error(E) :-
+    (   E = unwind(_) -> throw(E) ; true ),
+    print_message(error, E).
 
 % xpce_poll: pump the display exactly once, for tests and custom loops.
 % Succeeds except for control balls, which are rethrown as above.

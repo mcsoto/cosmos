@@ -106,11 +106,37 @@ A throwing callback prints a warning and the loop continues — except
 
 ## Event loop
 
-`xp.loop()` dispatches until the process ends. The bridge wires
-`done_message` to halt when it creates a top-level window
-(`picture`/`frame`/`dialog`), so closing the window quits, like Space.
-Unlike `pce_main_loop/1`, windows may be created *before* the loop starts:
-nothing is tracked, the display is just pumped.
+There are two loops, and they differ in *where the window is opened*.
+
+**`xp.loop()`** pumps the display until the program is done. Windows may be
+created *before* the loop starts: the bridge records the top-level windows it
+creates (`picture`/`frame`/`dialog`/`sdl_window`) and wires their
+`done_message` to its own handler, which only records the close. When the
+last **root** window is closed — a window that was not appended into another
+one — the loop returns and the program finishes normally, with status 0.
+
+Nothing halts from inside an XPCE event handler any more. Halting there
+unwinds through the toolkit's C++ frames, and XPCE answers that with a modal
+error dialog that blocks the application for good.
+
+**`xp.main_loop(goal)`** is the XPCE-native loop, the one the SDL demos use.
+The relation you hand it is what *opens* the window, because `pce_loop/2`
+compares the windows before and after the goal ran — so the window has to be
+created inside the goal. The loop dispatches until that window is gone and
+then returns. This is the Cosmos spelling of what `prolog/demo/asteroids.pl`
+does with its `asteroids_game` class:
+
+```cosmos
+rel game(_)
+    xp.create('frame', ['XPCE SDL demo'], app)
+    xp.create('sdl_window', ['Field', field_size], field)
+    xp.send(app, 'append', [field])
+    xp.send(app, 'open', [])
+
+xp.main_loop(game)
+```
+
+`sdl_demo.co` uses the first shape, `sdl_demo_game.co` the second.
 
 ## Menus and text editing: `xpce/notepad.co`
 

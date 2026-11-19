@@ -7,8 +7,12 @@
 // XPCE as event callbacks.
 //
 // Objects cross into Cosmos as integer HANDLES, never as raw references:
-// handles survive arithmetic as 3.0, round-trip exactly, and fail loudly
-// when unknown.  Numbers pass through (integral floats are rounded, since
+// handles survive arithmetic as 1000001.0, round-trip exactly, and fail loudly
+// when unknown.  They start at a million so they cannot be confused with the
+// plain numbers a program passes as a coordinate, an angle or a width: the
+// bridge resolves a number that matches a live handle back to its object, so
+// a shared number range would turn `pen, 2` into whatever object happened to
+// hold handle 2.  Numbers pass through (integral floats are rounded, since
 // XPCE slots usually want ints); strings become atoms on the way in and
 // come back as strings; live objects come back as fresh handles and empty
 // (@nil) reads back as null.
@@ -110,17 +114,41 @@ xp = {
     rel get_data(key, value)
         pl::xpce_get_data(key, value)
 
-    // Enter the XPCE event loop.  Never returns: closing a top-level
-    // window quits (the bridge wires done_message to halt when it
-    // creates one), as does quit() from a callback.
+    // Enter the XPCE event loop.  It RETURNS when the last top-level
+    // window the program opened is closed: the close arrives as the
+    // window's done_message, and the loop notices it.  A program that
+    // opened no window keeps looping, so a headless pump still works.
+    // quit() from a callback ends the process.
     rel loop()
         pl::xpce_loop()
+
+    // The XPCE-native loop, the one the SDL demos use: the relation is
+    // what OPENS the window, and the loop dispatches until that window is
+    // gone and then returns.  The relation takes one argument, the
+    // command line.
+    //
+    // The window has to be created inside the relation, because that is
+    // how pce_loop finds it: it compares the frames before and after the
+    // goal ran.  XPCE's own demos put their window in a 'game' class
+    // whose initialise opens it, and this is the Cosmos spelling of that:
+    //
+    //     rel game(_)
+    //         xp.create('frame', ['XPCE SDL demo'], app)
+    //         xp.create('sdl_window', ['Field', size(640, 480)], field)
+    //         xp.send(app, 'append', [field])
+    //         xp.send(app, 'open', [])
+    //
+    //     xp.main_loop(game)
+    rel main_loop(goal)
+        pl::xpce_main_loop(goal)
 
     // End the process.
     rel quit()
         c::halt()
 
-    // Pump the display exactly once, for tests and custom loops.
+    // Pump the display exactly once, for tests and custom loops.  The
+    // dispatch blocks while there is nothing to do, so a custom loop does
+    // not spin.
     rel poll()
         pl::xpce_poll()
 }

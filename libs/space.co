@@ -26,6 +26,14 @@
 //
 // A method added to space_xpce.co must be added here as well, or it stays
 // invisible to anyone requiring 'space'.
+//
+// The rgb(...) colour functor is exported from here, so a program that
+// requires 'space' can write setColor(rgb(255,0,0)) without declaring the
+// functor itself.  A Cosmos functor crosses the pl:: bridge as a term
+// named fc_<name>, so the backend receives fc_rgb(255,0,0) and accepts it
+// wherever a colour is expected: setColor, clear and setBackgroundColor.
+functor(rgb, Functor Number Number Number)
+
 require('space_xpce', xpce)
 
 // ---- Window lifecycle ----
@@ -33,8 +41,26 @@ require('space_xpce', xpce)
 rel init(width, height)
     xpce.init(width, height)
 
+// Open the canvas ahead of the loop.  startLoop already does this from
+// inside its boot goal; a program that drives its own loop can call it
+// directly first.
+rel open()
+    xpce.open()
+
 rel start(intervalMs, callbacks, initialState)
     xpce.start(intervalMs, callbacks, initialState)
+
+// Start the game loop.  The GAME relation opens the window; the loop then
+// dispatches until that window is closed.  The interval is in SECONDS here,
+// like the XPCE timer; start/3 takes milliseconds.
+//
+//     rel game(_)
+//         sp.init(640, 480)
+//         sp.open()
+//
+//     sp.startLoop(0.016, game, {update=update and draw=draw}, state)
+rel startLoop(interval, game, callbacks, initialState)
+    xpce.startLoop(interval, game, callbacks, initialState)
 
 rel startCanvas(fps, callbacks, initialState)
     xpce.startCanvas(fps, callbacks, initialState)
@@ -217,8 +243,16 @@ rel getFPS(fps)
 // program normally wants get/1, because two frames can see the same event
 // otherwise.
 //
+// The queue can also be emptied without draining it: clear/1 throws every
+// pending event away, clearType/2 only the events of one type.  has/2
+// answers whether an event of a type is waiting, count/2 how many, and
+// size/1 how many events are waiting in all.
+//
 // The event types are: mousemotion, mousedown, mouseup, mousewheel,
 // keydown, keyup, textinput, focus, blur and resize.
+//
+// The modifier keys (shift, ctrl, alt and gui) show up as ordinary
+// keydown/keyup events, because XPCE does not deliver events for them.
 
 rel getEvents(events)
     xpce.event.get(events)
@@ -229,11 +263,28 @@ rel getEventsOf(type, events)
 rel peekEvents(events)
     xpce.event.peek(events)
 
+rel clearEvents()
+    xpce.event.clear()
+
+rel clearEventsOf(type)
+    xpce.event.clearType(type)
+
+rel hasEvent(type, found)
+    xpce.event.has(type, found)
+
+rel countEvents(type, n)
+    xpce.event.count(type, n)
+
+rel eventCount(n)
+    xpce.event.size(n)
+
 // The nested tables mirror the shape of space_xpce's own export, so consumer
 // call sites are unchanged: sp.init, sp.graphics.clear, sp.keyboard.isDown.
 export({
     init = init,
+    open = open,
     start = start,
+    startLoop = startLoop,
     startCanvas = startCanvas,
     quit = quit,
     dispose = dispose,
@@ -310,6 +361,11 @@ export({
     event = {
         get = getEvents,
         getType = getEventsOf,
-        peek = peekEvents
+        peek = peekEvents,
+        clear = clearEvents,
+        clearType = clearEventsOf,
+        has = hasEvent,
+        count = countEvents,
+        size = eventCount
     }
 })

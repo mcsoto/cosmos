@@ -1,0 +1,75 @@
+// The XPCE-native shape of the SDL demo: a 'game' class whose initialise
+// opens the window, handed to xp.main_loop.  This is how XPCE's own demos
+// are written (see prolog/demo/asteroids.pl, where asteroids_game is a
+// frame and asteroids_window is the sdl_window inside it).
+//
+//   cosmos -c sdl_demo_game.co sdl_demo_game.pl sdl_demo_game --xpce
+//   swipl -q -s sdl_demo_game.pl
+//
+// The difference from sdl_demo.co is the loop.  xp.main_loop/1 takes the
+// relation that OPENS the window: the loop compares the windows before and
+// after the relation ran, so the window has to be created inside it.  When
+// the window is closed the loop returns and the program ends normally.
+//
+// xp.loop() is the other shape: the window is opened by the top-level goals
+// and the loop merely pumps the display until that window is closed.
+
+require('xpce', xp)
+
+// The game: a frame with the SDL playfield inside it.
+rel game(_)
+    xp.create('frame', ['XPCE SDL demo'], app)
+    xp.size(640, 480, field_size)
+    xp.create('sdl_window', ['Field', field_size], window)
+    xp.send(app, 'append', [window])
+
+    xp.color('#1b1b2f', background)
+    xp.send(window, 'background', [background])
+
+    // The sprite: a circle drawn once into a texture, shown by a layer.
+    // scale(none) shows the texture at its own size; the hot spot is the
+    // point of the texture that lands on the layer's area position and
+    // around which ->angle rotates.
+    xp.create('circle', [20], ball)
+    xp.color('#3050ff', blue)
+    xp.send(ball, 'fill', [blue])
+    xp.send(ball, 'pen', [2])
+
+    xp.create('sdl_texture', [ball], texture)
+    xp.point(10, 10, hot_spot)
+    xp.send(texture, 'hot_spot', [hot_spot])
+
+    xp.create('area', [100, 220, 0, 0], sprite_area)
+    xp.create('sdl_layer', [texture, sprite_area, 'none'], layer)
+    xp.send(window, 'append', [layer])
+
+    // Graphicals are drawn on top of the layers.
+    xp.create('text', ['An sdl_window with a sprite'], label)
+    xp.point(10, 10, label_pos)
+    xp.send(window, 'display', [label, label_pos])
+    xp.color('white', white)
+    xp.send(label, 'colour', [white])
+
+    xp.send(app, 'open', [])
+
+    // The tick callback cannot capture a top-level binding, so the handles
+    // it needs are shared state.
+    xp.set_data('layer', layer)
+    xp.set_data('area', sprite_area)
+    xp.timer(0.016, tick, timer_handle)
+
+// Move the sprite and rotate it.  The area is moved in place and then sent
+// to the layer again: XPCE uses an area as it is, so a changed area is not
+// noticed until the layer is handed it once more.
+rel tick(_timer)
+    require('xpce', xp)
+    xp.get_data('layer', lay)
+    xp.get_data('area', ar)
+    xp.get(ar, 'x', px)
+    xp.get(ar, 'y', py)
+    xp.send(ar, 'set', [(px + 4) % 620, py, 0, 0])
+    xp.send(lay, 'area', [ar])
+    xp.get(lay, 'angle', ang)
+    xp.send(lay, 'angle', [(ang + 3) % 360])
+
+xp.main_loop(game)

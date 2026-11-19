@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Space on XPCE — API &amp; User Guide</title>
-<meta name="description" content="API reference and user guide for the Cosmos Space library backed by SWI-Prolog XPCE: window, immediate-mode 2D drawing, timer game loop and a PyGame-style event queue.">
+<meta name="description" content="API reference and user guide for the Cosmos Space library backed by SWI-Prolog XPCE: window, immediate-mode 2D drawing, timer game loop, modifier keys and a PyGame-style event queue.">
 <style>
 :root{
   --bg:#ffffff; --bg-soft:#f6f7f9; --bg-code:#f4f5f7; --fg:#1b1d21; --fg-dim:#5b6169;
@@ -156,6 +156,7 @@ footer{border-top:1px solid var(--line);margin-top:56px;padding-top:18px;color:v
     <li><a href="#build">Build &amp; run</a></li>
     <li><a href="#loop">The loop model</a></li>
     <li><a href="#events">Events</a></li>
+    <li><a href="#input">Input &amp; modifiers</a></li>
     <li><a href="#api">API reference</a></li>
     <li><a href="#drawing">Drawing conventions</a></li>
     <li><a href="#checking">Compile-time checking</a></li>
@@ -193,8 +194,8 @@ no browser, no Electron, no network in the loop.</p>
     <p><code>space.pl</code> + <code>space.cif</code>, <code>space_xpce.pl</code> + <code>space_xpce.cif</code>. Checked in; regenerate after editing either <code>.co</code>.</p>
   </div>
   <div class="card">
-    <h3>Worked example</h3>
-    <p><code>test4.co</code> — an arrow-key-controlled rectangle in the header-only shape.</p>
+    <h3>Worked examples</h3>
+    <p><code>test4.co</code> — an arrow-key rectangle. <code>xpce/input.co</code> — the input API: modifiers, callbacks, event queue.</p>
   </div>
 </div>
 
@@ -235,8 +236,8 @@ no browser, no Electron, no network in the loop.</p>
 
 <span class="tok-k">rel</span> draw(s)
     g = sp.graphics
-    g.clear(<span class="tok-s">'#1b1b2f'</span>)
-    g.setColor(<span class="tok-s">'#3050ff'</span>)
+    g.clear(rgb(<span class="tok-n">27</span>, <span class="tok-n">27</span>, <span class="tok-n">47</span>))
+    g.setColor(rgb(<span class="tok-n">48</span>, <span class="tok-n">80</span>, <span class="tok-n">255</span>))
     g.rectangle(<span class="tok-s">'fill'</span>, s.x, <span class="tok-n">100</span>, <span class="tok-n">80</span>, <span class="tok-n">50</span>)
 
 sp.init(<span class="tok-n">640</span>, <span class="tok-n">480</span>)
@@ -312,7 +313,8 @@ swipl -q -s test4.pl          <span class="tok-c"># options 2 and 2b</span></cod
 sp.start(intervalMs, callbacks, state)    <span class="tok-c">// fixed interval, in milliseconds</span>
 sp.startCanvas(fps, callbacks, state)     <span class="tok-c">// fixed frame rate, in frames/second</span></code><button class="copy" type="button">Copy</button></pre>
 
-<p><code>callbacks</code> is a table with up to two entries, both optional:</p>
+<p><code>callbacks</code> is a table with up to two <em>loop</em> entries, both
+optional:</p>
 
 <div class="tablewrap">
 <table>
@@ -324,12 +326,28 @@ sp.startCanvas(fps, callbacks, state)     <span class="tok-c">// fixed frame rat
 </table>
 </div>
 
+<p>The same table may also hold the <strong>input callbacks</strong> —
+<code>keypressed</code>, <code>keyreleased</code>, <code>mousepressed</code>,
+<code>mousereleased</code>, <code>mousemoved</code>, <code>wheel</code>,
+<code>textinput</code>, <code>focus</code>, <code>blur</code> and
+<code>resize</code>. They are called with the arguments listed in
+<a href="#events">Events</a>, before <code>update</code> runs for that frame,
+and the state they produce is threaded through to <code>update</code>.</p>
+
+<pre><code><span class="tok-k">rel</span> keypressed(key, state, newState)
+    newState = state
+
+sp.start(<span class="tok-n">16</span>, {update=update and draw=draw and keypressed=keypressed}, s)</code><button class="copy" type="button">Copy</button></pre>
+
 <h3>Semantics that matter</h3>
 <ul>
   <li><strong><code>dt</code> is in seconds</strong>, not milliseconds, even
       though <code>start</code> takes milliseconds. It comes from
       <code>get_time/1</code>. Multiply your per-second rates by <code>dt</code>
-      to stay frame-rate independent.</li>
+      to stay frame-rate independent. It is also <strong>clamped</strong> to a
+      few frame intervals, so a callback that took a long time — a long print,
+      a slow disk write — cannot hand the next frame a huge step and make a
+      game jump across the screen.</li>
   <li>If <code>update</code> is omitted, state passes through unchanged. If
       <code>draw</code> is omitted, the frame is cleared and nothing is
       painted.</li>
@@ -355,19 +373,29 @@ sp.startCanvas(fps, callbacks, state)     <span class="tok-c">// fixed frame rat
 <section id="events">
 <h2>Events</h2>
 
-<p>XPCE has no polling API in this build, so input arrives as callbacks into the
-backend and is queued here, PyGame-style.</p>
+<p>Input arrives as callbacks into the backend and is queued here, PyGame-style.
+The queue is what <code>sp.event</code> operates on.</p>
 
 <div class="tablewrap">
 <table>
   <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
   <tbody>
     <tr><td><code>get(events)</code></td><td>Drains everything delivered since the last call.</td></tr>
-    <tr><td><code>getType(type, events)</code></td><td>Drains only events of one kind.</td></tr>
+    <tr><td><code>getType(type, events)</code></td><td>Drains only events of one kind; <strong>the others stay queued</strong>.</td></tr>
     <tr><td><code>peek(events)</code></td><td>Does <strong>not</strong> drain. This is what the frame tick uses.</td></tr>
+    <tr><td><code>clear()</code></td><td>Throws every pending event away without handing it over.</td></tr>
+    <tr><td><code>clearType(type)</code></td><td>Throws the pending events of one type away; the rest stay queued.</td></tr>
+    <tr><td><code>has(type, found)</code></td><td><code>found</code> is <code>1</code> when an event of that type is waiting, <code>0</code> otherwise.</td></tr>
+    <tr><td><code>count(type, n)</code></td><td>How many pending events of that type.</td></tr>
+    <tr><td><code>size(n)</code></td><td>How many pending events in all.</td></tr>
   </tbody>
 </table>
 </div>
+
+<p>The queue holds at most 256 events. A program that polls drains it every
+frame and never gets near the limit; a program that only uses the callbacks
+never drains it at all, and the oldest event is the one dropped when the
+queue overflows.</p>
 
 <p>Each event is a table with at least a <code>type</code> field:</p>
 
@@ -375,11 +403,16 @@ backend and is queued here, PyGame-style.</p>
 <table>
   <thead><tr><th scope="col"><code>type</code></th><th scope="col">Extra fields</th></tr></thead>
   <tbody>
-    <tr><td><code>'mousemotion'</code></td><td><code>posx</code> <code>posy</code> <code>x</code> <code>y</code> <code>button</code> <code>clicks</code> <code>mod</code></td></tr>
+    <tr><td><code>'mousemotion'</code></td><td><code>posx</code> <code>posy</code> <code>x</code> <code>y</code> <code>dx</code> <code>dy</code> <code>button</code> <code>clicks</code> <code>mod</code></td></tr>
     <tr><td><code>'mousedown'</code></td><td>as above</td></tr>
     <tr><td><code>'mouseup'</code></td><td>as above</td></tr>
-    <tr><td><code>'mousewheel'</code></td><td>as above, plus <code>wheel</code> (always <code>0</code>)</td></tr>
+    <tr><td><code>'mousewheel'</code></td><td>as above, plus <code>wheel</code> (the scroll amount in notches)</td></tr>
     <tr><td><code>'keydown'</code></td><td><code>key</code> <code>char</code> <code>mod</code></td></tr>
+    <tr><td><code>'keyup'</code></td><td><code>key</code> <code>mod</code> — the release of the matching key-down</td></tr>
+    <tr><td><code>'textinput'</code></td><td><code>text</code> — the character a key press produced</td></tr>
+    <tr><td><code>'focus'</code></td><td>the window gained the keyboard focus</td></tr>
+    <tr><td><code>'blur'</code></td><td>the window lost it</td></tr>
+    <tr><td><code>'resize'</code></td><td><code>width</code> <code>height</code></td></tr>
   </tbody>
 </table>
 </div>
@@ -393,36 +426,171 @@ failing, so <code>ev.posx</code> on a keydown is harmless.</p>
 typed, and <code>mod</code> is any of <code>"s"</code> (shift),
 <code>"c"</code> (control), <code>"m"</code> (meta). Shift is already folded
 into the character, so shift+A arrives as <code>key='a'</code>,
-<code>char='A'</code>, <code>mod='s'</code>.</p>
+<code>char='A'</code>, <code>mod='s'</code>. A <code>'keyup'</code> carries the
+same <code>key</code> name as the <code>'keydown'</code> it ends.</p>
+
+<p><code>dx</code> and <code>dy</code> are the movement since the previous mouse
+event, so they are <code>0</code> on the first one the backend sees.
+<code>clicks</code> is the click count as XPCE reports it
+(<code>single</code>, <code>double</code>, <code>triple</code>), and
+<code>button</code> is the Space number: <code>1</code> left, <code>2</code>
+right, <code>3</code> middle.</p>
 
 <pre><code><span class="tok-k">rel</span> update(_dt, s, s2)
     sp.event.get(events)
     list.each(events, show, _out)   <span class="tok-c">// each/3 calls p(index, element, result)</span>
     s2 = s</code><button class="copy" type="button">Copy</button></pre>
 
-<div class="box warn">
-  <span class="tag">No keyup</span>
-  <p>This XPCE build's <code>@event_tree</code> has no release events under
-  <code>keyboard/</code>, so only presses are ever delivered. A
-  "move while held" model therefore has no way to know when to stop — nudge per
-  press instead. Holding a key still glides, because the OS repeats the press.</p>
+<div class="box note">
+  <span class="tag">peek vs get</span>
+  <p>Every event reaches the callbacks <strong>exactly once</strong> — the tick
+  fires the events the callbacks have not seen yet, not the whole queue — and
+  the queue itself is only peeked at, so a polling program that drains with
+  <code>get()</code> still finds the event. Using both styles in one program
+  means seeing the event twice: once as a callback and once from the queue.</p>
 </div>
 
 <h3>Callbacks (Love2D style)</h3>
-<p>Pass an <code>on</code> table to <code>sp.start</code> and each event of that
-type is handed to the relation, before <code>update</code> runs for that
-frame:</p>
+
+<p>There are two ways to be told about an event, and they work at the same
+time.</p>
+
+<h4>As a named callback</h4>
+
+<p>Put the relation under its own name in the <code>sp.start</code> table and the
+backend calls it for every event of that kind:</p>
+
+<pre><code><span class="tok-k">rel</span> keypressed(key, state, newState)
+    newState = state
+
+sp.start(<span class="tok-n">33</span>, {update=update and draw=draw and keypressed=keypressed}, s)</code><button class="copy" type="button">Copy</button></pre>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Callback</th><th scope="col">Arguments</th></tr></thead>
+  <tbody>
+    <tr><td><code>keypressed(key, state, newState)</code></td><td>the key name</td></tr>
+    <tr><td><code>keyreleased(key, state, newState)</code></td><td>the key name</td></tr>
+    <tr><td><code>mousepressed(x, y, button, state, newState)</code></td><td></td></tr>
+    <tr><td><code>mousereleased(x, y, button, state, newState)</code></td><td></td></tr>
+    <tr><td><code>mousemoved(x, y, dx, dy, state, newState)</code></td><td><code>dx</code>/<code>dy</code> are the movement</td></tr>
+    <tr><td><code>wheel(dx, dy, state, newState)</code></td><td>the scroll amount</td></tr>
+    <tr><td><code>textinput(text, state, newState)</code></td><td>the typed text</td></tr>
+    <tr><td><code>focus(state, newState)</code></td><td></td></tr>
+    <tr><td><code>blur(state, newState)</code></td><td></td></tr>
+    <tr><td><code>resize(width, height, state, newState)</code></td><td></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>A callback that does not care about the state may leave the last two
+arguments out, and one that does not care about anything else may take only the
+leading ones. The state is <strong>threaded</strong>: a callback that produces a
+new state hands it to the next callback, and <code>update</code> runs with the
+state the input callbacks left behind.</p>
+
+<p>The legacy names <code>mousedown</code> and <code>mouseup</code> are accepted
+as well; they get <strong>no button argument</strong>, because the old relations
+are <code>(x, y, state, newState)</code>.</p>
+
+<h4>As an <code>on</code> table</h4>
+
+<p>Pass a table of per-type handlers instead, and the relation receives the whole
+event table:</p>
 
 <pre><code><span class="tok-k">rel</span> on_keydown(ev)
     print([<span class="tok-s">'key '</span>, ev.key])
 
 sp.start(<span class="tok-n">33</span>, {update=update and draw=draw and on={keydown=on_keydown}}, s)</code><button class="copy" type="button">Copy</button></pre>
+</section>
+
+<section id="input">
+<h2>Input &amp; modifiers</h2>
+
+<h3>Polling</h3>
+
+<p><code>sp.keyboard.isDown(key)</code> <strong>polls XPCE's keyboard device</strong>,
+so it answers from the hardware and is correct even if the app missed a press or
+a release. The mouse side reads the state the event layer maintains, so the
+pointer only reports a real position after the first mouse event has arrived.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>isDown(key)</code></td><td>Succeeds while the named key is held. Under <code>sp.keyboard</code> and <code>sp.input</code> this is the keyboard.</td></tr>
+    <tr><td><code>isMouseDown(button)</code></td><td>Succeeds while that button is held. Under <code>sp.mouse</code>, <code>isDown/1</code> is the same thing.</td></tr>
+    <tr><td><code>getX(x)</code> / <code>getY(y)</code> / <code>getPosition(pos)</code></td><td>Last known pointer position.</td></tr>
+    <tr><td><code>buttonDown(button)</code></td><td>Succeeds while that button is held.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Key names are the lower-case Love2D ones — <code>'a'</code>,
+<code>'space'</code>, <code>'escape'</code>, <code>'return'</code>,
+<code>'tab'</code>, <code>'backspace'</code>, <code>'delete'</code>,
+<code>'left'</code>, <code>'right'</code>, <code>'up'</code>, <code>'down'</code>,
+<code>'home'</code>, <code>'end'</code>, <code>'pageup'</code>,
+<code>'pagedown'</code>, <code>'insert'</code>, <code>'pause'</code>,
+<code>'f1'</code>…<code>'f24'</code> — and the DOM arrow aliases
+(<code>'arrowleft'</code>, <code>'arrowup'</code>, …) are accepted as well.
+Mouse buttons may be given either as the number above or as the name
+<code>'left'</code>, <code>'right'</code>, <code>'middle'</code>.</p>
+
+<h3>Modifier keys</h3>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Name</th><th scope="col">Synonyms</th><th scope="col">The key</th></tr></thead>
+  <tbody>
+    <tr><td><code>'shift'</code></td><td>—</td><td>either shift key</td></tr>
+    <tr><td><code>'ctrl'</code></td><td><code>'control'</code></td><td>either control key</td></tr>
+    <tr><td><code>'alt'</code></td><td><code>'meta'</code></td><td>either alt key</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="box warn">
+  <span class="tag">XPCE delivers no modifier events</span>
+  <p>XPCE's own manual says it: <em>"a modifier key, such as Shift, generates
+  neither"</em> a key event nor a key release. So a program that only looks at
+  the events never sees shift, control or alt being pressed. The backend
+  therefore <strong>synthesises</strong> them: a modifier that goes down
+  produces an ordinary <code>'keydown'</code> event whose <code>key</code> is
+  the modifier name, and letting go produces the matching <code>'keyup'</code>.
+  A modifier is thus visible both as an event and through
+  <code>isDown</code>.</p>
+</div>
+
+<pre><code><span class="tok-k">rel</span> keypressed(key, state, newState)
+    <span class="tok-c">// key is 'shift', 'ctrl' or 'alt' for a modifier</span>
+    newState = state
+
+<span class="tok-k">rel</span> update(dt, s, s2)
+    sp.keyboard.isDown(<span class="tok-s">'shift'</span>, down)   <span class="tok-c">// 1 while shift is held</span>
+    s2 = s</code><button class="copy" type="button">Copy</button></pre>
+
+<p>The <code>mod</code> field of any event carries the modifiers that were held
+when it happened, as the PyGame-style string <code>"s"</code>, <code>"c"</code>,
+<code>"m"</code> (<code>""</code> for none).</p>
+
+<div class="box warn">
+  <span class="tag">There is no 'gui' modifier</span>
+  <p>XPCE's event mask has no bit for the GUI key, and the keyboard device of
+  this build does not know the name of the key — asking about it raises
+  <code>Unknown key</code>, and an XPCE error inside the event loop stops the
+  frame for good. A modifier that cannot be seen is not offered at all, so
+  <code>'gui'</code> is not a name you can use.</p>
+</div>
 
 <div class="box note">
-  <span class="tag">peek vs get</span>
-  <p>The tick <strong>peeks</strong> at the queue for callbacks, so a polling
-  program that drains with <code>get()</code> decides which frame sees which
-  event. Pick one style per program.</p>
+  <span class="tag">The vocabulary stays XPCE-native</span>
+  <p>The SDL names (<code>'Left Shift'</code>, <code>'Right Ctrl'</code>, …) are
+  how the XPCE <em>keyboard device</em> spells those keys. They are used
+  internally to talk to that device and are <strong>not</strong> part of the
+  Space API. Arrows are the only alias exception, and they exist because the
+  Space API has always documented both <code>'left'</code> and
+  <code>'arrowleft'</code>.</p>
 </div>
 </section>
 
@@ -433,7 +601,10 @@ sp.start(<span class="tok-n">33</span>, {update=update and draw=draw and on={key
 <code>sp.input</code>, <code>sp.keyboard</code>, <code>sp.mouse</code>,
 <code>sp.timer</code> and <code>sp.event</code> are sub-tables;
 <code>input</code>, <code>keyboard</code> and <code>mouse</code> are the same
-table under three names, matching the browser Canvas vocabulary.</p>
+table under three names, matching the browser Canvas vocabulary.
+<code>sp.input.isDown/1</code> is the keyboard,
+<code>sp.input.isMouseDown/1</code> and <code>sp.input.buttonDown/1</code> are
+the mouse.</p>
 
 <h3>Top level</h3>
 <div class="tablewrap">
@@ -445,6 +616,8 @@ table under three names, matching the browser Canvas vocabulary.</p>
     <tr><td><code>sp.startCanvas(fps, callbacks, state)</code></td><td>Fixed-fps loop; <code>intervalMs = 1000/fps</code>.</td></tr>
     <tr><td><code>sp.quit()</code></td><td>End the process. Same as closing the window.</td></tr>
     <tr><td><code>sp.dispose()</code></td><td>Currently just another name for <code>quit</code>.</td></tr>
+    <tr><td><code>sp.stop()</code></td><td>The Love2D name for <code>quit</code>.</td></tr>
+    <tr><td><code>sp.beginFrame()</code> / <code>sp.endFrame()</code></td><td>Frame markers. XPCE presents every drawing call at once, so these do nothing.</td></tr>
     <tr><td><code>sp.loadImage(source, name)</code></td><td>Loads via XPCE <code>image/1</code>; see <a href="#drawing">drawing conventions</a>.</td></tr>
   </tbody>
 </table>
@@ -455,17 +628,19 @@ table under three names, matching the browser Canvas vocabulary.</p>
 <table>
   <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>setBackgroundColor(c)</code> / <code>getBackgroundColor(c)</code></td><td>Getter returns the fixed <code>#000000</code>.</td></tr>
-    <tr><td><code>setColor(c)</code> / <code>getColor(c)</code></td><td>Current ink; sticky until changed. Getter returns <code>#ffffff</code>.</td></tr>
+    <tr><td><code>setBackgroundColor(c)</code> / <code>getBackgroundColor(c)</code></td><td>The background, tracked separately from the ink. The getter answers <code>#000000</code> until one is set.</td></tr>
+    <tr><td><code>setColor(c)</code> / <code>getColor(c)</code></td><td>Current ink; sticky until changed. The getter answers <code>#ffffff</code> until one is set.</td></tr>
     <tr><td><code>clear(c)</code></td><td>Paint background and clear.</td></tr>
     <tr><td><code>rectangle(mode, x, y, w, h)</code></td><td></td></tr>
     <tr><td><code>line(points)</code></td><td>Flat <code>[x1,y1,x2,y2,…]</code>.</td></tr>
+    <tr><td><code>point(x, y)</code></td><td>A single dot.</td></tr>
+    <tr><td><code>points(points)</code></td><td>Several dots, as one flat list of coordinates.</td></tr>
     <tr><td><code>circle(mode, x, y, r)</code></td><td><code>r</code> is a <strong>radius</strong>.</td></tr>
     <tr><td><code>ellipse(mode, x, y, rx, ry)</code></td><td><code>rx</code>/<code>ry</code> are <strong>radii</strong>.</td></tr>
     <tr><td><code>arc(mode, arcType, x, y, r, angle1, angle2)</code></td><td>Angles in radians.</td></tr>
     <tr><td><code>polygon(mode, points)</code></td><td>Flat <code>[x1,y1,…]</code>; filled by even-odd scanline.</td></tr>
     <tr><td><code>print(text, x, y)</code></td><td></td></tr>
-    <tr><td><code>printf(text, x, y, width, align)</code></td><td><code>width</code>/<code>align</code> ignored.</td></tr>
+    <tr><td><code>printf(text, x, y, width, align)</code></td><td>Text in a box <code>width</code> pixels wide, aligned <code>'left'</code>, <code>'center'</code> or <code>'right'</code>.</td></tr>
     <tr><td><code>newFont(size, family, style, font)</code></td><td>Returns a font handle; result is the <strong>last</strong> parameter.</td></tr>
     <tr><td><code>setFont(font)</code> / <code>getFont(font)</code></td><td></td></tr>
     <tr><td><code>getDimensions(size)</code></td><td><code>{width, height}</code>.</td></tr>
@@ -473,9 +648,9 @@ table under three names, matching the browser Canvas vocabulary.</p>
     <tr><td><code>push()</code> / <code>pop()</code></td><td>Transform stack.</td></tr>
     <tr><td><code>origin()</code></td><td>Reset the transform.</td></tr>
     <tr><td><code>translate(x, y)</code> / <code>rotate(angle)</code> / <code>scale(x, y)</code></td><td>Scale also affects shape sizes.</td></tr>
-    <tr><td><code>shear(x, y)</code></td><td>No-op.</td></tr>
+    <tr><td><code>shear(x, y)</code></td><td>Shear transform; a sheared rectangle is drawn as a polygon, since XPCE has no sheared rectangle.</td></tr>
     <tr><td><code>setLineWidth(w)</code> / <code>getLineWidth(w)</code></td><td></td></tr>
-    <tr><td><code>setLineStyle(style)</code></td><td>No-op.</td></tr>
+    <tr><td><code>setLineStyle(style)</code> / <code>getLineStyle(style)</code></td><td>Recorded and read back; XPCE has no rough/smooth pen of its own.</td></tr>
     <tr><td><code>setScissor(x, y, w, h)</code> / <code>clearScissor()</code> / <code>getScissor(scissor)</code></td><td>Recorded, <strong>not enforced</strong>.</td></tr>
     <tr><td><code>draw(image, x, y)</code></td><td></td></tr>
     <tr><td><code>refresh()</code></td><td>Unnecessary; the loop flushes each frame.</td></tr>
@@ -485,16 +660,45 @@ table under three names, matching the browser Canvas vocabulary.</p>
 <p><code>mode</code> is <code>'fill'</code> or <code>'line'</code>. Fill also
 strokes the outline.</p>
 
+<p>Every method that takes a colour takes it in any of these forms:</p>
+
+<pre><code>g.setColor(<span class="tok-s">'#ff0000'</span>)
+g.setColor([<span class="tok-n">255</span>, <span class="tok-n">0</span>, <span class="tok-n">0</span>])
+g.setColor(<span class="tok-n">1</span>, <span class="tok-n">0</span>, <span class="tok-n">0</span>)
+g.setColor(rgb(<span class="tok-n">255</span>, <span class="tok-n">0</span>, <span class="tok-n">0</span>))
+g.setColor(rgba(<span class="tok-n">255</span>, <span class="tok-n">0</span>, <span class="tok-n">0</span>, <span class="tok-n">1</span>))</code><button class="copy" type="button">Copy</button></pre>
+
+<p>The <code>rgb(...)</code> functor is exported by the library, so a program
+that requires <code>'space'</code> can write it without declaring the functor
+itself. A component of <code>1</code> or less is a normalized value, a larger
+one is a byte; if any component is a byte, all of them are.</p>
+
 <h3><code>sp.input</code> / <code>sp.keyboard</code> / <code>sp.mouse</code></h3>
-<p>These read the state the event layer maintains, so they only report real
-values after the first input event has arrived.</p>
+<p>See <a href="#input">Input &amp; modifiers</a> for the full picture.</p>
 <div class="tablewrap">
 <table>
   <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>isDown(key)</code></td><td>Succeeds while the named key is held.</td></tr>
+    <tr><td><code>isDown(key)</code></td><td>Succeeds while the named key is held, including the modifiers <code>'shift'</code>, <code>'ctrl'</code> and <code>'alt'</code>.</td></tr>
     <tr><td><code>getX(x)</code> / <code>getY(y)</code> / <code>getPosition(pos)</code></td><td>Last known pointer position.</td></tr>
-    <tr><td><code>buttonDown(button)</code></td><td>Succeeds while that button is held. Buttons are <code>1</code> left, <code>2</code> middle, <code>3</code> right.</td></tr>
+    <tr><td><code>buttonDown(button)</code></td><td>Succeeds while that button is held. Buttons are <code>1</code> left, <code>2</code> right, <code>3</code> middle.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3><code>sp.event</code></h3>
+<div class="tablewrap">
+<table>
+  <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>get(events)</code></td><td>Drains everything delivered since the last call.</td></tr>
+    <tr><td><code>getType(type, events)</code></td><td>Drains only events of one kind; the others stay queued.</td></tr>
+    <tr><td><code>peek(events)</code></td><td>Does <strong>not</strong> drain.</td></tr>
+    <tr><td><code>clear()</code></td><td>Throw every pending event away.</td></tr>
+    <tr><td><code>clearType(type)</code></td><td>Throw the pending events of one type away.</td></tr>
+    <tr><td><code>has(type, found)</code></td><td><code>1</code> when an event of that type is waiting, <code>0</code> otherwise.</td></tr>
+    <tr><td><code>count(type, n)</code></td><td>How many pending events of that type.</td></tr>
+    <tr><td><code>size(n)</code></td><td>How many pending events in all.</td></tr>
   </tbody>
 </table>
 </div>
@@ -504,9 +708,9 @@ values after the first input event has arrived.</p>
 <table>
   <thead><tr><th scope="col">Call</th><th scope="col">Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>getTime(time)</code></td><td>Seconds.</td></tr>
-    <tr><td><code>getDelta(delta)</code></td><td>Seconds since the previous frame.</td></tr>
-    <tr><td><code>getFPS(fps)</code></td><td></td></tr>
+    <tr><td><code>getTime(time)</code></td><td>Seconds since the backend was created.</td></tr>
+    <tr><td><code>getDelta(delta)</code></td><td>Milliseconds per frame (the update interval).</td></tr>
+    <tr><td><code>getFPS(fps)</code></td><td>The corresponding frame rate.</td></tr>
   </tbody>
 </table>
 </div>
@@ -515,9 +719,12 @@ values after the first input event has arrived.</p>
 <section id="drawing">
 <h2>Drawing conventions</h2>
 <ul>
-  <li><strong>Colours</strong> are <code>'#rrggbb'</code> strings or
-      <code>[R,G,B]</code> numeric lists. Anything else silently becomes
-      <strong>white</strong> — a mistyped colour will not raise.</li>
+  <li><strong>Colours</strong> are <code>'#rrggbb'</code> strings,
+      <code>[R,G,B]</code> numeric lists, or the <code>rgb(r,g,b)</code> and
+      <code>rgba(r,g,b,a)</code> functors the library exports. Anything
+      else silently becomes <strong>white</strong> — a mistyped colour will not
+      raise. A component of <code>1</code> or less is normalized, a larger one
+      is a byte; if any component is a byte, all of them are.</li>
   <li><strong>Images</strong> are loaded by XPCE's <code>image/1</code>, so
       format support is XPCE's: GIF, JPEG and XPM work; PNG needs
       <code>library(pce_image)</code>. A path that cannot be loaded is swallowed,
@@ -535,7 +742,8 @@ values after the first input event has arrived.</p>
       value position.</li>
   <li><strong>Transforms</strong> apply to coordinates <em>and</em> to shape
       sizes, so <code>scale</code> inside a <code>push</code>/<code>pop</code>
-      pair magnifies what you draw.</li>
+      pair magnifies what you draw. <code>shear</code> is part of the same
+      stack.</li>
 </ul>
 </section>
 
@@ -552,6 +760,7 @@ checked: arity and member existence are both enforced.</p>
     <tr><td><code>sp.init(320,480)</code></td><td>accepted</td></tr>
     <tr><td><code>sp.init(320)</code></td><td><code>Wrong arity for sp.init</code></td></tr>
     <tr><td><code>sp.graphics.clear('#fff')</code></td><td>accepted</td></tr>
+    <tr><td><code>sp.graphics.clear(rgb(255,0,0))</code></td><td>accepted</td></tr>
     <tr><td><code>sp.graphics.clear()</code></td><td><code>Wrong arity for sp.graphics.clear</code></td></tr>
     <tr><td><code>sp.nosuch(1)</code></td><td><code>Unknown imported member: sp.nosuch</code></td></tr>
   </tbody>
@@ -584,7 +793,7 @@ neither, or the two entry points will disagree about what compiles.</p>
 
 <section id="rules">
 <h2>Rules that will bite you</h2>
-<p>Both come from Cosmos language rules, not from this library.</p>
+<p>All three come from Cosmos language rules, not from this library.</p>
 <ol>
   <li><strong>Match <code>require</code>'s placement to the entry you build
       with.</strong> With <code>--main</code>, <code>require</code> goes inside
@@ -599,6 +808,13 @@ neither, or the two entry points will disagree about what compiles.</p>
       makes <code>newFont(size, family, style, font)</code> usable in value
       position, and it is why getters take an out-parameter rather than
       returning a value.</li>
+  <li><strong>A functor crosses the <code>pl::</code> bridge as
+      <code>fc_&lt;name&gt;</code>.</strong> That is why the backend receives
+      <code>rgb(255,0,0)</code> as the Prolog term
+      <code>fc_rgb(255,0,0)</code>, and why the backend accepts that term
+      wherever a colour is expected. A program that requires a library which
+      does <em>not</em> export the functor has to declare it itself before it
+      can be used.</li>
 </ol>
 
 <div class="box ok">
@@ -614,18 +830,21 @@ neither, or the two entry points will disagree about what compiles.</p>
 
 <section id="limits">
 <h2>Limits</h2>
-<p>Known and deliberate for this version.</p>
+<p>Known and deliberate for this version:</p>
 <ul>
-  <li><strong>Input arrives as events, not polling.</strong>
-      <code>sp.event.get()</code> drains the queue and <code>sp.input</code>
-      reads the state it maintains, so <code>isDown/1</code>,
-      <code>buttonDown/1</code> and <code>getX</code>/<code>getY</code>/<code>getPosition</code>
-      only report real values after the first event arrives. There is no
-      <code>'keyup'</code>, and <code>wheel</code> is always <code>0</code>.</li>
+  <li><strong>Keyboard state is polled, mouse state is event-driven.</strong>
+      <code>isDown/1</code> asks XPCE's keyboard device, so it is accurate at
+      any time. <code>buttonDown/1</code> and
+      <code>getX</code>/<code>getY</code>/<code>getPosition</code> read the state
+      the event layer maintains, so the pointer only reports a real position
+      after the first mouse event arrives.</li>
+  <li><strong>No <code>'gui'</code> modifier.</strong> The event mask has no bit
+      for it and the keyboard device of this build does not know the name of the
+      key, so it cannot be offered.</li>
   <li><strong><code>setScissor</code> records but does not clip.</strong></li>
-  <li><strong><code>shear</code> and <code>setLineStyle</code> are
-      no-ops</strong>; <code>getLineStyle</code>-style accessors do not
-      exist.</li>
+  <li><strong><code>setLineStyle</code> records but does not change the pen</strong>
+      — XPCE draws every line in one style. <code>getLineStyle</code> reads the
+      recorded value back.</li>
   <li><strong>Rotating an ellipse</strong> moves its centre; the shape stays
       axis-aligned.</li>
   <li><strong>No window title control.</strong> The title is always
@@ -647,8 +866,10 @@ neither, or the two entry points will disagree about what compiles.</p>
     <tr><td><code>Unknown imported member: sp.…</code></td><td>An interface <code>.cif</code> is reachable but stale, or you called a method that does not exist. Regenerate <code>libs/*.cif</code>, or remove the <code>.cif</code> beside your program to compile unchecked.</td></tr>
     <tr><td><code>Unknown procedure: space_xpce_…</code></td><td>The Prolog backend was never loaded. It is loaded at <em>runtime</em> from a path written into the entry template; a plain compile has no entry point and fails this way. Rebuild with <code>--main</code> or <code>--xpce</code>.</td></tr>
     <tr><td>Window opens but nothing is drawn</td><td>A <code>draw</code>/<code>update</code> exception is being swallowed as a warning. Read stderr.</td></tr>
+    <tr><td>A callback never fires</td><td>It must be registered in the <code>sp.start</code> table under its own name, and the argument list must match one of the documented forms.</td></tr>
+    <tr><td>Shift, control or alt never appears</td><td>They are synthesised, so they arrive one frame late and only while the window has the focus. Check the modifier names: <code>'shift'</code>, <code>'ctrl'</code>, <code>'alt'</code>.</td></tr>
     <tr><td>Shapes have the wrong size</td><td>You passed a diameter where a radius is expected, or <code>scale</code> is still active from an unbalanced <code>push</code>.</td></tr>
-    <tr><td>A colour came out white</td><td>The value was neither <code>'#rrggbb'</code> nor <code>[R,G,B]</code>.</td></tr>
+    <tr><td>A colour came out white</td><td>The value was neither <code>'#rrggbb'</code>, <code>[R,G,B]</code> nor an <code>rgb(...)</code> / <code>rgba(...)</code> functor.</td></tr>
     <tr><td><code>main/2</code> where you expected <code>main/1</code></td><td>A top-level <code>require</code> with a <code>--main</code> build. Move it into the rel bodies, or build with <code>--xpce</code>.</td></tr>
     <tr><td>Process crashes on shutdown</td><td>Something tried to close or destroy the window from outside the event loop. Let process exit reclaim it.</td></tr>
   </tbody>
@@ -666,9 +887,13 @@ neither, or the two entry points will disagree about what compiles.</p>
     <tr><td>libs/space_xpce.co</td><td>Cosmos wrapper, one <code>rel</code> per method.</td></tr>
     <tr><td>libs/space_xpce_prolog.pl</td><td>Raw Prolog/XPCE. Loaded at runtime.</td></tr>
     <tr><td>test4.co</td><td>Arrow-key example, <code>--xpce</code> header-only shape.</td></tr>
+    <tr><td>xpce/input.co</td><td>The input API in one file: modifiers, callbacks, event queue.</td></tr>
+    <tr><td>test/space_xpce_input.pl</td><td>Regression suite for the input side. Runs without a window.</td></tr>
     <tr><td>misc/moving_rect.co</td><td>The animated <code>ui2.pl</code> port, <code>--main</code> shape.</td></tr>
     <tr><td>misc/simple_xpce.co</td><td>One-shot drawing, no loop.</td></tr>
     <tr><td>misc/demo_space_xpce.co</td><td>Every primitive, plus transforms, fonts, scissor.</td></tr>
+    <tr><td>XPCE_SIMPLE_LIBRARY.md</td><td>The same guide in Markdown, with the build notes.</td></tr>
+    <tr><td>docs/space-api.md</td><td>The backend-neutral Space API reference.</td></tr>
     <tr><td>XPCE_BACKEND.md</td><td>Backend layout, XPCE quirks, build integration.</td></tr>
     <tr><td>compiler_issue.txt</td><td>The compiler gaps this library works around.</td></tr>
     <tr><td>XPCE_LIBRARY.md</td><td>The other XPCE library (<code>libs/xpce.co</code>).</td></tr>

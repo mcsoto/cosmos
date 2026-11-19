@@ -1,0 +1,65 @@
+// Exercises the input side of the Space API under XPCE.
+//
+//   * the TOP-LEVEL input callbacks (keypressed, mousepressed, wheel, ...):
+//     they are registered in the map that sp.start takes, under their own
+//     names, and they are called with the arguments the Space API
+//     documents;
+//   * the rgb(...) colour functor: a colour can be written as a term
+//     instead of a string;
+//   * the event queue operations: has, count and size look at the queue
+//     without draining it, clear throws it away.
+//
+// Run it with:
+//
+//   cosmos.exe -l xpce/input.co --xpce
+//
+// The window has to be focused for the keyboard to reach it, and XPCE
+// delivers the modifier keys only through the keyboard device, so shift,
+// control and alt show up as keydown/keyup events with the key 'shift',
+// 'ctrl' or 'alt'.
+
+require('space', sp)
+
+// The rgb(...) colour functor.  A program declares the functors it uses;
+// the backend receives rgb(255,0,0) as the term fc_rgb(255,0,0) and
+// accepts it wherever a colour is expected.
+functor(rgb, Functor Number Number Number)
+
+rel update(dt, s, s2)
+    events = sp.event.get()
+    for (e in events)
+        print(['EV', e.type])
+    n = sp.event.size()
+    pending = sp.event.has('keydown')
+    color = sp.graphics.getColor()
+    s2 = {ticks=s.ticks+1 and pending=pending and queue=n and color=color}
+
+rel draw(s)
+    g = sp.graphics
+    g.clear(rgb(16, 16, 24))
+    g.setColor(rgb(255, 0, 0))
+    g.rectangle('fill', 20, 20, 60, 60)
+    print(['tick', s.ticks, 'queue', s.queue, 'pending', s.pending, 'color', s.color])
+
+rel keypressed(key, s, s2)
+    print(['keypressed', key])
+    s2 = {pressed=s.pressed+1}
+
+rel keyreleased(key, s, s2)
+    print(['keyreleased', key])
+    s2 = s
+
+rel mousepressed(x, y, button, s, s2)
+    print(['mousepressed', x, y, button])
+    s2 = s
+
+rel mousereleased(x, y, button, s, s2)
+    print(['mousereleased', x, y, button])
+    s2 = s
+
+rel wheel(dx, dy, s, s2)
+    print(['wheel', dx, dy])
+    s2 = s
+
+sp.init(320, 240)
+sp.start(16, {update=update and draw=draw and keypressed=keypressed and keyreleased=keyreleased and mousepressed=mousepressed and mousereleased=mousereleased and wheel=wheel}, {ticks=0 and pressed=0})

@@ -12,6 +12,7 @@ x={
 //Parse error at 4:4: Unexpected token (expected NEWLINE)
 //only occur on case+table container
 
+function + for mechanics
 
 sp.start(16,{
 	update=update

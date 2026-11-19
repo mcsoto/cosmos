@@ -1,3 +1,21 @@
+ .\cosmos -l .\xpce\tictactoe.co --xpce
+Warning: D:/Computer/Documents/cosmos/libs/object.pl:5:
+Warning:    Local definition of user:object/1 overrides weak import from pce_principal
+-obj
+-obj
+[]
+ERROR: [Thread main] assoc:insert/5: No rule matches assoc:insert([],"_prototype",t,_1892,_1894)
+
+rel p(start x, x) next x=2;
+
+width = getnil(callbacks.width,640)
+
+//issues
+.\cosmos -l .\xpce\board.co --xpce
+Parse error at 38:4: Unexpected token (expected NEWLINE)
+
+//
+check objs
 
 check types/how functors apply when def. in different files
 

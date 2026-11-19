@@ -5,9 +5,6 @@ nil={}
 list=table.toList
 update_=table.update
 set_=table.set
-
-rel new(o,prop,_o)
-	table.update(o,prop,o2)
 	
 rel get(t,o,o2)
 	choose(pl::get_(t,o,o2))
@@ -23,7 +20,8 @@ rel set(t,o,o2,t2)
 	pl::obj_set(t,o,o2,t2)
 	
 t={
-	'new'=new
+	'new'=rel (o,prop,_o)
+		table.update(o,prop,o2)
 	'get'=get
 	'set'=set
 	
@@ -33,7 +31,7 @@ t={
 		
 	rel createFrom(t,_o,o2)
 		set_(t,'_prototype',_o,t2)
-		c::makeobj(t2,o2)
+		c::makeobj(t2,o2) 
 		
 	rel update(o1,t2,o3)
 		c::makeobj(t1,o1)

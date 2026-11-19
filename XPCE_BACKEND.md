@@ -19,7 +19,8 @@ SWI-Prolog's XPCE toolkit (`library(pce)` + `library(pce_main)`).
 
 ## API covered
 
-`sp.init(w,h)`, `sp.start(ms,callbacks,state)`, `sp.startCanvas(fps,callbacks,state)`,
+`sp.init(w,h)`, `sp.open()`, `sp.start(ms,callbacks,state)`,
+`sp.startLoop(seconds,game,callbacks,state)`, `sp.startCanvas(fps,callbacks,state)`,
 `sp.quit/dispose/stop/loadImage`, `sp.beginFrame/sp.endFrame`,
 `graphics.clear/setColor/setBackgroundColor/getColor/getBackgroundColor/rectangle/line/point/points/circle/ellipse/arc/polygon/print/printf/push/pop/origin/translate/rotate/scale/shear/setLineWidth/getLineWidth/setLineStyle/getLineStyle/setScissor/clearScissor/getScissor/draw/refresh`,
 plus `newFont/setFont/getFont`, `getDimensions/getWidth/getHeight`, timer (`getTime/getDelta/getFPS`),

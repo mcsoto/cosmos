@@ -1,6 +1,8 @@
+Make no change in compiler/ if not instructed.
+
 **Raw Prolog**
 
-You can use a "raw Prolog" style with operators 'choose', 'cut' or 'once'. 
+You can use a "raw Prolog" style with operators 'choose', 'cut' or 'once'. `cut` is 0-arity, `A and cut and B`.
 
 `choose(A) B else C` lowers to `(A -> B ; C)`. `when(A) B else C` provides a simple `(A, B ; C)`. See compiler/docs/LOWERING_TABLE.md.
 
@@ -21,22 +23,34 @@ rel ch3(a, r)
         r = 'pos'
     else
         r = 'neg'
+
 // A cut: compiles to '!' in Prolog
 rel cut1(l, out)
     ch1(a,r)
 	cut
 
-// A cut: compiles to 'once' in Prolog
+// once: compiles to 'once' in Prolog
 rel once1(l, out)
     once ch1(a,r)
 ´´´
 
 **A relation's result is its last parameter.** `rel f(a, out)` answers through
-  `out`; there is no value-returning form. 
-  
+  `out`; there is no value-returning form.
+
 `p(a, out)` can be called as `out = p(a)`. The last parameter is sometimes used as the output.
 
-See [ENGINE_ISSUES.md] for more tips and engine workarounds. 
+See [ENGINE_ISSUES.md] for more tips and engine workarounds.
+
+Using 'function' instead of 'rel' can provide more checks, but it explictly assumes the last parameter is being used as the output. In Prolog, this is not always the case.
+
+´´´
+function f(a, out)
+    choose(a > 0)
+        out = 1
+    else
+        out = 0
+´´´
+
 
 # Advanced (Semi-stable)
 
@@ -56,6 +70,13 @@ function ch1(a, r)
 ´if´ is part of a declarative style. It may use operators like 'dif' or 'if_' internally. There are caveats.
 
 ´´´
+//equality in condition is converted to 'if_'
+rel ch2(a, r)
+    if(a = 0)
+        r = 'pos'
+    else
+        r = 'neg'
+
 rel ch1(a, r)
     if(a > 0)
         r = 'pos'
@@ -63,4 +84,4 @@ rel ch1(a, r)
         r = 'neg'
 ´´´
 
-**Note (compiler issue):** ´if´ is slow for complex goals, e.g. ´if(walkable(x)) ...´. Can be used for simple equality/inequality. 
+**Note (compiler issue):** ´if´ is slow for complex goals, e.g. ´if(walkable(x)) ...´. Can be used for simple equality/inequality.

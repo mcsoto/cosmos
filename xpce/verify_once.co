@@ -1,0 +1,30 @@
+// Verifies that an event reaches the callbacks exactly ONCE.
+//
+// The window is resized when it opens, and XPCE delivers that as a real
+// event.  The tick used to fire the callbacks with the whole queue on every
+// frame, so this callback used to run on every single frame, for ever.
+//
+// Run it and watch how many times the line appears: it should be a handful
+// at the start-up and then stop.
+
+require('space', sp)
+
+rel update(_dt, s, s2)
+	s2 = s
+
+rel resize(w, h, s, s2)
+	print(['resize ', w, 'x', h])
+	s2 = s
+
+rel keypressed(key, s, s2)
+	print(['key ', key])
+	s2 = s
+
+rel draw(s)
+	g = sp.graphics
+	g.clear('#101018')
+	g.setColor('#ffffff')
+	g.print('verify-once', 10, 10)
+
+sp.init(640, 480)
+sp.start(16, {update=update and draw=draw and resize=resize and keypressed=keypressed}, {n=0})

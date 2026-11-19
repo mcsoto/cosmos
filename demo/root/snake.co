@@ -8,10 +8,10 @@ cell=24
 board=480
 step_ms=140
 
+// The body is a list of [x,y] cells, head first.  It grows when the snake
+// eats and loses its last cell when it moves without eating.
 initial={
-    head_x=10 and head_y=10
-    body1_x=9 and body1_y=10
-    body2_x=8 and body2_y=10
+    body=[[10,10],[9,10],[8,10]]
     food_x=14 and food_y=10
     dir_x=1 and dir_y=0
     next_x=1 and next_y=0
@@ -24,26 +24,47 @@ rel reset(s)
 rel same(x1,y1,x2,y2)
     x1=x2 and y1=y2
 
-rel occupied(s,x,y)
-    same(x,s.head_x,y,s.head_y) or
-    same(x,s.body1_x,y,s.body1_y) or
-    same(x,s.body2_x,y,s.body2_y)
+// Build a whole state from its parts.  Keeping the field list in one
+// place means tick and apply_key cannot forget a field in one branch.
+rel make_state(body,food_x,food_y,dir_x,dir_y,next_x,next_y,score,game_over,win,s2)
+    s2={body=body and food_x=food_x and food_y=food_y and dir_x=dir_x and dir_y=dir_y and next_x=next_x and next_y=next_y and score=score and game_over=game_over and win=win}
 
-rel place_food(s,x,y)
+// Is (x,y) one of the cells in the body?  An empty list answers false.
+rel hits(body,x,y)
+    body=[[cx,cy]|rest]
+    if(cx=x and cy=y)
+        true
+    else
+        hits(rest,x,y)
+
+// Drop the last cell; that is the tail the snake leaves behind when it
+// moves without eating.
+rel drop_last(l,l2)
+    if(l=[])
+        l2=[]
+    else
+        l=[h|t]
+        if(t=[])
+            l2=[]
+        else
+            l2=[h|r]
+            drop_last(t,r)
+
+rel place_food(body,x,y)
     math.random(1,18,x)
     math.random(1,18,y)
-    when(occupied(s,x,y))
-        place_food(s,x,y)
+    when(hits(body,x,y))
+        place_food(body,x,y)
 
 rel apply_key(key,s,s2)
-    if(key='up' and s.dir_y!=1)//(key!=up or s.dir_y=1)
-        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=0 and dir_y=-1 and next_x=0 and next_y=-1 and score=s.score and game_over=s.game_over and win=s.win}
+    if(key='up' and s.dir_y!=1)
+        make_state(s.body,s.food_x,s.food_y,0,-1,0,-1,s.score,s.game_over,s.win,s2)
     elseif(key='down' and s.dir_y!=-1)
-        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=0 and dir_y=1 and next_x=0 and next_y=1 and score=s.score and game_over=s.game_over and win=s.win}
+        make_state(s.body,s.food_x,s.food_y,0,1,0,1,s.score,s.game_over,s.win,s2)
     elseif(key='left' and s.dir_x!=1)
-        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=-1 and dir_y=0 and next_x=-1 and next_y=0 and score=s.score and game_over=s.game_over and win=s.win}
+        make_state(s.body,s.food_x,s.food_y,-1,0,-1,0,s.score,s.game_over,s.win,s2)
     elseif(key='right' and s.dir_x!=-1)
-        s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=1 and dir_y=0 and next_x=1 and next_y=0 and score=s.score and game_over=s.game_over and win=s.win}
+        make_state(s.body,s.food_x,s.food_y,1,0,1,0,s.score,s.game_over,s.win,s2)
     elseif(key='r' and s.game_over=True)
         s2=initial
     else
@@ -53,17 +74,25 @@ rel tick(s,s2)
     if(s.game_over=True)
         s2=s
     else
-        nx=s.head_x+s.next_x
-        ny=s.head_y+s.next_y
+        body=s.body
+        body=[head|_]
+        head=[hx,hy]
+        nx=hx+s.next_x
+        ny=hy+s.next_y
         if(nx<0 or nx>=grid or ny<0 or ny>=grid)
-            s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score and game_over=True and win=False}
-        elseif(same(nx,ny,s.body1_x,s.body1_y) or same(nx,ny,s.body2_x,s.body2_y))
-            s2={head_x=s.head_x and head_y=s.head_y and body1_x=s.body1_x and body1_y=s.body1_y and body2_x=s.body2_x and body2_y=s.body2_y and food_x=s.food_x and food_y=s.food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score and game_over=True and win=False}
+            make_state(s.body,s.food_x,s.food_y,s.next_x,s.next_y,s.next_x,s.next_y,s.score,True,False,s2)
+        elseif(hits(s.body,nx,ny))
+            make_state(s.body,s.food_x,s.food_y,s.next_x,s.next_y,s.next_x,s.next_y,s.score,True,False,s2)
         elseif(same(nx,ny,s.food_x,s.food_y))
-            place_food(s,food_x,food_y)
-            s2={head_x=nx and head_y=ny and body1_x=s.head_x and body1_y=s.head_y and body2_x=s.body1_x and body2_y=s.body1_y and food_x=food_x and food_y=food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score+1 and game_over=False and win=False}
+            // Eat: add the new head and keep the tail, so the body grows.
+            grown=[[nx,ny]|s.body]
+            place_food(grown,food_x,food_y)
+            make_state(grown,food_x,food_y,s.next_x,s.next_y,s.next_x,s.next_y,s.score+1,False,False,s2)
         else
-            s2={head_x=nx and head_y=ny and body1_x=s.head_x and body1_y=s.head_y and body2_x=s.body1_x and body2_y=s.body1_y and food_x=s.food_x and food_y=s.food_y and dir_x=s.next_x and dir_y=s.next_y and next_x=s.next_x and next_y=s.next_y and score=s.score and game_over=False and win=False}
+            // Move: add the new head and drop the last cell.
+            grown=[[nx,ny]|s.body]
+            drop_last(grown,shrunk)
+            make_state(shrunk,s.food_x,s.food_y,s.next_x,s.next_y,s.next_x,s.next_y,s.score,False,False,s2)
 
 // The XPCE backend has no `keypressed` callback name: input is polled from
 // the event queue inside update, and apply_key is fed from it, one key at a
@@ -94,18 +123,37 @@ rel draw_cell(x,y,color)
     sp.graphics.setColor(color)
     sp.graphics.rectangle('fill',x*cell+1,y*cell+1,cell-2,cell-2)
 
+rel draw_body(body)
+    if(body=[])
+        true
+    else
+        body=[c|rest]
+        c=[x,y]
+        draw_cell(x,y,'#42d99a')
+        draw_body(rest)
+
 rel render(s)
     sp.graphics.setColor('#0b1220')
     sp.graphics.rectangle('fill',0,0,board,board)
     draw_cell(s.food_x,s.food_y,'#ff6b6b')
-    draw_cell(s.body2_x,s.body2_y,'#2fbf87')
-    draw_cell(s.body1_x,s.body1_y,'#42d99a')
-    draw_cell(s.head_x,s.head_y,'#b4ffe2')
+    draw_body(s.body)
+    body=s.body
+    body=[head|_]
+    head=[hx,hy]
+    draw_cell(hx,hy,'#b4ffe2')
     if(s.game_over=True)
         sp.graphics.setColor('#182235')
-        sp.graphics.rectangle('fill',120,216,240,48)
+        sp.graphics.rectangle('fill',90,200,300,80)
+        sp.graphics.setColor('#f3c969')
+        sp.graphics.printf('GAME OVER',90,214,300,'center')
+        sp.graphics.setColor('#9bb7c6')
+        sp.graphics.printf('press R to restart',90,246,300,'center')
 
 sp.init(board,board)
 sp.start(step_ms,{
     update=update and draw=render
 },initial)
+
+require('xpce', xp)
+
+xp.main_loop(game)

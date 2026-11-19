@@ -1,0 +1,76 @@
+
+// Advance the simulation. dt is seconds since the previous frame; this demo
+// moves a fixed step per tick to match ui2.pl, so dt is unused.
+require('space2', sp)
+require('logic', logic)
+
+/*
+rel move(start o)
+	if(e.key='left' or e.key='left')
+		next o.x += 1
+	elseif(e.key='up' or e.key='w')
+		next o.y -= 1
+*/		
+
+functor(rgb, Functor Number Number Number)
+
+function move(key,!o)
+	if(key='left')
+		!o.x += 1
+	elseif(key='up')
+		!o.y -= 1
+		//move o->o
+function move2(key,!o)
+	(key='left' or key='right' or key='up' or key='down')
+	!o.dir = key
+	
+function update(_dt, In s, s2)
+	if(s.dir='right')
+		s2 = {x = (s.x + 2) % 520 and y=0 and dir='right'}
+	else
+		s2 = {x = (s.x - 2) % 520 and y=0}
+	//s=s2
+	//print([o.x,o.y])
+	//sp.event.getType('keydown', keys)	and print(keys)
+	/*
+	events=sp.event.get()
+	//print(e)
+	//pl::write('|')	pl::writeln(e)
+	if(logic.bound(e))
+		print(e)
+	if(sp.keyboard.isDown('left'))
+		print(1)
+	for (e in events)
+		if(e.type!='mousemotion')
+			print(e)
+		if(e.type='keyup')
+			print([e.key,o,o2])
+			move(e.key,o,o2)//Out key
+			*/
+	//print(e.textinput)
+	//handle_key(d, key, e)
+	//move(key,o,o2)
+	
+rel mouseup(mx,my,s,s2)
+	print(['-mouse'])
+
+rel keypressed(key,s,s2)
+	print('-key')
+	print(key)
+	if(key='left')
+		update(s,{dir='left' and x=s.x},s2)
+	else
+		update(s,{dir='right' and x=s.x},s2)
+
+rel mousepressed(key, state, newState)
+	print('-')
+	
+// Paint one frame from the current state.
+rel draw(s)
+	g = sp.graphics
+	g.clear('#1b1b2f')
+	g.setColor('#3050ff')
+	g.rectangle('fill', s.x, 100, 80, 50)
+
+sp.init(640, 480)
+sp.start(16, {update=update and draw=draw and keypressed=keypressed and mouseup=mouseup}, {x=100 and y=0 and dir='right'})

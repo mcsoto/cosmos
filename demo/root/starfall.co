@@ -8,7 +8,9 @@ cell=40
 hud=40
 width=cols*cell
 height=rows*cell+hud
-tick_ms=130
+// The frame interval, in seconds: sp.startLoop takes seconds, like the
+// XPCE timer.
+tick=0.13
 
 initial={
     px=6 and py=9 and cores=0 and lives=3 and ended=0 and won=0
@@ -114,30 +116,12 @@ rel keypressed(key,s,s2)
     else
         s2=s
 
-// The XPCE backend has no `keypressed` callback name: input is polled from
-// the event queue inside update, and keypressed is fed from it, one key at a
-// time, threading the state through the keys.
-//
-// The queue is taken in one go and sorted out here.  getType/2 would keep
-// the events it was not asked for, and this demo never looks at them, so
-// they would pile up for ever.
+// The keys arrive through a CALLBACK: `keypressed` is registered in the
+// startLoop map under its own name, so the backend calls it once for every
+// key the user presses, and threads the state through it.  The world then
+// advances one step per frame.
 rel update(s,s2)
-    sp.event.get(events)
-    apply_events(events,s,s1)
-    step(s1,s2)
-
-// Apply every event of this frame to the running state.
-rel apply_events(events,s,s2)
-    if(events=[])
-        s2=s
-    else
-        events=[ev|rest]
-        kind=ev.type
-        if(kind='keydown')
-            keypressed(ev.key,s,s1)
-        else
-            s1=s
-        apply_events(rest,s1,s2)
+    step(s,s2)
 
 rel draw_star(x,y,color)
     px=(x-1)*cell
@@ -168,7 +152,7 @@ rel draw_player(s)
     sp.graphics.rectangle('fill',px+13,py+18,5,5)
     sp.graphics.rectangle('fill',px+22,py+18,5,5)
 
-rel draw_hud(s)
+function draw_hud(s)
     sp.graphics.setColor('#10172c')
     sp.graphics.rectangle('fill',0,0,width,hud)
     sp.graphics.setColor('#7dffd1')
@@ -224,7 +208,13 @@ rel draw(s)
         sp.graphics.setColor('#f5d06f')
         sp.graphics.rectangle('fill',168,228,144,7)
 
-sp.init(width,height)
-sp.start(tick_ms,{
-    update=update and draw=draw
-},initial)
+// The game relation opens the window.  The loop finds the windows that its
+// own goal created, so the window has to be opened inside the relation that
+// is handed to startLoop -- the same shape xp.main_loop/1 uses.
+rel game(_)
+    sp.init(width,height)
+    sp.open()
+
+sp.startLoop(tick, game, {
+    update=update and draw=draw and keypressed=keypressed
+}, initial)

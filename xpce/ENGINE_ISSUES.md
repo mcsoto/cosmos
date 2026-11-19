@@ -1,4 +1,4 @@
-# Cosmos engine and compiler issues found while building `misc/dungeon.co`
+# Cosmos engine and compiler issues found while building `xpce/dungeon.co`
 
 Everything below was reproduced against this checkout. Each item says how to
 reproduce it, what the symptom was, and what the fix or workaround is. The
@@ -255,7 +255,7 @@ underscores, and every ignored parameter has a name.
 
 ## 9. The `dirty` flag is never cleared, so the map is repainted every frame
 
-`misc/dungeon.co` - **fixed**
+`xpce/dungeon.co` - **fixed**
 
 The game is written to repaint only when a turn resolved:
 
@@ -378,6 +378,42 @@ list and re-asserting it.
 | `retractall/1` calls in `test4` | 16851 | 0 |
 ---
 
+## 12. A bare `cosmos -c file.co` produces a `.pl` that cannot be run
+
+`compiler/platform/driver.pl` only appends the launch entry - the code that
+loads `libs/space_xpce_prolog.pl` and then calls the file's top-level goals -
+when an entry kind is asked for:
+
+```prolog
+compiler_compile_application(Stage, Input, Output, Module, Entry, Executable) :-
+    compiler_compile_file(Stage, Input, Output, Module),
+    (   Entry == none -> true
+    ;   compiler_add_entry(Output, Module, Entry)
+    ),
+```
+
+`Entry` is `main` for `--main` and `xpce` for `--xpce`; a plain `-c` leaves
+it at `none`.  So a Space program compiled with `-c` has no entry, and running
+it dies with:
+
+```
+ERROR: [Thread main] apply/2: Unknown procedure: space_xpce_init/3
+```
+
+The backend is simply never loaded, so the error names a procedure from it.
+The same file compiled with `-c ... --xpce` runs, and so does
+`cosmos -l file.co --xpce`, which recompiles with the entry.
+
+**The symptom is confusing because it is silent in the other direction too:**
+the generated entry is what *calls* the file's top-level goals, so a program
+without it does not merely lose the backend - it does not start at all, and
+nothing is written to stderr.
+
+**Workaround:** compile the Space programs with `--xpce` (the `.pl` files in
+`xpce/` are compiled that way), and run them with `-l file.co --xpce`.
+
+---
+
 ## Optimisation notes
 
 * **`choose` instead of `if` when the condition is a call.** `if` runs the
@@ -410,7 +446,7 @@ list and re-asserting it.
   based game should do its work in `update` and leave `draw` cheap.
 
 These notes are backed by measurements now: `docs/PROFILING.md` has the
-profiles of `test4` and `misc/dungeon.co`, the reports are in
+profiles of `test4` and `xpce/dungeon.co`, the reports are in
 `docs/profiles/`, and the profiler itself is `--profile` (see the same
 document).
 

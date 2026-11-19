@@ -1,0 +1,1 @@
+t("module","ws_check",<,t("fields",t,-,t("exports",t,-,t,t),t("format",1.0,-,t,t)),t("schemas",t("t",t("kind","constructor",-,t("fields",[fc_Entry(fc_LiteralExpr("update",fc_Loc(2.0,2.0)),fc_VarExpr("update",fc_Loc(2.0,9.0))),fc_Entry(fc_LiteralExpr("draw",fc_Loc(3.0,2.0)),fc_VarExpr("draw",fc_Loc(3.0,7.0)))],-,t,t),t("location",fc_Loc(1.0,1.0),-,t,t)),-,t,t),-,t,t)).

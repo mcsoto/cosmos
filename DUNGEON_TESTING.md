@@ -1,11 +1,17 @@
 # Dungeon - a Space tile crawler
 
-`misc/dungeon.co` is a turn-based dungeon crawler written against the Space
-library (`require('space', sp)`) and the Cosmos language.
+`xpce/dungeon.co` is a turn-based dungeon crawler written against the Space
+library (`require('space2', sp)`) and the Cosmos language.
 
 ```
-cosmos -l misc/dungeon.co --xpce
+cosmos -l xpce/dungeon.co --xpce
 ```
+
+The `--xpce` is not optional.  It is what makes the compiler emit the launch
+entry - the code that loads the backend and then runs the file's top-level
+goals.  A bare `cosmos -c file.co` leaves a `.pl` without that entry, and
+running that one dies with `Unknown procedure: space_xpce_init/3`, because the
+backend is never loaded.
 
 Collect the six gems, then reach the exit.  Enemies hunt by scent: once per turn
 the game builds a **breadth-first flow field** rooted at the player's tile - the
@@ -21,11 +27,11 @@ enough away and the scent goes cold, which is the whole tactic.
 | G | toggle the scent overlay (the cells the pack can currently smell) |
 | P | hand the controls to autoplay |
 | R | restart |
-| Q | quit - see issue 1 in `docs/ENGINE_ISSUES.md`, this does not work yet |
+| Q | quit - see issue 1 in `xpce/ENGINE_ISSUES.md`, this does not work yet |
 
 ## The level
 
-`misc/dungeon.co` holds the level as a list of row strings.  The characters
+`xpce/dungeon.co` holds the level as a list of row strings.  The characters
 are:
 
 | character | meaning |
@@ -65,17 +71,65 @@ recursive call.
 ## Verifying it
 
 The game is verified by letting it play itself.  Set `autoplayFlag` to 1 (and
-`traceFlag` to 1) in `misc/dungeon.co` and run it; the trace is written to
+`traceFlag` to 1) in `xpce/dungeon.co` and run it; the trace is written to
 `dungeon_log` in the working directory:
 
 ```
-turn=21.0 gems=4.0 pos=15.0,15.0 over=1.0 won=0.0 status=Caught. Press R to try again.
+turn=28.0 gems=4.0 pos=15.0,15.0 over=1.0 won=0.0 status=Caught. Press R to try again.
 ```
+
+The turn and the cell in that line vary from run to run; the outcome does not.
 
 `dungeon_log` rather than stdout, because the game loop never returns and
 buffered stdout is lost when the process is stopped.  Writing it needs
-`pl::open/4` with real Prolog atoms - `docs/ENGINE_ISSUES.md` issue 2 has the
+`pl::open/4` with real Prolog atoms - `xpce/ENGINE_ISSUES.md` issue 2 has the
 details.
+
+Two things about the trace:
+
+* **It writes one line per frame, not per turn.**  `diag/1` is called at the
+  top of the update, so a frame that changes nothing still writes a line.
+* **The trace slows the game down.**  Every line opens the file, appends and
+  closes it again, and the game logic already costs about three seconds per
+  turn (see "How slow is it" below), so a traced run takes minutes to reach
+  the end of a game.
+
+The end of the game can also be reached without a window and without the
+trace, by driving the compiled `update` relation from Prolog - this is what
+`test/dungeon_autoplay.pl` does:
+
+```
+swipl -q -g "main" -t "halt" test/dungeon_autoplay.pl
+```
+
+It prints the same lines and it checks that the pack catches the player.
+
+### How slow is it
+
+One turn of the autoplay costs about **3 seconds**, and the cost is in the
+game logic, not in the drawing:
+
+| what | how long |
+| --- | --- |
+| one `flow_field` sweep (a breadth-first distance field over the 28x19 map) | 1.4 s |
+| one turn (two sweeps: the scent field and the objective field) | 3.0 s |
+| one `tile_at` (reading one cell) | 0.15 ms |
+| one `lst_put` at the end of a 532 element list | 2.3 ms |
+
+The sweep is dominated by two things.  The distance field is a plain list and
+`dist_put/6` writes through `lst_put/4`, which copies the list up to the
+index, so filling the field is quadratic - 532 writes of up to 532 elements
+each, about half a second of the sweep.  The rest is the per-neighbour
+`walkable` check, which reads one character through a host call; the BFS asks
+for four neighbours per cell, so that is another few hundred milliseconds.
+
+A mutable field, or a difference array, would make the field linear, and
+reading the map once into a table of characters would remove the host calls.
+
+
+This is pre-existing and unchanged by the callback rewrite: the pathfinding
+code is identical in `xpce/dungeon.co` and in `xpce/dungeon_queue.co`.
+
 
 What was checked, and how:
 
@@ -89,22 +143,57 @@ What was checked, and how:
 | the exit is locked until the gems are gone | on the exit with gems left, the status is `Gems left: n` and `won` is 0 |
 | the win is detected | on the exit with no gems left, `won` is 1, `over` is 1, and the status is `Escaped in n turns` |
 | the state is threaded through the loop | the turn counter advances, and the position and gem count change with it |
+| the keys arrive through the callback | `test/dungeon_input.pl`: a press lands on the queue, the queue keeps the order the keys were typed, one key is played per frame, a press moves the player one cell, a restart puts the turn counter back to zero |
+| the autoplay ends in a capture | `test/dungeon_autoplay.pl`: the game ends with the player caught, `over` is 1, `won` is 0, and the status says `Caught` |
 
 Two things the autoplay does *not* do: it does not win, and it does not
 survive.  It walks straight at the objective and the pack catches it.  That is
 the expected outcome of a greedy pathfinder in a game with hunters, not a
 defect in the search - the search is verified by the distance checks above.
+The turn it is caught on varies between runs (21 in the old run, 28 in the
+runs since), and so does the cell: the enemies that are out of scent walk with
+`rand_dir/2`, which draws from the random generator, so the pack closes in at
+a slightly different place and time each time.  What does not vary is the
+outcome: the player is caught, `over` is 1, `won` is 0, and the status says
+`Caught`.
+
+## How the keys get in
+
+The keys arrive through a **callback**.  `keypressed` is registered in the
+`sp.start` map under its own name, the way `xpce/test1.co` does it:
+
+```
+sp.start(16, {update=update and draw=draw and keypressed=keypressed}, gameState)
+```
+
+The backend calls it once for every key the user presses and hands it the key
+name and the state; the callback returns the new state.  The game is turn
+based, so one key press is one turn: the callback *appends* the key name to
+the queue in the state, and the update takes one key off the queue per frame.
+
+Two things follow from that:
+
+* **The queue keeps the order the keys were typed.**  Appending, not
+  prepending: a burst of three keys is played in the order it was typed.
+* **The backend delivers every event exactly once.**  The polling queue is
+  only peeked at, so `sp.event.get()` still finds an event that the callback
+  has already seen.  A program that uses both styles sees the event twice.
+
+`xpce/dungeon_queue.co` is the same game in the older shape: it polls the
+event queue with `sp.event.getType('keydown', ...)` every frame and keeps the
+keydown EVENT TABLES in the queue.  It is kept as the reference for the old
+shape; `xpce/dungeon.co` is the one to run.
 
 ## Things that will bite you if you edit this file
 
 Most of them are compiler behaviour rather than game design; they are collected
-in `docs/ENGINE_ISSUES.md`.  The ones that shaped the code here:
+in `xpce/ENGINE_ISSUES.md`.  The ones that shaped the code here:
 
 * **The `dirty` flag says the next draw has to repaint.**  The update clears
   it, because by the time the update runs the draw of the frame before it has
   already happened; the first frame and every 45th one keep it set.  When the
   flag was never cleared the whole map was redrawn every frame - 762 XPCE
-  rectangles a frame and 4.5 fps.  See `docs/ENGINE_ISSUES.md` issue 9;
+  rectangles a frame and 4.5 fps.  See `xpce/ENGINE_ISSUES.md` issue 9;
   `docs/PROFILING.md` has the measurement.
 * **A table field must not be compared inside a condition.**  `if(s.gems = [])`
   writes to the state instead of testing it, and empties the gem list.  Every

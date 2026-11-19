@@ -1,3 +1,36 @@
+Everything is in place. Here's where the work landed.
+
+## The four capabilities
+
+**1. Modifier keys are now visible** — as events *and* via `isDown`.
+
+XPCE never delivers events for modifier keys (its own manual says a modifier "generates neither"), so the backend synthesises them: a modifier going down produces an ordinary `keydown` event whose `key` is the modifier name, and letting go produces the matching `keyup`. Modifier state is tracked from the event's button mask (control `0x1`, shift `0x2`, meta `0x4`) combined with a per-frame keyboard-device poll.
+
+Per your instruction, the vocabulary is XPCE-native — `shift`, `ctrl`, `alt`, with `control`/`meta` as synonyms and **no** `'Left Shift'`-style aliases; arrows remain the only alias exception. The SDL names exist purely internally to speak to the XPCE device. There is deliberately **no** `gui` modifier: the event mask has no bit for it and this build's device doesn't know the key name, so polling it raises an XPCE error that kills the frame.
+
+**2. Top-level callbacks now fire.** `keypressed`, `keyreleased`, `mousepressed`, `mousereleased`, `mousemoved`, `wheel`, `textinput`, `focus`, `blur`, `resize` are dispatched from the `sp.start` map under their own names. The state is threaded through them and `update` runs with whatever state they left. The legacy `mousedown`/`mouseup` forms are dispatched without the button argument, and the `"on"` handler map keeps working unchanged.
+
+**3. `rgb(...)` functor accepted** in `setColor`, `clear` and `setBackgroundColor` — `rgb(255,0,0)` and `rgba(r,g,b,a)`. The functor is exported from `libs/space.co`, so programs that `require('space', sp)` can use it without declaring it. This also fixed a pre-existing bug: `space_xpce_colour_string/2` used an invalid `format/2` pattern that raised `format_character '.' does not exist` for every non-string colour.
+
+**4. Event-queue companions added**: `sp.event.clear()`, `clearType(type)`, `has(type,found)`, `count(type,n)`, `size(n)`, alongside the already-fixed `getType`.
+
+## Verification
+
+- `test/space_xpce_input.pl` — 43 checks, **all pass**. One check needed fixing: it still asserted a four-name modifier list including `gui`, which contradicts your "keep to the XPCE API" decision; it now asserts the set is exactly `{shift, ctrl, alt}`.
+- `xpce/input.co` runs under `--xpce`: prints `color,#ff0000`, and `sp.event.size()`/`sp.event.has()` report correctly.
+- Your `xpce/test.co` runs clean — only `resize` events, no phantom key presses, empty stderr.
+- `libs/space.co`, `libs/space_xpce.co`, `xpce/input.co`, `xpce/test.co` all compile; `.pl`/`.cif` regenerated. `compiler/` untouched.
+
+## Docs
+
+`XPCE_SIMPLE_LIBRARY.md` §5 gained the modifier table, the `rgb()`/`rgba()` colour forms, the expanded `sp.event` table (`clear`/`clearType`/`has`/`count`/`size`), the event field table with `dx`/`dy`, and a rewritten callbacks section covering both the named callbacks and the `on` table. `docs/space-api.md` gained an `## Events` section (it had none), the `rgb()` colour forms, the modifier names, and the callback registration/state-threading semantics.
+
+## Two things I could not prove here
+
+Synthetic keystrokes never reach the XPCE window in this environment — `SendInput`/`keybd_event` produced only `resize`/`focus`/`blur`, no key events at all. So **the modifier delivery and `keypressed` need a manual check with real key presses on your machine**; they're covered by the Prolog suite but not end-to-end here. Second, `meta` is mapped to the physical **Alt** key (mask bit `0x4`), which follows XPCE's own modifier naming but I couldn't confirm empirically for the same reason.
+
+==
+
 The report is too categorical. XPCE is primarily a GUI toolkit, but that does not mean it lacks mouse and keyboard input. It supports GUI events, including button presses, keyboard input, and pointer interaction.
 
 The distinction is between two different approaches:

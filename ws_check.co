@@ -1,0 +1,4 @@
+t={
+	update=update
+	draw=draw
+}

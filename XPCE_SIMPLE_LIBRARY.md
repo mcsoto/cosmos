@@ -81,7 +81,25 @@ shape.
 sp.init(width, height)                    size the window (created on start)
 sp.start(intervalMs, callbacks, state)     fixed interval, in milliseconds
 sp.startCanvas(fps, callbacks, state)      fixed frame rate, in frames/second
+sp.startLoop(seconds, game, callbacks, s)  fixed interval, in seconds, with
+                                          a game relation that opens the window
 ```
+
+`sp.startLoop` is the `xp.main_loop/1` shape: the program owns the window.
+The `game` relation runs inside the loop's own goal — the loop only dispatches
+windows that goal created — so it is where `sp.init` and `sp.open` go:
+
+```cosmos
+rel game(_)
+    sp.init(640, 480)
+    sp.open()
+
+sp.startLoop(0.13, game, {update=update and draw=draw}, initial)
+```
+
+The interval is in **seconds** here, unlike `start`'s milliseconds, because it
+is the XPCE timer interval. `sp.start` and `sp.startLoop` both end in
+`pce_main_loop/1`: closing the window ends the process.
 
 `callbacks` is a table with up to two entries, both optional:
 
@@ -90,11 +108,26 @@ sp.startCanvas(fps, callbacks, state)      fixed frame rate, in frames/second
 | `update` | `update(dt, state, newState)` | once per frame, before drawing; binds `newState` |
 | `draw` | `draw(state)` | once per frame, with the state `update` produced |
 
+It may also hold the **input callbacks** — `keypressed`, `keyreleased`,
+`mousepressed`, `mousereleased`, `mousemoved`, `wheel`, `textinput`,
+`focus`, `blur` and `resize`. They are called with the arguments the Space
+API documents for them (see §5), before `update` runs for that frame:
+
+```cosmos
+rel keypressed(key, state, newState)
+    newState = state
+
+sp.start(33, {update=update and draw=draw and keypressed=keypressed}, s)
+```
+
 Semantics that matter:
 
 - **`dt` is in seconds**, not milliseconds, even though `start` takes
   milliseconds. It comes from `get_time/1`. Multiply your per-second rates by
-  `dt` to stay frame-rate independent.
+  `dt` to stay frame-rate independent. It is also **clamped** to a few frame
+  intervals, so a callback that took a long time — a long print, a slow disk
+  write — cannot hand the next frame a huge step and make a game jump across
+  the screen.
 - If `update` is omitted, state passes through unchanged. If `draw` is omitted,
   the frame is cleared and nothing is painted.
 - **The window is cleared and flushed around `draw`, automatically.** You do
@@ -124,8 +157,10 @@ is the mouse.
 
 | Call | Notes |
 | --- | --- |
-| `sp.init(width, height)` | Size in pixels. The window is created on `start`, or resized if one already exists. |
+| `sp.init(width, height)` | Size in pixels. The window is created on `start`, or by `sp.open()` inside a `startLoop` game relation; it is resized if one already exists. |
+| `sp.open()` | Create the window. Only needed by the `startLoop` shape, from inside the game relation. |
 | `sp.start(intervalMs, callbacks, state)` | Fixed-interval loop. |
+| `sp.startLoop(seconds, game, callbacks, state)` | Fixed-interval loop whose `game(_)` relation opens the window; interval in seconds. |
 | `sp.startCanvas(fps, callbacks, state)` | Fixed-fps loop; `intervalMs = 1000/fps`. |
 | `sp.quit()` | End the process. Same as closing the window. |
 | `sp.dispose()` | Currently just another name for `quit`. |
@@ -166,6 +201,20 @@ is the mouse.
 
 `mode` is `'fill'` or `'line'`. Fill also strokes the outline.
 
+Every method that takes a colour takes it in any of the forms below:
+
+```cosmos
+g.setColor('#ff0000')
+g.setColor([255, 0, 0])
+g.setColor(1, 0, 0)
+g.setColor(rgb(255, 0, 0))
+```
+
+The `rgb(...)` functor is exported by the library, so a program that requires
+`'space'` can write it without declaring the functor itself. `rgba(r, g, b, a)`
+is accepted as well. A component of `1` or less is a normalized value, a
+larger one is a byte; if any component is a byte, all of them are.
+
 ### `sp.input` / `sp.keyboard` / `sp.mouse`
 
 `sp.keyboard.isDown/1` **polls** XPCE's keyboard device, so it answers from the
@@ -188,6 +237,38 @@ number above or as the name `'left'`, `'right'`, `'middle'`.
 Held keys and buttons are cleared when the window loses the keyboard focus, so
 a key that was down at that moment does not stay "down" for ever.
 
+#### Modifier keys
+
+The three modifiers have XPCE-native names:
+
+| Name | Synonyms | The key |
+| --- | --- | --- |
+| `'shift'` | — | either shift key |
+| `'ctrl'` | `'control'` | either control key |
+| `'alt'` | `'meta'` | either alt key |
+
+There is **no** `'gui'` modifier. XPCE's event mask has no bit for it and its
+keyboard device does not know the name of the key, so asking about it raises
+an XPCE error — and an error inside the event loop stops the frame for good.
+
+Because XPCE delivers **no** events for the modifier keys, the backend
+synthesises them: a modifier that goes down produces an ordinary `'keydown'`
+event whose `key` is the modifier name, and letting go produces the matching
+`'keyup'`. So a modifier is visible in three places:
+
+```cosmos
+rel keypressed(key, s, s2)
+    // key is 'shift', 'ctrl' or 'alt' for a modifier
+    s2 = s
+
+rel update(dt, s, s2)
+    sp.keyboard.isDown('shift', down)   // 1 while shift is held
+    s2 = s
+```
+
+The `mod` field of any event carries the modifiers that were held when it
+happened, as the PyGame-style string `"s"`, `"c"`, `"m"` (`""` for none).
+
 ### `sp.event` - the PyGame-style queue
 
 Input arrives as callbacks into the backend and is queued here; `isDown/1` is
@@ -198,12 +279,22 @@ the exception and polls the keyboard device directly.
 | `get(events)` | Drains everything delivered since the last call. |
 | `getType(type, events)` | Drains only events of one kind; the others stay queued. |
 | `peek(events)` | Does **not** drain. This is what the frame tick uses. |
+| `clear()` | Throws every pending event away without handing it over. |
+| `clearType(type)` | Throws the pending events of one type away; the rest stay queued. |
+| `has(type, found)` | `found` is `1` when an event of that type is waiting, `0` otherwise. |
+| `count(type, n)` | How many pending events of that type. |
+| `size(n)` | How many pending events in all. |
+
+The queue holds at most 256 events. A program that polls drains it every
+frame and never gets near the limit; a program that only uses the callbacks
+never drains it at all, and the oldest event is the one dropped when the
+queue overflows.
 
 Each event is a table with at least a `type` field:
 
 | `type` | Extra fields |
 | --- | --- |
-| `'mousemotion'` | `posx` `posy` `x` `y` `button` `clicks` `mod` |
+| `'mousemotion'` | `posx` `posy` `x` `y` `dx` `dy` `button` `clicks` `mod` |
 | `'mousedown'` | as above |
 | `'mouseup'` | as above |
 | `'mousewheel'` | as above, plus `wheel` (the scroll amount in notches) |
@@ -223,6 +314,9 @@ A field an event does not carry reads back as `null` rather than failing, so
 shift+A arrives as `key='a'`, `char='A'`, `mod='s'`. A `'keyup'` carries the
 same `key` name as the `'keydown'` it ends.
 
+`dx` and `dy` are the movement since the previous mouse event, so they are
+`0` on the first one the backend sees.
+
 ```cosmos
 rel update(_dt, s, s2)
     sp.event.get(events)
@@ -232,8 +326,46 @@ rel update(_dt, s, s2)
 
 ### Callbacks (Love2D style)
 
-Pass an `on` table to `sp.start` and each event of that type is handed to the
-relation, before `update` runs for that frame:
+There are two ways to be told about an event.
+
+**As a named callback.** Put the relation under its own name in the `sp.start`
+table and the backend calls it for every event of that kind, before `update`
+runs for that frame:
+
+```cosmos
+rel keypressed(key, state, newState)
+    newState = state
+
+sp.start(33, {update=update and draw=draw and keypressed=keypressed}, s)
+```
+
+The names are `keypressed`, `keyreleased`, `mousepressed`, `mousereleased`,
+`mousemoved`, `wheel`, `textinput`, `focus`, `blur` and `resize`. The
+arguments are:
+
+| Callback | Arguments |
+| --- | --- |
+| `keypressed(key, state, newState)` | the key name |
+| `keyreleased(key, state, newState)` | the key name |
+| `mousepressed(x, y, button, state, newState)` | |
+| `mousereleased(x, y, button, state, newState)` | |
+| `mousemoved(x, y, dx, dy, state, newState)` | `dx`/`dy` are the movement |
+| `wheel(dx, dy, state, newState)` | the scroll amount |
+| `textinput(text, state, newState)` | the typed text |
+| `focus(state, newState)` | |
+| `blur(state, newState)` | |
+| `resize(width, height, state, newState)` | |
+
+A callback that does not care about the state may leave the last two
+arguments out, and one that does not care about anything else may take only
+the first ones. The state is **threaded**: a callback that produces a new
+state hands it to the next callback, and `update` runs with the state the
+input callbacks left behind.
+
+The legacy names `mousedown` and `mouseup` are accepted as well; they get no
+button argument, because the old relations are `(x, y, state, newState)`.
+
+**As an `on` table.** Pass a table of per-type handlers instead:
 
 ```cosmos
 rel on_keydown(ev)
@@ -242,8 +374,14 @@ rel on_keydown(ev)
 sp.start(33, {update=update and draw=draw and on={keydown=on_keydown}}, s)
 ```
 
-The tick **peeks** at the queue for this, so a polling program that drains
-with `get()` decides which frame sees which event.
+Here the relation receives the whole event table.
+
+Both work at the same time. Every event reaches the callbacks **exactly
+once** — the tick fires the events the callbacks have not seen yet, not the
+whole queue — and the queue itself is only peeked at, so a polling program
+that drains with `get()` still finds the event. Using both styles in one
+program means seeing the event twice: once as a callback and once from the
+queue.
 
 ### `sp.timer`
 
@@ -255,8 +393,11 @@ with `get()` decides which frame sees which event.
 
 ## 6. Drawing conventions
 
-- **Colours** are `'#rrggbb'` strings or `[R,G,B]` numeric lists. Anything
+- **Colours** are `'#rrggbb'` strings, `[R,G,B]` numeric lists, or the
+  `rgb(r,g,b)` / `rgba(r,g,b,a)` functors the library exports. Anything
   else silently becomes **white** — a mistyped colour will not raise.
+  A component of `1` or less is normalized, a larger one is a byte; if any
+  component is a byte, all of them are.
 - **Images** are loaded by XPCE's `image/1`, so the format support is XPCE's:
   GIF, JPEG and XPM work, PNG needs `library(pce_image)`. A path that cannot be
   loaded is swallowed, so `loadImage` succeeds and `draw` then shows nothing.
@@ -307,6 +448,18 @@ re-exporting a `require`d module directly does not work — the compiler records
 no members for it. See `compiler_issue.txt`. **If you add a method to
 `space_xpce.co`, add a matching forwarder to `space.co`**, or it stays invisible
 to anyone requiring `'space'`.
+
+The forwarder also has to be listed in the `export({...})` table at the bottom of
+`space.co`. A relation that is missing there still compiles and appears in
+`space.pl`, but `sp.<name>` is not a member at runtime and the *whole* program
+fails with only `CosmosError: Program didn't return successfully` — there is no
+compile-time warning. (That is what happened to `sp.open` and `sp.startLoop`.)
+`test/space_exports.pl` checks the table against the relations, and the checked-in
+`space.pl` against the table:
+
+```powershell
+swipl -q -g main -t halt test/space_exports.pl
+```
 
 ## 8. Build and run
 
